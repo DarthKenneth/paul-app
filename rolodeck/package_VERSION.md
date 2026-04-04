@@ -1,0 +1,16 @@
+# package.json — Version History
+
+**File:** `package.json`
+**Project:** Rolodeck (project v1.2)
+**Copyright:** © 2026 ArdinGate Studios LLC. All rights reserved.
+
+> JSON does not support inline comments. Version history is tracked here.
+
+## Change Log
+
+| Version | Date | Author | Description |
+|---------|------|--------|-------------|
+| v1.0 | 2026-04-03 | Claude | Initial scaffold — Expo 51 managed workflow, React Navigation v6 (stack + bottom tabs), AsyncStorage 1.23.1, DM Serif Display + DM Sans Google Fonts, @expo/vector-icons (Ionicons), react-native-gesture-handler |
+| v1.0.1 | 2026-04-03 | Claude | Added sharp ^0.33.0 to devDependencies and `icons` script (node scripts/generate-icons.js) — makes icon.svg the SVG source of truth for all PNG exports |
+| v1.1   | 2026-04-03 | Claude | Bumped version to 1.1.0 — project v1.1 feature release |
+| v1.2   | 2026-04-03 | Claude | Bumped version to 1.2.0, added jest + babel-jest + test script, added Jest config — debug/harden/optimize/futureproof release |

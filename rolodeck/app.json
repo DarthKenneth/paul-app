@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Rolodeck",
+    "slug": "rolodeck",
+    "scheme": "rolodeck",
+    "version": "1.3.0",
+    "orientation": "portrait",
+    "icon": "./store-assets/icons/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./store-assets/icons/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#C6ECEA"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ardingate.rolodeck"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./store-assets/icons/adaptive-icon-fg.png",
+        "backgroundColor": "#C6ECEA"
+      },
+      "package": "com.ardingate.rolodeck"
+    },
+    "web": {
+      "favicon": "./store-assets/icons/icon.png"
+    }
+  }
+}

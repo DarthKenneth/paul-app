@@ -1,0 +1,46 @@
+# Expo / React Native
+node_modules/
+.expo/
+dist/
+web-build/
+.expo-shared/
+
+# Build outputs
+android/
+ios/
+
+# Secrets & signing
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.suo
+.history/
+
+# Misc
+*.pem
+Thumbs.db

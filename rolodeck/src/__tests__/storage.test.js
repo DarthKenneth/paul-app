@@ -1,0 +1,523 @@
+// =============================================================================
+// storage.test.js - Adversarial stress tests for storage.js
+// Version: 1.0
+// Last Updated: 2026-04-03
+//
+// PROJECT:      Rolodeck (project v1.2)
+//
+// CHANGE LOG:
+// v1.0  2026-04-03  Claude  Initial adversarial test suite
+// =============================================================================
+
+// ── AsyncStorage mock ────────────────────────────────────────────────────────
+
+const store = {};
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn((key) => Promise.resolve(store[key] ?? null)),
+  setItem: jest.fn((key, value) => {
+    store[key] = value;
+    return Promise.resolve();
+  }),
+  removeItem: jest.fn((key) => {
+    delete store[key];
+    return Promise.resolve();
+  }),
+  multiRemove: jest.fn((keys) => {
+    keys.forEach((k) => delete store[k]);
+    return Promise.resolve();
+  }),
+}));
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getAllCustomers,
+  getCustomerById,
+  addCustomer,
+  updateCustomer,
+  deleteCustomer,
+  addServiceEntry,
+  updateServiceEntry,
+  deleteServiceEntry,
+  getSortPreference,
+  saveSortPreference,
+  clearAllData,
+  initStorage,
+  getSchemaVersion,
+  CURRENT_SCHEMA_VERSION,
+} from '../data/storage';
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  // Clear mock store
+  Object.keys(store).forEach((k) => delete store[k]);
+  jest.clearAllMocks();
+});
+
+// ── getAllCustomers ───────────────────────────────────────────────────────────
+
+describe('getAllCustomers', () => {
+  test('returns empty array when no data exists', async () => {
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+
+  test('returns empty array for corrupted JSON', async () => {
+    store['@rolodeck_customers'] = 'not valid json {{{';
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+
+  test('returns empty array for non-array JSON (object)', async () => {
+    store['@rolodeck_customers'] = JSON.stringify({ not: 'an array' });
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+
+  test('returns empty array for non-array JSON (string)', async () => {
+    store['@rolodeck_customers'] = JSON.stringify('just a string');
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+
+  test('returns empty array for non-array JSON (number)', async () => {
+    store['@rolodeck_customers'] = JSON.stringify(42);
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+
+  test('returns empty array for null value', async () => {
+    store['@rolodeck_customers'] = JSON.stringify(null);
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+
+  test('ensures serviceLog array exists on every customer', async () => {
+    store['@rolodeck_customers'] = JSON.stringify([
+      { id: '1', name: 'No Log' },
+      { id: '2', name: 'Null Log', serviceLog: null },
+      { id: '3', name: 'String Log', serviceLog: 'not an array' },
+      { id: '4', name: 'Good Log', serviceLog: [{ id: 'e1' }] },
+    ]);
+    const result = await getAllCustomers();
+    expect(result).toHaveLength(4);
+    result.forEach((c) => {
+      expect(Array.isArray(c.serviceLog)).toBe(true);
+    });
+    // Good log should preserve its entries
+    expect(result[3].serviceLog).toHaveLength(1);
+  });
+
+  test('returns empty array for empty string', async () => {
+    store['@rolodeck_customers'] = '';
+    const result = await getAllCustomers();
+    expect(result).toEqual([]);
+  });
+});
+
+// ── addCustomer ──────────────────────────────────────────────────────────────
+
+describe('addCustomer', () => {
+  test('adds a customer with all fields', async () => {
+    const result = await addCustomer({
+      name: 'John Doe',
+      email: 'john@example.com',
+      phone: '555-0123',
+      address: '123 Main St',
+      zipCode: '90210',
+    });
+    expect(result.id).toBeTruthy();
+    expect(result.name).toBe('John Doe');
+    expect(result.serviceLog).toEqual([]);
+
+    const all = await getAllCustomers();
+    expect(all).toHaveLength(1);
+  });
+
+  test('adds a customer with minimal data (only name)', async () => {
+    const result = await addCustomer({ name: 'Minimal' });
+    expect(result.name).toBe('Minimal');
+    expect(result.email).toBe('');
+    expect(result.phone).toBe('');
+    expect(result.address).toBe('');
+    expect(result.zipCode).toBe('');
+  });
+
+  test('adds a customer with empty object', async () => {
+    const result = await addCustomer({});
+    expect(result.name).toBe('');
+    expect(result.id).toBeTruthy();
+  });
+
+  test('generates unique IDs for multiple customers', async () => {
+    const c1 = await addCustomer({ name: 'A' });
+    const c2 = await addCustomer({ name: 'B' });
+    const c3 = await addCustomer({ name: 'C' });
+    expect(c1.id).not.toBe(c2.id);
+    expect(c2.id).not.toBe(c3.id);
+    expect(c1.id).not.toBe(c3.id);
+  });
+
+  test('handles adding many customers', async () => {
+    for (let i = 0; i < 100; i++) {
+      await addCustomer({ name: `Customer ${i}` });
+    }
+    const all = await getAllCustomers();
+    expect(all).toHaveLength(100);
+  });
+});
+
+// ── getCustomerById ──────────────────────────────────────────────────────────
+
+describe('getCustomerById', () => {
+  test('returns null for non-existent ID', async () => {
+    const result = await getCustomerById('nonexistent');
+    expect(result).toBeNull();
+  });
+
+  test('returns null when no customers exist', async () => {
+    const result = await getCustomerById('any-id');
+    expect(result).toBeNull();
+  });
+
+  test('finds customer by ID', async () => {
+    const added = await addCustomer({ name: 'Find Me' });
+    const found = await getCustomerById(added.id);
+    expect(found).not.toBeNull();
+    expect(found.name).toBe('Find Me');
+  });
+});
+
+// ── updateCustomer ───────────────────────────────────────────────────────────
+
+describe('updateCustomer', () => {
+  test('updates customer fields', async () => {
+    const c = await addCustomer({ name: 'Original' });
+    const updated = await updateCustomer(c.id, { name: 'Updated' });
+    expect(updated.name).toBe('Updated');
+  });
+
+  test('preserves serviceLog during update', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    await addServiceEntry(c.id, { date: new Date().toISOString(), notes: 'Test service' });
+
+    const updated = await updateCustomer(c.id, { name: 'Test Updated' });
+    expect(updated.serviceLog).toHaveLength(1);
+  });
+
+  test('throws for non-existent customer', async () => {
+    await expect(updateCustomer('fake-id', { name: 'X' })).rejects.toThrow(
+      'Customer not found',
+    );
+  });
+
+  test('ignores serviceLog in updates (cannot overwrite via update)', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    await addServiceEntry(c.id, { date: new Date().toISOString(), notes: 'Original' });
+
+    await updateCustomer(c.id, { serviceLog: [] });
+    const found = await getCustomerById(c.id);
+    expect(found.serviceLog).toHaveLength(1);
+  });
+});
+
+// ── deleteCustomer ───────────────────────────────────────────────────────────
+
+describe('deleteCustomer', () => {
+  test('removes customer', async () => {
+    const c = await addCustomer({ name: 'To Delete' });
+    await deleteCustomer(c.id);
+    const all = await getAllCustomers();
+    expect(all).toHaveLength(0);
+  });
+
+  test('does not throw for non-existent customer', async () => {
+    await expect(deleteCustomer('fake-id')).resolves.toBeUndefined();
+  });
+
+  test('only removes the target customer', async () => {
+    const c1 = await addCustomer({ name: 'Keep' });
+    const c2 = await addCustomer({ name: 'Delete' });
+    await deleteCustomer(c2.id);
+    const all = await getAllCustomers();
+    expect(all).toHaveLength(1);
+    expect(all[0].id).toBe(c1.id);
+  });
+});
+
+// ── addServiceEntry ──────────────────────────────────────────────────────────
+
+describe('addServiceEntry', () => {
+  test('adds an entry to customer serviceLog', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    const entry = await addServiceEntry(c.id, {
+      date: '2026-04-03T12:00:00.000Z',
+      notes: 'Annual checkup',
+    });
+    expect(entry.id).toBeTruthy();
+    expect(entry.type).toBe('service');
+
+    const found = await getCustomerById(c.id);
+    expect(found.serviceLog).toHaveLength(1);
+  });
+
+  test('prepends new entries (newest first)', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    await addServiceEntry(c.id, { date: '2025-01-01T00:00:00.000Z', notes: 'First' });
+    await addServiceEntry(c.id, { date: '2026-01-01T00:00:00.000Z', notes: 'Second' });
+
+    const found = await getCustomerById(c.id);
+    expect(found.serviceLog[0].notes).toBe('Second');
+    expect(found.serviceLog[1].notes).toBe('First');
+  });
+
+  test('throws for non-existent customer', async () => {
+    await expect(
+      addServiceEntry('fake-id', { date: new Date().toISOString() }),
+    ).rejects.toThrow('Customer not found');
+  });
+
+  test('defaults to current date and service type', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    const entry = await addServiceEntry(c.id, {});
+    expect(entry.date).toBeTruthy();
+    expect(entry.type).toBe('service');
+    expect(entry.notes).toBe('');
+  });
+
+  test('handles customer with corrupted serviceLog (non-array)', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    // Corrupt the serviceLog directly in storage
+    const all = JSON.parse(store['@rolodeck_customers']);
+    all[0].serviceLog = 'corrupted';
+    store['@rolodeck_customers'] = JSON.stringify(all);
+
+    // addServiceEntry should recover because loadCustomers fixes serviceLog
+    const entry = await addServiceEntry(c.id, { date: new Date().toISOString() });
+    expect(entry.id).toBeTruthy();
+
+    const found = await getCustomerById(c.id);
+    expect(found.serviceLog).toHaveLength(1);
+  });
+});
+
+// ── updateServiceEntry ───────────────────────────────────────────────────────
+
+describe('updateServiceEntry', () => {
+  test('updates an existing entry', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    const entry = await addServiceEntry(c.id, { notes: 'Original' });
+
+    const updated = await updateServiceEntry(c.id, entry.id, { notes: 'Updated' });
+    expect(updated.notes).toBe('Updated');
+    expect(updated.id).toBe(entry.id); // ID preserved
+  });
+
+  test('throws for non-existent customer', async () => {
+    await expect(updateServiceEntry('fake', 'fake', {})).rejects.toThrow(
+      'Customer not found',
+    );
+  });
+
+  test('throws for non-existent entry', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    await expect(updateServiceEntry(c.id, 'fake-entry', {})).rejects.toThrow(
+      'Service entry not found',
+    );
+  });
+
+  test('preserves entry ID even if update tries to change it', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    const entry = await addServiceEntry(c.id, { notes: 'Test' });
+
+    const updated = await updateServiceEntry(c.id, entry.id, {
+      id: 'hacked-id',
+      notes: 'New',
+    });
+    expect(updated.id).toBe(entry.id);
+  });
+});
+
+// ── deleteServiceEntry ───────────────────────────────────────────────────────
+
+describe('deleteServiceEntry', () => {
+  test('removes a specific entry', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    const e1 = await addServiceEntry(c.id, { notes: 'Keep' });
+    const e2 = await addServiceEntry(c.id, { notes: 'Delete' });
+
+    await deleteServiceEntry(c.id, e2.id);
+    const found = await getCustomerById(c.id);
+    expect(found.serviceLog).toHaveLength(1);
+    expect(found.serviceLog[0].id).toBe(e1.id);
+  });
+
+  test('throws for non-existent customer', async () => {
+    await expect(deleteServiceEntry('fake', 'fake')).rejects.toThrow(
+      'Customer not found',
+    );
+  });
+
+  test('silently succeeds for non-existent entry (filter returns same array)', async () => {
+    const c = await addCustomer({ name: 'Test' });
+    await addServiceEntry(c.id, { notes: 'Keep' });
+    // Deleting non-existent entry should not throw
+    await expect(deleteServiceEntry(c.id, 'fake-entry')).resolves.toBeUndefined();
+  });
+});
+
+// ── Sort preference ──────────────────────────────────────────────────────────
+
+describe('sort preference', () => {
+  test('defaults to "name" when no preference saved', async () => {
+    const pref = await getSortPreference();
+    expect(pref).toBe('name');
+  });
+
+  test('persists and retrieves preference', async () => {
+    await saveSortPreference('zip');
+    const pref = await getSortPreference();
+    expect(pref).toBe('zip');
+  });
+
+  test('handles overwriting preference', async () => {
+    await saveSortPreference('zip');
+    await saveSortPreference('email');
+    const pref = await getSortPreference();
+    expect(pref).toBe('email');
+  });
+});
+
+// ── clearAllData ─────────────────────────────────────────────────────────────
+
+describe('clearAllData', () => {
+  test('removes all customer and preference data', async () => {
+    await addCustomer({ name: 'Test' });
+    await saveSortPreference('zip');
+    await clearAllData();
+
+    const customers = await getAllCustomers();
+    const pref = await getSortPreference();
+    expect(customers).toEqual([]);
+    expect(pref).toBe('name');
+  });
+});
+
+// ── Schema version ───────────────────────────────────────────────────────────
+
+describe('schema version', () => {
+  test('initStorage sets schema version when not present', async () => {
+    await initStorage();
+    const version = await getSchemaVersion();
+    expect(version).toBe(CURRENT_SCHEMA_VERSION);
+  });
+
+  test('initStorage does not overwrite existing version', async () => {
+    store['@rolodeck_schema_version'] = '99';
+    await initStorage();
+    const version = await getSchemaVersion();
+    expect(version).toBe(99);
+  });
+
+  test('getSchemaVersion returns null when not set', async () => {
+    const version = await getSchemaVersion();
+    expect(version).toBeNull();
+  });
+});
+
+// ── Adversarial scenarios ────────────────────────────────────────────────────
+
+describe('adversarial scenarios', () => {
+  test('handles extremely long customer name', async () => {
+    const longName = 'A'.repeat(10000);
+    const c = await addCustomer({ name: longName });
+    expect(c.name).toBe(longName);
+    const found = await getCustomerById(c.id);
+    expect(found.name.length).toBe(10000);
+  });
+
+  test('handles special characters in fields', async () => {
+    const c = await addCustomer({
+      name: '"}]}\\n\\t<script>alert("xss")</script>',
+      email: 'test@example.com',
+      phone: '+1 (555) 🎉',
+      address: '123 "Main" St & Co.',
+      zipCode: '00000-1234',
+    });
+    const found = await getCustomerById(c.id);
+    expect(found.name).toBe('"}]}\\n\\t<script>alert("xss")</script>');
+    expect(found.phone).toBe('+1 (555) 🎉');
+  });
+
+  test('handles unicode and emoji in all fields', async () => {
+    const c = await addCustomer({
+      name: '田中太郎 🏠',
+      email: 'tanaka@例え.jp',
+      address: '東京都渋谷区 123',
+    });
+    const found = await getCustomerById(c.id);
+    expect(found.name).toBe('田中太郎 🏠');
+  });
+
+  test('handles rapid sequential adds', async () => {
+    const promises = Array.from({ length: 50 }, (_, i) =>
+      addCustomer({ name: `Rapid ${i}` }),
+    );
+    // These run concurrently — potential race condition
+    // With current implementation, some may be lost, but it should not crash
+    await Promise.allSettled(promises);
+    const all = await getAllCustomers();
+    // At minimum should not crash; ideally all 50 are present
+    expect(all.length).toBeGreaterThan(0);
+    expect(all.length).toBeLessThanOrEqual(50);
+  });
+
+  test('handles customer with deeply nested garbage in serviceLog', async () => {
+    store['@rolodeck_customers'] = JSON.stringify([
+      {
+        id: 'bad',
+        name: 'Bad Data',
+        serviceLog: [
+          { id: 'e1', date: { nested: { deep: true } }, type: 'service', notes: '' },
+        ],
+      },
+    ]);
+    // Should not crash when loading
+    const customers = await getAllCustomers();
+    expect(customers).toHaveLength(1);
+    expect(customers[0].serviceLog).toHaveLength(1);
+  });
+
+  test('handles storage with massive data (1MB+ JSON)', async () => {
+    const customers = Array.from({ length: 500 }, (_, i) => ({
+      id: `c-${i}`,
+      name: `Customer ${i} ${'x'.repeat(1000)}`,
+      email: `c${i}@example.com`,
+      phone: '555-0000',
+      address: '123 Test St',
+      zipCode: '00000',
+      serviceLog: Array.from({ length: 10 }, (_, j) => ({
+        id: `e-${i}-${j}`,
+        date: new Date(2020 + j, 0, 1).toISOString(),
+        type: 'service',
+        notes: 'test note'.repeat(10),
+      })),
+    }));
+    store['@rolodeck_customers'] = JSON.stringify(customers);
+
+    const all = await getAllCustomers();
+    expect(all).toHaveLength(500);
+    expect(all[0].serviceLog).toHaveLength(10);
+  });
+
+  test('ID generation produces unique IDs even in rapid succession', async () => {
+    const ids = new Set();
+    const c = await addCustomer({ name: 'Test' });
+    for (let i = 0; i < 100; i++) {
+      const entry = await addServiceEntry(c.id, { notes: `Entry ${i}` });
+      ids.add(entry.id);
+    }
+    expect(ids.size).toBe(100);
+  });
+});

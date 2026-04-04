@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<!-- Rolodeck — icon-preview.html | v1.0 | 2026-04-03 | Copyright © 2026 ArdinGate Studios LLC -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rolodeck — Brand Preview</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: #F5F0E8;
+      font-family: 'DM Sans', sans-serif;
+      color: #1A1A1A;
+      padding: 48px 32px 80px;
+      min-height: 100vh;
+    }
+
+    .page-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #999;
+      margin-bottom: 48px;
+    }
+
+    /* ── Icon sizes section ── */
+    .section-label {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #999;
+      margin-bottom: 20px;
+      margin-top: 56px;
+    }
+
+    .icon-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    .icon-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-item svg {
+      display: block;
+      border-radius: 22.4%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    .icon-size-label {
+      font-size: 11px;
+      color: #999;
+      font-weight: 500;
+    }
+
+    /* ── Wordmark section ── */
+    .wordmark-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .wordmark {
+      font-family: 'DM Serif Display', serif;
+      color: #1A1A1A;
+      line-height: 1;
+    }
+
+    .wordmark .teal { color: #4AACA5; }
+
+    .wordmark-lg { font-size: 56px; }
+    .wordmark-md { font-size: 36px; }
+    .wordmark-sm { font-size: 22px; }
+
+    .tagline {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 400;
+      color: #888;
+      letter-spacing: 0.2px;
+      margin-top: 4px;
+    }
+
+    /* ── Color palette section ── */
+    .palette-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .swatch-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .swatch-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: #888;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .swatch-hex {
+      font-size: 10px;
+      color: #bbb;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: #DDD5C4;
+      margin: 52px 0 0;
+    }
+
+    /* ── Theme chips section ── */
+    .theme-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .theme-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 30px;
+      border: 1px solid #DDD5C4;
+      background: #FFFDF9;
+    }
+
+    .theme-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+    }
+
+    .theme-chip-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #444;
+    }
+
+    /* ── Copyright ── */
+    .copyright {
+      font-size: 11px;
+      color: #bbb;
+      margin-top: 60px;
+    }
+  </style>
+</head>
+<body>
+
+  <p class="page-title">Rolodeck · Brand Preview</p>
+
+  <!-- ── Icon at 4 sizes ── -->
+  <p class="section-label">App Icon</p>
+  <div class="icon-row">
+
+    <!-- 140px -->
+    <div class="icon-item">
+      <svg width="140" height="140" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1024" height="1024" rx="230" fill="url(#bg140)"/>
+        <ellipse cx="320" cy="200" rx="280" ry="120" fill="white" opacity="0.18"/>
+        <ellipse cx="512" cy="720" rx="370" ry="115" fill="#2E8A84" opacity="0.18"/>
+        <path d="M185 348 Q185 720 512 720 Q839 720 839 348" fill="#5BBFB9" opacity="0.35"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="#7ECEC9"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="url(#drum140)"/>
+        <rect x="256" y="163" width="512" height="302" rx="46" fill="#C2EDED" stroke="#9DD8D5" stroke-width="9" transform="rotate(-6 512 314)"/>
+        <rect x="256" y="163" width="512" height="302" rx="46" fill="#D8F3F1" stroke="#A8DDD9" stroke-width="9" transform="rotate(-2 512 314)"/>
+        <rect x="256" y="140" width="512" height="326" rx="46" fill="#FFFDF9" stroke="#C5E8E6" stroke-width="11"/>
+        <circle cx="360" cy="255" r="58" fill="#7ECEC9" opacity="0.65"/>
+        <circle cx="360" cy="238" r="22" fill="white" opacity="0.8"/>
+        <ellipse cx="360" cy="292" rx="32" ry="18" fill="white" opacity="0.8"/>
+        <rect x="442" y="222" width="210" height="34" rx="17" fill="#4AACA5" opacity="0.7"/>
+        <rect x="442" y="270" width="140" height="22" rx="11" fill="#C9B99A" opacity="0.8"/>
+        <rect x="302" y="360" width="420" height="11" rx="5.5" fill="#DDD5C4"/>
+        <circle cx="348" cy="407" r="17" fill="#D4795A" opacity="0.65"/>
+        <rect x="392" y="396" width="164" height="22" rx="11" fill="#C9B99A" opacity="0.55"/>
+        <circle cx="348" cy="452" r="17" fill="#7ECEC9" opacity="0.5"/>
+        <rect x="392" y="441" width="120" height="22" rx="11" fill="#C9B99A" opacity="0.4"/>
+        <rect x="185" y="256" width="654" height="80" rx="70" fill="white" opacity="0.22"/>
+        <circle cx="185" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="185" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <circle cx="839" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="839" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <defs>
+          <linearGradient id="bg140" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#E8F6F5"/>
+            <stop offset="45%" stop-color="#C6ECEA"/>
+            <stop offset="100%" stop-color="#A8DED9"/>
+          </linearGradient>
+          <linearGradient id="drum140" x1="185" y1="256" x2="839" y2="698" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="white" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="#2E8A84" stop-opacity="0.32"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="icon-size-label">140px</span>
+    </div>
+
+    <!-- 100px -->
+    <div class="icon-item">
+      <svg width="100" height="100" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1024" height="1024" rx="230" fill="url(#bg100)"/>
+        <ellipse cx="320" cy="200" rx="280" ry="120" fill="white" opacity="0.18"/>
+        <ellipse cx="512" cy="720" rx="370" ry="115" fill="#2E8A84" opacity="0.18"/>
+        <path d="M185 348 Q185 720 512 720 Q839 720 839 348" fill="#5BBFB9" opacity="0.35"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="#7ECEC9"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="url(#drum100)"/>
+        <rect x="256" y="163" width="512" height="302" rx="46" fill="#C2EDED" stroke="#9DD8D5" stroke-width="9" transform="rotate(-6 512 314)"/>
+        <rect x="256" y="163" width="512" height="302" rx="46" fill="#D8F3F1" stroke="#A8DDD9" stroke-width="9" transform="rotate(-2 512 314)"/>
+        <rect x="256" y="140" width="512" height="326" rx="46" fill="#FFFDF9" stroke="#C5E8E6" stroke-width="11"/>
+        <circle cx="360" cy="255" r="58" fill="#7ECEC9" opacity="0.65"/>
+        <circle cx="360" cy="238" r="22" fill="white" opacity="0.8"/>
+        <ellipse cx="360" cy="292" rx="32" ry="18" fill="white" opacity="0.8"/>
+        <rect x="442" y="222" width="210" height="34" rx="17" fill="#4AACA5" opacity="0.7"/>
+        <rect x="442" y="270" width="140" height="22" rx="11" fill="#C9B99A" opacity="0.8"/>
+        <rect x="302" y="360" width="420" height="11" rx="5.5" fill="#DDD5C4"/>
+        <circle cx="348" cy="407" r="17" fill="#D4795A" opacity="0.65"/>
+        <rect x="392" y="396" width="164" height="22" rx="11" fill="#C9B99A" opacity="0.55"/>
+        <circle cx="348" cy="452" r="17" fill="#7ECEC9" opacity="0.5"/>
+        <rect x="392" y="441" width="120" height="22" rx="11" fill="#C9B99A" opacity="0.4"/>
+        <rect x="185" y="256" width="654" height="80" rx="70" fill="white" opacity="0.22"/>
+        <circle cx="185" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="185" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <circle cx="839" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="839" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <defs>
+          <linearGradient id="bg100" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#E8F6F5"/>
+            <stop offset="45%" stop-color="#C6ECEA"/>
+            <stop offset="100%" stop-color="#A8DED9"/>
+          </linearGradient>
+          <linearGradient id="drum100" x1="185" y1="256" x2="839" y2="698" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="white" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="#2E8A84" stop-opacity="0.32"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="icon-size-label">100px</span>
+    </div>
+
+    <!-- 60px -->
+    <div class="icon-item">
+      <svg width="60" height="60" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1024" height="1024" rx="230" fill="url(#bg60)"/>
+        <ellipse cx="320" cy="200" rx="280" ry="120" fill="white" opacity="0.18"/>
+        <path d="M185 348 Q185 720 512 720 Q839 720 839 348" fill="#5BBFB9" opacity="0.35"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="#7ECEC9"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="url(#drum60)"/>
+        <rect x="256" y="163" width="512" height="302" rx="46" fill="#C2EDED" stroke="#9DD8D5" stroke-width="9" transform="rotate(-6 512 314)"/>
+        <rect x="256" y="163" width="512" height="302" rx="46" fill="#D8F3F1" stroke="#A8DDD9" stroke-width="9" transform="rotate(-2 512 314)"/>
+        <rect x="256" y="140" width="512" height="326" rx="46" fill="#FFFDF9" stroke="#C5E8E6" stroke-width="11"/>
+        <circle cx="360" cy="255" r="58" fill="#7ECEC9" opacity="0.65"/>
+        <rect x="442" y="222" width="210" height="34" rx="17" fill="#4AACA5" opacity="0.7"/>
+        <rect x="185" y="256" width="654" height="80" rx="70" fill="white" opacity="0.22"/>
+        <circle cx="185" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="185" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <circle cx="839" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="839" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <defs>
+          <linearGradient id="bg60" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#E8F6F5"/>
+            <stop offset="45%" stop-color="#C6ECEA"/>
+            <stop offset="100%" stop-color="#A8DED9"/>
+          </linearGradient>
+          <linearGradient id="drum60" x1="185" y1="256" x2="839" y2="698" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="white" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="#2E8A84" stop-opacity="0.32"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="icon-size-label">60px</span>
+    </div>
+
+    <!-- 40px -->
+    <div class="icon-item">
+      <svg width="40" height="40" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="1024" height="1024" rx="230" fill="url(#bg40)"/>
+        <path d="M185 348 Q185 720 512 720 Q839 720 839 348" fill="#5BBFB9" opacity="0.35"/>
+        <rect x="185" y="256" width="654" height="442" rx="70" fill="#7ECEC9"/>
+        <rect x="256" y="140" width="512" height="326" rx="46" fill="#FFFDF9" stroke="#C5E8E6" stroke-width="11"/>
+        <rect x="442" y="222" width="210" height="34" rx="17" fill="#4AACA5" opacity="0.7"/>
+        <circle cx="185" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="185" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <circle cx="839" cy="477" r="58" fill="#2E8A84" opacity="0.55"/>
+        <circle cx="839" cy="477" r="28" fill="#FFFDF9" opacity="0.75"/>
+        <defs>
+          <linearGradient id="bg40" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#E8F6F5"/>
+            <stop offset="45%" stop-color="#C6ECEA"/>
+            <stop offset="100%" stop-color="#A8DED9"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="icon-size-label">40px</span>
+    </div>
+
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── Wordmark ── -->
+  <p class="section-label">Wordmark</p>
+  <div class="wordmark-wrap">
+    <div class="wordmark wordmark-lg">Rolo<span class="teal">deck</span></div>
+    <div class="wordmark wordmark-md">Rolo<span class="teal">deck</span></div>
+    <div class="wordmark wordmark-sm">Rolo<span class="teal">deck</span></div>
+  </div>
+  <p class="tagline">Every contact, perfectly in hand.</p>
+
+  <div class="divider"></div>
+
+  <!-- ── Color palette ── -->
+  <p class="section-label">Brand Colors</p>
+  <div class="palette-row">
+    <div class="swatch-item">
+      <div class="swatch" style="background:#4AACA5;"></div>
+      <div class="swatch-label">Primary<br>Teal</div>
+      <div class="swatch-hex">#4AACA5</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#D4795A;"></div>
+      <div class="swatch-label">Accent<br>Rust</div>
+      <div class="swatch-hex">#D4795A</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#F5F0E8; border:1px solid #DDD5C4;"></div>
+      <div class="swatch-label">Background<br>Cream</div>
+      <div class="swatch-hex">#F5F0E8</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#FFFDF9; border:1px solid #DDD5C4;"></div>
+      <div class="swatch-label">Surface<br>Ivory</div>
+      <div class="swatch-hex">#FFFDF9</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#C6ECEA;"></div>
+      <div class="swatch-label">Teal<br>Pale</div>
+      <div class="swatch-hex">#C6ECEA</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#2E8A84;"></div>
+      <div class="swatch-label">Teal<br>Dark</div>
+      <div class="swatch-hex">#2E8A84</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#DDD5C4;"></div>
+      <div class="swatch-label">Cream<br>Dark</div>
+      <div class="swatch-hex">#DDD5C4</div>
+    </div>
+    <div class="swatch-item">
+      <div class="swatch" style="background:#1A1A1A;"></div>
+      <div class="swatch-label">Text<br>Charcoal</div>
+      <div class="swatch-hex">#1A1A1A</div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ── Themes ── -->
+  <p class="section-label">Color Themes</p>
+  <div class="theme-row">
+    <div class="theme-chip">
+      <div class="theme-dot" style="background:#4AACA5;"></div>
+      <span class="theme-chip-label">Rolodeck Classic</span>
+    </div>
+    <div class="theme-chip">
+      <div class="theme-dot" style="background:#3A7BD5;"></div>
+      <span class="theme-chip-label">Ocean Blue</span>
+    </div>
+    <div class="theme-chip">
+      <div class="theme-dot" style="background:#5C8A5A;"></div>
+      <span class="theme-chip-label">Forest Green</span>
+    </div>
+    <div class="theme-chip">
+      <div class="theme-dot" style="background:#6C63FF;"></div>
+      <span class="theme-chip-label">Midnight</span>
+    </div>
+  </div>
+
+  <p class="copyright">© 2026 ArdinGate Studios LLC. All rights reserved.</p>
+
+</body>
+</html>
