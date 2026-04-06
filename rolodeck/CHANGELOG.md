@@ -8,6 +8,51 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.9] - 2026-04-06
+
+### Changed
+- Calendar Sync now works properly on Android: the Rolodeck calendar is created
+  under the user's Google account source (syncs to Google Calendar automatically)
+  instead of a non-syncing local calendar; falls back to any writable calendar
+  source if no Google account is found on the device
+- Permission-denied alert now gives platform-specific navigation instructions
+  (iOS: Settings > Privacy & Security > Calendars;
+   Android: Settings > Apps > Rolodeck > Permissions > Calendar)
+
+### Infrastructure
+- Added `expo-calendar` plugin config to `app.json` for the iOS calendar
+  permission description string used in the system prompt
+- Added `READ_CALENDAR` and `WRITE_CALENDAR` to Android permissions in `app.json`
+
+---
+
+## [1.8] - 2026-04-06
+
+### Added
+- Calendar Sync toggle in Settings (below Backup & Restore) — one-way push of
+  service due dates to Apple Calendar (iCloud synced on iOS automatically)
+- `calendarSync.js` utility: creates a dedicated "Rolodeck" calendar on first
+  enable, upserts all-day events for each customer's due date with address,
+  phone, and email in the event notes, and a 1-day-before alarm
+- Auto-sync on service log: whenever a service entry is saved, the customer's
+  due-date calendar event is updated automatically (fire-and-forget)
+- `removeCustomerEvent()` in calendarSync.js for future archive/delete integration
+- `expo-calendar ~13.0.5` dependency added
+
+---
+
+## [1.7] - 2026-04-06
+
+### Added
+- Calendar view on the Services tab — toggle between the existing list and a monthly
+  calendar showing each customer's upcoming due date as a colored dot (red = overdue,
+  orange = due within 30 days, rust = due within 90 days, teal = later)
+- Tapping a date on the calendar reveals a panel listing all customers due on that
+  day, each tappable to navigate to their detail page
+- Installed `react-native-calendars` dependency
+
+---
+
 ## [1.6] - 2026-04-04
 
 ### Added

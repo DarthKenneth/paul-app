@@ -1,12 +1,14 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: theme, sort, Square token, version
-// Version: 1.4
-// Last Updated: 2026-04-04
+// Version: 1.5.2
+// Last Updated: 2026-04-06
 //
-// PROJECT:      Rolodeck (project v1.6)
+// PROJECT:      Rolodeck (project v1.8)
 // FILES:        SettingsScreen.js     (this file)
 //               colors.js             (Themes, ThemeNames, ThemeKeys)
 //               storage.js            (getSortPreference, saveSortPreference)
+//               calendarSync.js       (getCalendarSyncEnabled, enableCalendarSync,
+//                                      disableCalendarSync, syncAllCustomers)
 //               squarePlaceholder.js  (get/save/clearSquareAccessToken)
 //               theme.js              (useTheme)
 //               typography.js         (FontFamily, FontSize)
@@ -38,6 +40,20 @@
 //       - Imported cloudProviderLabel from backup.js for platform-specific copy
 //       - Added backup section UI (Coming Soon badge, platform-specific description)
 //       - Updated APP_VERSION to '1.6'
+// v1.5.2  2026-04-06  Claude  Added paddingRight: 12 to archiveLeft to prevent
+//                             description text from clipping behind the toggle
+// v1.5.1  2026-04-06  Claude  Platform-specific calendar permission denied message
+//                             (iOS: Settings > Privacy & Security > Calendars;
+//                              Android: Settings > Apps > Rolodeck > Permissions)
+// v1.5  2026-04-06  Claude  Calendar Sync section
+//       - Added Calendar Sync toggle section (below Backup & Restore)
+//       - Toggle calls enableCalendarSync (requests permission + initial sync)
+//         or disableCalendarSync on change
+//       - Permission denial shows an Alert and reverts the toggle
+//       - Animated toggle shares same spring animation as archive toggle
+//       - calendarSyncAnim / calendarSyncKnob mirrors archive toggle pattern
+//       - Imported getCalendarSyncEnabled, enableCalendarSync, disableCalendarSync
+//       - Updated APP_VERSION to '1.8'
 // =============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -49,6 +65,8 @@ import {
   Animated,
   StyleSheet,
   SafeAreaView,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
@@ -56,8 +74,13 @@ import { Themes, ThemeNames, ThemeKeys } from '../styles/colors';
 import { FontPresets, FontPresetNames, FontPresetKeys, FontSize } from '../styles/typography';
 import { getSortPreference, saveSortPreference, getShowArchived, saveShowArchived } from '../data/storage';
 import { cloudProviderLabel } from '../utils/backup';
+import {
+  getCalendarSyncEnabled,
+  enableCalendarSync,
+  disableCalendarSync,
+} from '../utils/calendarSync';
 
-const APP_VERSION = '1.6';
+const APP_VERSION = '1.8';
 
 const SORT_OPTIONS = [
   { key: 'name', label: 'Name',     icon: 'text-outline'     },
@@ -69,14 +92,18 @@ export default function SettingsScreen() {
   const { theme, themeKey, setTheme, fontKey, setFont } = useTheme();
   const styles = makeStyles(theme);
 
-  const [sortPref, setSortPref]         = useState('name');
-  const [showArchived, setShowArchived] = useState(false);
-  const toggleAnim = useRef(new Animated.Value(0)).current;
+  const [sortPref, setSortPref]           = useState('name');
+  const [showArchived, setShowArchived]   = useState(false);
+  const [calendarSync, setCalendarSync]   = useState(false);
+  const [calSyncBusy, setCalSyncBusy]     = useState(false);
+  const toggleAnim    = useRef(new Animated.Value(0)).current;
+  const calSyncAnim   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let active = true;
     getSortPreference().then((p) => { if (active) setSortPref(p); });
     getShowArchived().then((v) => { if (active) { setShowArchived(v); toggleAnim.setValue(v ? 1 : 0); } });
+    getCalendarSyncEnabled().then((v) => { if (active) { setCalendarSync(v); calSyncAnim.setValue(v ? 1 : 0); } });
     return () => { active = false; };
   }, []);
 
@@ -97,11 +124,48 @@ export default function SettingsScreen() {
     await saveShowArchived(next);
   };
 
+  const handleCalendarSyncToggle = async () => {
+    if (calSyncBusy) return;
+    setCalSyncBusy(true);
+    try {
+      if (calendarSync) {
+        setCalendarSync(false);
+        Animated.spring(calSyncAnim, { toValue: 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
+        await disableCalendarSync();
+      } else {
+        // Optimistically animate then revert if permission denied
+        setCalendarSync(true);
+        Animated.spring(calSyncAnim, { toValue: 1, useNativeDriver: false, friction: 6, tension: 80 }).start();
+        const granted = await enableCalendarSync();
+        if (!granted) {
+          setCalendarSync(false);
+          Animated.spring(calSyncAnim, { toValue: 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
+          Alert.alert(
+            'Calendar Access Required',
+            Platform.OS === 'ios'
+              ? 'Rolodeck needs access to your calendar to sync service due dates. Enable it in Settings > Privacy & Security > Calendars.'
+              : 'Rolodeck needs access to your calendar to sync service due dates. Enable it in Settings > Apps > Rolodeck > Permissions > Calendar.',
+          );
+        }
+      }
+    } finally {
+      setCalSyncBusy(false);
+    }
+  };
+
   const toggleBg = toggleAnim.interpolate({
     inputRange:  [0, 1],
     outputRange: [theme.border, theme.primary],
   });
   const knobTranslate = toggleAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [2, 20],
+  });
+  const calSyncBg = calSyncAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [theme.border, theme.primary],
+  });
+  const calSyncKnob = calSyncAnim.interpolate({
     inputRange:  [0, 1],
     outputRange: [2, 20],
   });
@@ -249,6 +313,29 @@ export default function SettingsScreen() {
           </Text>
         </View>
 
+        {/* ── Calendar sync ── */}
+        <Pressable
+          style={[styles.section, styles.archiveRow]}
+          onPress={handleCalendarSyncToggle}
+          disabled={calSyncBusy}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: calendarSync }}
+          accessibilityLabel="Calendar sync"
+        >
+          <View style={styles.archiveLeft}>
+            <Ionicons name="calendar-outline" size={20} color={theme.textSecondary} />
+            <View>
+              <Text style={styles.archiveTitle}>Calendar Sync</Text>
+              <Text style={styles.archiveDesc}>
+                Auto-add service due dates to Apple Calendar
+              </Text>
+            </View>
+          </View>
+          <Animated.View style={[styles.toggle, { backgroundColor: calSyncBg }]}>
+            <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: calSyncKnob }] }]} />
+          </Animated.View>
+        </Pressable>
+
         {/* ── Square integration (coming soon) ── */}
         <View style={[styles.section, styles.comingSoonSection]}>
           <View style={styles.comingSoonHeader}>
@@ -380,6 +467,7 @@ function makeStyles(theme) {
       alignItems:    'center',
       gap:           12,
       flex:          1,
+      paddingRight:  12,
     },
     archiveTitle: {
       fontFamily: theme.fontBodyMedium,

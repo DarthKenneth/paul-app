@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "1.6.0",
+    "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./store-assets/icons/icon.png",
     "userInterfaceStyle": "automatic",
@@ -15,6 +15,14 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Rolodeck uses your calendar to sync service due dates for your customers."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ardingate.rolodeck"
@@ -24,7 +32,8 @@
         "foregroundImage": "./store-assets/icons/adaptive-icon-fg.png",
         "backgroundColor": "#C6ECEA"
       },
-      "package": "com.ardingate.rolodeck"
+      "package": "com.ardingate.rolodeck",
+      "permissions": ["READ_CALENDAR", "WRITE_CALENDAR"]
     },
     "web": {
       "favicon": "./store-assets/icons/icon.png"

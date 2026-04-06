@@ -1,11 +1,12 @@
 // =============================================================================
 // AddServiceScreen.js - Add a service entry: date stamp + notes
-// Version: 1.2
-// Last Updated: 2026-04-03
+// Version: 1.3
+// Last Updated: 2026-04-06
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.8)
 // FILES:        AddServiceScreen.js  (this file)
-//               storage.js           (addServiceEntry)
+//               storage.js           (addServiceEntry, getCustomerById)
+//               calendarSync.js      (syncCustomerDueDate)
 //               theme.js             (useTheme)
 //               typography.js        (FontFamily, FontSize)
 //
@@ -34,6 +35,10 @@
 //                             overflows; now uses strict regex + round-trip check
 //                           - Added saving state for double-tap protection
 //                           - Added try/catch around addServiceEntry call
+// v1.3  2026-04-06  Claude  Fire-and-forget calendar sync after successful save
+//                           - Fetches updated customer via getCustomerById after
+//                             addServiceEntry, then calls syncCustomerDueDate
+//                           - Sync errors are swallowed; never blocks save flow
 // =============================================================================
 
 import React, { useState } from 'react';
@@ -49,7 +54,8 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { addServiceEntry } from '../data/storage';
+import { addServiceEntry, getCustomerById } from '../data/storage';
+import { syncCustomerDueDate } from '../utils/calendarSync';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 
@@ -98,6 +104,11 @@ export default function AddServiceScreen({ route, navigation }) {
         type:  'service',
         notes: notes.trim(),
       });
+
+      // Fire-and-forget calendar sync — never blocks or throws to the user
+      getCustomerById(customerId)
+        .then((customer) => syncCustomerDueDate(customer))
+        .catch(() => {});
 
       if (typeof onAlertsRefresh === 'function') {
         onAlertsRefresh();

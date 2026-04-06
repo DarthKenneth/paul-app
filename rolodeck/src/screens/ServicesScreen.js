@@ -1,9 +1,9 @@
 // =============================================================================
 // ServicesScreen.js - Upcoming and overdue service list, grouped by due window
-// Version: 2.0.1
-// Last Updated: 2026-04-03
+// Version: 2.1
+// Last Updated: 2026-04-06
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.7)
 // FILES:        ServicesScreen.js    (this file)
 //               storage.js           (getAllCustomers)
 //               serviceAlerts.js     (groupCustomersByDueWindow, getServiceStatus,
@@ -15,40 +15,50 @@
 //
 // ARCHITECTURE:
 //   - useFocusEffect reloads on every tab focus
-//   - SectionList driven by groupCustomersByDueWindow() from serviceAlerts.js
-//   - Sections: Overdue / Next 30 Days / Next 31-60 Days / Next 61-90 Days / Later
-//     Empty sections are omitted by groupCustomersByDueWindow
-//   - Section headers color-coded by urgency:
-//       Overdue     → theme.overdue (red)
-//       Next 30     → theme.warning (amber)
-//       Next 31-60  → theme.accent  (rust)
-//       Next 61-90  → theme.accent  (rust, lighter treatment)
-//       Later       → theme.success (green)
-//   - Each row shows: customer name, last service date, status label
-//   - Tapping a row navigates cross-tab to CustomersTab → CustomerDetail
-//   - No filter chips — sections replace them; all customers always visible
+//   - Two view modes: 'list' and 'calendar', toggled via segment bar
+//   - LIST MODE:
+//       SectionList driven by groupCustomersByDueWindow() from serviceAlerts.js
+//       Sections: Overdue / Next 30 Days / Next 31-60 Days / Next 61-90 Days / Later
+//       Empty sections omitted by groupCustomersByDueWindow
+//   - CALENDAR MODE:
+//       react-native-calendars Calendar component
+//       Each customer's due date (last service + 365 days) shown as a dot
+//       Dot color = urgency level: overdue=red, warning=orange, upcoming=rust, ok=teal
+//       Never-serviced customers omitted from calendar (no pinnable due date)
+//       Tapping a day shows a panel of customers due on that date
+//   - Tapping a customer row navigates cross-tab to CustomersTab → CustomerDetail
+//   - Section headers color-coded by urgency (list mode)
 //
 // CHANGE LOG:
-// v1.0  2026-04-03  Claude  Initial scaffold — flat FlatList with filter chips
-// v2.0  2026-04-03  Claude  Full rewrite as section-based SectionList
+// v1.0    2026-04-03  Claude  Initial scaffold — flat FlatList with filter chips
+// v2.0    2026-04-03  Claude  Full rewrite as section-based SectionList
 //         - Replaced filter chips with automatic due-window sections
 //         - Rows now show last service date and status sub-line
 //         - Section headers color-coded by urgency
 //         - Empty state handles both zero customers and all-current cases
 // v2.0.1  2026-04-03  Claude  Added try/catch on storage load in useFocusEffect
+// v2.1    2026-04-06  Claude  Calendar view toggle
+//         - Added List/Calendar segment bar at top of screen
+//         - Calendar view shows each customer's due date as an urgency-colored dot
+//         - Tapping a calendar day reveals a panel of customers due on that date
+//         - Never-serviced customers excluded from calendar (no pinnable due date)
+//         - Added allCustomers state to support calendar data preparation
+//         - Added react-native-calendars dependency [updated ARCHITECTURE]
 // =============================================================================
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   SectionList,
+  FlatList,
   Pressable,
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { Calendar } from 'react-native-calendars';
 import { getAllCustomers } from '../data/storage';
 import {
   groupCustomersByDueWindow,
@@ -57,6 +67,9 @@ import {
 } from '../utils/serviceAlerts';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
+
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+const SERVICE_INTERVAL_DAYS = 365;
 
 // Color key per section — maps to theme properties
 const SECTION_COLOR_KEY = {
@@ -67,12 +80,31 @@ const SECTION_COLOR_KEY = {
   later:   'success',
 };
 
+function dotColorForLevel(level, theme) {
+  switch (level) {
+    case 'overdue':  return theme.overdue;
+    case 'warning':  return theme.warning;
+    case 'upcoming': return theme.accent;
+    default:         return theme.success;
+  }
+}
+
+function dueDateString(customer) {
+  const last = getLastServiceDate(customer);
+  if (!last) return null;
+  const due = new Date(last.getTime() + SERVICE_INTERVAL_DAYS * MS_PER_DAY);
+  return due.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
 export default function ServicesScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
-  const [sections, setSections] = React.useState([]);
+  const [viewMode, setViewMode]           = React.useState('list');
+  const [sections, setSections]           = React.useState([]);
+  const [allCustomers, setAllCustomers]   = React.useState([]);
   const [totalCustomers, setTotalCustomers] = React.useState(0);
+  const [selectedDate, setSelectedDate]   = React.useState(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,6 +114,7 @@ export default function ServicesScreen({ navigation }) {
           if (active) {
             const active_ = all.filter((c) => !c.archived);
             setSections(groupCustomersByDueWindow(active_));
+            setAllCustomers(active_);
             setTotalCustomers(active_.length);
           }
         })
@@ -98,6 +131,93 @@ export default function ServicesScreen({ navigation }) {
       params: { customerId },
     });
   };
+
+  // ── Calendar helpers ────────────────────────────────────────────────────────
+
+  const markedDates = useMemo(() => {
+    const result = {};
+    for (const customer of allCustomers) {
+      const dateStr = dueDateString(customer);
+      if (!dateStr) continue; // skip never-serviced
+      const status = getServiceStatus(customer);
+      if (!result[dateStr]) result[dateStr] = { dots: [] };
+      // Cap at 3 dots per day to avoid visual overflow
+      if (result[dateStr].dots.length < 3) {
+        result[dateStr].dots.push({
+          key:   customer.id,
+          color: dotColorForLevel(status.level, theme),
+        });
+      }
+    }
+    if (selectedDate) {
+      if (!result[selectedDate]) result[selectedDate] = { dots: [] };
+      result[selectedDate] = {
+        ...result[selectedDate],
+        selected:      true,
+        selectedColor: theme.primary,
+      };
+    }
+    return result;
+  }, [allCustomers, selectedDate, theme]);
+
+  const customersOnSelectedDay = useMemo(() => {
+    if (!selectedDate) return [];
+    return allCustomers.filter((c) => dueDateString(c) === selectedDate);
+  }, [allCustomers, selectedDate]);
+
+  const calendarTheme = useMemo(() => ({
+    backgroundColor:            theme.surface,
+    calendarBackground:         theme.surface,
+    textSectionTitleColor:      theme.textMuted,
+    selectedDayBackgroundColor: theme.primary,
+    selectedDayTextColor:       theme.cardBg,
+    todayTextColor:             theme.primary,
+    dayTextColor:               theme.text,
+    textDisabledColor:          theme.border,
+    arrowColor:                 theme.primary,
+    monthTextColor:             theme.text,
+    textDayFontFamily:          theme.fontBody,
+    textMonthFontFamily:        theme.fontUiBold,
+    textDayHeaderFontFamily:    theme.fontUiMedium,
+    textDayFontSize:            FontSize.sm,
+    textMonthFontSize:          FontSize.base,
+    textDayHeaderFontSize:      FontSize.xs,
+  }), [theme]);
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  const renderToggle = () => (
+    <View style={styles.toggleBar}>
+      <Pressable
+        style={[styles.toggleBtn, viewMode === 'list' && styles.toggleBtnActive]}
+        onPress={() => setViewMode('list')}
+      >
+        <Ionicons
+          name="list"
+          size={15}
+          color={viewMode === 'list' ? theme.cardBg : theme.textMuted}
+          style={styles.toggleIcon}
+        />
+        <Text style={[styles.toggleLabel, viewMode === 'list' && styles.toggleLabelActive]}>
+          List
+        </Text>
+      </Pressable>
+      <Pressable
+        style={[styles.toggleBtn, viewMode === 'calendar' && styles.toggleBtnActive]}
+        onPress={() => setViewMode('calendar')}
+      >
+        <Ionicons
+          name="calendar"
+          size={15}
+          color={viewMode === 'calendar' ? theme.cardBg : theme.textMuted}
+          style={styles.toggleIcon}
+        />
+        <Text style={[styles.toggleLabel, viewMode === 'calendar' && styles.toggleLabelActive]}>
+          Calendar
+        </Text>
+      </Pressable>
+    </View>
+  );
 
   const renderSectionHeader = ({ section }) => {
     const colorKey = SECTION_COLOR_KEY[section.key] || 'textMuted';
@@ -147,9 +267,36 @@ export default function ServicesScreen({ navigation }) {
     );
   };
 
+  const renderCalendarRow = ({ item }) => {
+    const status = getServiceStatus(item);
+    const accentColor = dotColorForLevel(status.level, theme);
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        onPress={() => handleRowPress(item.id)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name || 'Customer'}, ${status.label}`}
+      >
+        <View style={[styles.rowAccent, { backgroundColor: accentColor }]} />
+        <View style={styles.rowBody}>
+          <Text style={styles.rowName} numberOfLines={1}>
+            {item.name || 'Unnamed'}
+          </Text>
+          <Text style={[styles.rowStatus, { color: accentColor }]} numberOfLines={1}>
+            {status.label}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.border} />
+      </Pressable>
+    );
+  };
+
+  // ── Empty states ────────────────────────────────────────────────────────────
+
   if (totalCustomers === 0) {
     return (
       <SafeAreaView style={styles.safe}>
+        {renderToggle()}
         <View style={styles.emptyFull}>
           <Ionicons name="calendar-outline" size={56} color={theme.border} />
           <Text style={styles.emptyTitle}>No customers yet</Text>
@@ -161,9 +308,57 @@ export default function ServicesScreen({ navigation }) {
     );
   }
 
+  // ── Calendar view ───────────────────────────────────────────────────────────
+
+  if (viewMode === 'calendar') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        {renderToggle()}
+        <Calendar
+          markingType="multi-dot"
+          markedDates={markedDates}
+          onDayPress={(day) => setSelectedDate(
+            selectedDate === day.dateString ? null : day.dateString
+          )}
+          theme={calendarTheme}
+          style={styles.calendar}
+        />
+        {selectedDate ? (
+          customersOnSelectedDay.length > 0 ? (
+            <View style={styles.dayPanel}>
+              <Text style={styles.dayPanelTitle}>
+                Due {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                  weekday: 'short', month: 'short', day: 'numeric'
+                })}
+              </Text>
+              <FlatList
+                data={customersOnSelectedDay}
+                keyExtractor={(item) => item.id}
+                renderItem={renderCalendarRow}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                contentContainerStyle={styles.dayPanelList}
+              />
+            </View>
+          ) : (
+            <View style={styles.dayPanelEmpty}>
+              <Text style={styles.dayPanelEmptyText}>No customers due on this date.</Text>
+            </View>
+          )
+        ) : (
+          <View style={styles.dayPanelEmpty}>
+            <Text style={styles.dayPanelEmptyText}>Tap a date to see who's due.</Text>
+          </View>
+        )}
+      </SafeAreaView>
+    );
+  }
+
+  // ── List view ───────────────────────────────────────────────────────────────
+
   if (sections.length === 0) {
     return (
       <SafeAreaView style={styles.safe}>
+        {renderToggle()}
         <View style={styles.emptyFull}>
           <Ionicons name="checkmark-circle-outline" size={56} color={theme.success} />
           <Text style={styles.emptyTitle}>All services current</Text>
@@ -185,6 +380,7 @@ export default function ServicesScreen({ navigation }) {
         contentContainerStyle={styles.listContent}
         stickySectionHeadersEnabled={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListHeaderComponent={renderToggle}
       />
     </SafeAreaView>
   );
@@ -198,6 +394,69 @@ function makeStyles(theme) {
     },
     listContent: {
       paddingBottom: 30,
+    },
+    // ── Toggle ──
+    toggleBar: {
+      flexDirection:    'row',
+      margin:           16,
+      marginBottom:      8,
+      backgroundColor:  theme.border,
+      borderRadius:     10,
+      padding:           3,
+    },
+    toggleBtn: {
+      flex:           1,
+      flexDirection:  'row',
+      alignItems:     'center',
+      justifyContent: 'center',
+      paddingVertical: 7,
+      borderRadius:    8,
+      gap:             5,
+    },
+    toggleBtnActive: {
+      backgroundColor: theme.primary,
+    },
+    toggleIcon: {
+      // gap on parent handles spacing
+    },
+    toggleLabel: {
+      fontFamily: theme.fontUiMedium,
+      fontSize:   FontSize.sm,
+      color:      theme.textMuted,
+    },
+    toggleLabelActive: {
+      color: theme.cardBg,
+    },
+    // ── Calendar ──
+    calendar: {
+      marginHorizontal: 12,
+      borderRadius:      12,
+      overflow:         'hidden',
+    },
+    dayPanel: {
+      flex:             1,
+      marginTop:        12,
+    },
+    dayPanelTitle: {
+      fontFamily:      theme.fontUiBold,
+      fontSize:        FontSize.sm,
+      color:           theme.textSecondary,
+      textTransform:   'uppercase',
+      letterSpacing:    0.6,
+      marginHorizontal: 16,
+      marginBottom:      8,
+    },
+    dayPanelList: {
+      paddingBottom: 30,
+    },
+    dayPanelEmpty: {
+      marginTop:    20,
+      alignItems:  'center',
+    },
+    dayPanelEmptyText: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.sm,
+      color:      theme.textMuted,
     },
     // ── Section header ──
     sectionHeader: {
