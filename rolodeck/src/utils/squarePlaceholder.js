@@ -1,9 +1,9 @@
 // =============================================================================
 // squarePlaceholder.js - Square OAuth + Invoicing integration
-// Version: 2.0
-// Last Updated: 2026-04-03
+// Version: 3.0
+// Last Updated: 2026-04-04
 //
-// PROJECT:      Rolodeck (project v1.3)
+// PROJECT:      Rolodeck (project v1.5)
 // FILES:        squarePlaceholder.js  (this file — OAuth flow + invoice API)
 //               SettingsScreen.js     (Connect to Square button, disconnect)
 //               InvoiceButton.js      (calls sendSquareInvoice)
@@ -11,20 +11,20 @@
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
-//   - OAuth 2.0 flow with PKCE-style redirect:
-//       1. App opens Square's authorization URL in an in-app browser
-//       2. User logs in and authorizes Rolodeck
-//       3. Square redirects to rolodeck://square/callback?code=XXX
-//       4. App sends the code to YOUR backend server
-//       5. Backend exchanges code + client_secret for an access token
-//       6. App stores the token locally in AsyncStorage
-//   - The client_secret NEVER lives in the app — only on the backend
+//   - OAuth 2.0 + PKCE (RFC 7636) — no backend server required:
+//       1. App generates code_verifier (32 random bytes, base64url-encoded)
+//          and code_challenge (SHA-256 of verifier, base64url-encoded)
+//       2. App opens Square's authorization URL with the code_challenge
+//       3. User logs in and authorizes Rolodeck
+//       4. Square redirects to rolodeck://square/callback?code=XXX
+//       5. App exchanges code + code_verifier DIRECTLY with Square
+//          (Square verifies the PKCE challenge; no client_secret needed)
+//       6. App stores the access token in AsyncStorage
 //   - Required setup:
 //       1. Register app at https://developer.squareup.com/apps
 //       2. Set redirect URL to: rolodeck://square/callback
-//       3. Deploy a backend endpoint that accepts { code } and returns
-//          { access_token } after exchanging with Square
-//       4. Fill in SQUARE_CONFIG below with your values
+//       3. Fill in SQUARE_CONFIG below (clientId, locationId)
+//       4. Toggle SQUARE_ENVIRONMENT to 'production' when going live
 //   - Required Square OAuth scopes: INVOICES_WRITE, ORDERS_WRITE,
 //     CUSTOMERS_READ, PAYMENTS_WRITE
 //   - Invoice flow (once connected):
@@ -37,24 +37,47 @@
 // v2.0  2026-04-03  Claude  Full rewrite for OAuth + invoice structure
 //       - Added OAuth config, authorization URL builder, token exchange
 //       - Added connectSquare() using expo-web-browser
-//       - Added handleSquareCallback() for deep link redirect
 //       - Restructured sendSquareInvoice() with full 3-step flow
 //         (create order → create invoice → publish)
 //       - Removed importSquareContacts (feature removed)
+// v2.1  2026-04-04  Claude  Config + plumbing pass
+//       - Added SQUARE_ENVIRONMENT flag with dynamic base URL selection
+//       - Added locationId to SQUARE_CONFIG
+//       - Updated backendTokenUrl to Vercel endpoint pattern
+//       - sendSquareInvoice() reads locationId from config
+// v3.0  2026-04-04  Claude  Replaced backend token exchange with PKCE
+//       - Removed backend dependency entirely (no Vercel / server needed)
+//       - Added generateCodeVerifier() and generateCodeChallenge() (expo-crypto)
+//       - buildAuthUrl() now includes code_challenge + code_challenge_method=S256
+//       - exchangeCodeForToken() calls Square directly with code_verifier
+//       - Removed backendTokenUrl from config
+//       - Removed unused Linking import
 // =============================================================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
-import { Linking } from 'react-native';
 
-// ── Configuration — fill these in with your Square app values ─────────────────
+// ── Configuration — fill these in after registering at developer.squareup.com ─
+
+// Toggle between 'sandbox' (free testing) and 'production' (live payments).
+// Sandbox and production have SEPARATE app credentials in the Square Developer
+// Dashboard — make sure clientId matches whichever environment this is set to.
+const SQUARE_ENVIRONMENT = 'sandbox'; // TODO: change to 'production' when going live
+
+const BASE_URLS = {
+  sandbox:    'https://connect.squareupsandbox.com',
+  production: 'https://connect.squareup.com',
+};
+
+const _base = BASE_URLS[SQUARE_ENVIRONMENT] ?? BASE_URLS.production;
 
 const SQUARE_CONFIG = {
-  // From https://developer.squareup.com/apps → your app → OAuth
-  clientId:    'YOUR_SQUARE_APP_ID',        // TODO: Replace
-  // Your backend endpoint that exchanges auth code → access token
-  backendTokenUrl: 'https://your-backend.com/api/square/token', // TODO: Replace
-  // Must match the redirect URL registered in your Square app
+  // From developer.squareup.com/apps → your app → Credentials tab
+  clientId:   'YOUR_SQUARE_APP_ID',       // TODO: Replace
+  // From Square Dashboard → Account & Settings → Locations
+  locationId: 'YOUR_SQUARE_LOCATION_ID',  // TODO: Replace
+  // Must match the redirect URL registered in your Square app's OAuth settings
   redirectUri: 'rolodeck://square/callback',
   // Scopes needed for invoicing
   scopes: [
@@ -63,9 +86,8 @@ const SQUARE_CONFIG = {
     'CUSTOMERS_READ',
     'PAYMENTS_WRITE',
   ],
-  // Square API base URLs
-  authBase: 'https://connect.squareup.com',
-  apiBase:  'https://connect.squareup.com',
+  authBase:   _base,
+  apiBase:    _base,
   apiVersion: '2024-01-18',
 };
 
@@ -91,23 +113,50 @@ export async function isSquareConnected() {
   return !!token;
 }
 
+// ── PKCE helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Generate a PKCE code verifier: 32 cryptographically random bytes,
+ * base64url-encoded (RFC 7636 §4.1).
+ */
+async function generateCodeVerifier() {
+  const bytes = await Crypto.getRandomBytesAsync(32);
+  let binary = '';
+  bytes.forEach((b) => { binary += String.fromCharCode(b); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+/**
+ * Derive the PKCE code challenge from a verifier:
+ * BASE64URL(SHA-256(verifier)) per RFC 7636 §4.2.
+ */
+async function generateCodeChallenge(verifier) {
+  const digest = await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    verifier,
+    { encoding: Crypto.CryptoEncoding.BASE64 },
+  );
+  return digest.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 // ── OAuth flow ────────────────────────────────────────────────────────────────
 
 /**
- * Build the Square OAuth authorization URL.
- * Includes a random state parameter for CSRF protection.
+ * Build the Square OAuth authorization URL with PKCE challenge and CSRF state.
  */
-function buildAuthUrl() {
+function buildAuthUrl(codeChallenge) {
   const state = Array.from({ length: 16 }, () =>
     Math.floor(Math.random() * 256).toString(16).padStart(2, '0'),
   ).join('');
 
   const params = new URLSearchParams({
-    client_id:     SQUARE_CONFIG.clientId,
-    response_type: 'code',
-    scope:         SQUARE_CONFIG.scopes.join(' '),
-    redirect_uri:  SQUARE_CONFIG.redirectUri,
+    client_id:             SQUARE_CONFIG.clientId,
+    response_type:         'code',
+    scope:                 SQUARE_CONFIG.scopes.join(' '),
+    redirect_uri:          SQUARE_CONFIG.redirectUri,
     state,
+    code_challenge:        codeChallenge,
+    code_challenge_method: 'S256',
   });
 
   return {
@@ -117,15 +166,16 @@ function buildAuthUrl() {
 }
 
 /**
- * Open the Square OAuth login page in an in-app browser.
- * Returns the authorization code from the redirect, or null if cancelled.
+ * Open the Square OAuth login page and return the access token on success.
+ * Uses PKCE — no backend server required.
  *
- * @returns {Promise<string|null>} authorization code
+ * @returns {Promise<string|null>} access token, or null if cancelled
  */
 export async function connectSquare() {
-  const { url } = buildAuthUrl();
+  const verifier   = await generateCodeVerifier();
+  const challenge  = await generateCodeChallenge(verifier);
+  const { url }    = buildAuthUrl(challenge);
 
-  // Open Square's auth page; it will redirect to rolodeck://square/callback
   const result = await WebBrowser.openAuthSessionAsync(
     url,
     SQUARE_CONFIG.redirectUri,
@@ -135,10 +185,9 @@ export async function connectSquare() {
     return null;
   }
 
-  // Extract the authorization code from the redirect URL
   const parsed = new URL(result.url);
-  const code = parsed.searchParams.get('code');
-  const error = parsed.searchParams.get('error');
+  const code   = parsed.searchParams.get('code');
+  const error  = parsed.searchParams.get('error');
 
   if (error) {
     throw new Error(`Square authorization failed: ${error}`);
@@ -147,48 +196,46 @@ export async function connectSquare() {
     throw new Error('No authorization code received from Square.');
   }
 
-  // Exchange the code for an access token via your backend
-  const token = await exchangeCodeForToken(code);
+  const token = await exchangeCodeForToken(code, verifier);
   await saveSquareAccessToken(token);
   return token;
 }
 
 /**
- * Exchange an authorization code for an access token.
- * This calls YOUR backend — the client_secret lives there, not in the app.
+ * Exchange an authorization code for an access token using PKCE.
+ * Calls Square directly — no backend, no client_secret.
  *
- * Your backend should:
- *   1. Receive { code, redirect_uri }
- *   2. POST to https://connect.squareup.com/oauth2/token with:
- *      { client_id, client_secret, code, redirect_uri, grant_type: 'authorization_code' }
- *   3. Return { access_token } from the Square response
- *
- * @param {string} code — authorization code from OAuth redirect
+ * @param {string} code         — authorization code from OAuth redirect
+ * @param {string} codeVerifier — the verifier generated before opening the browser
  * @returns {Promise<string>} access token
  */
-async function exchangeCodeForToken(code) {
+async function exchangeCodeForToken(code, codeVerifier) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
-    const res = await fetch(SQUARE_CONFIG.backendTokenUrl, {
+    const res = await fetch(`${SQUARE_CONFIG.authBase}/oauth2/token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type':   'application/json',
+        'Square-Version': SQUARE_CONFIG.apiVersion,
+      },
       body: JSON.stringify({
+        client_id:     SQUARE_CONFIG.clientId,
         code,
-        redirect_uri: SQUARE_CONFIG.redirectUri,
+        code_verifier: codeVerifier,
+        redirect_uri:  SQUARE_CONFIG.redirectUri,
+        grant_type:    'authorization_code',
       }),
       signal: controller.signal,
     });
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Token exchange failed (HTTP ${res.status})`);
-    }
-
     const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.errors?.[0]?.detail || `Token exchange failed (HTTP ${res.status})`);
+    }
     if (!data.access_token) {
-      throw new Error('Backend did not return an access token.');
+      throw new Error('Square did not return an access token.');
     }
     return data.access_token;
   } finally {
@@ -200,8 +247,6 @@ async function exchangeCodeForToken(code) {
 
 /**
  * Disconnect from Square — removes the stored access token.
- * Optionally, your backend could also revoke the token with Square's
- * POST /oauth2/revoke endpoint.
  */
 export async function disconnectSquare() {
   await clearSquareAccessToken();
@@ -253,10 +298,9 @@ async function squareApi(method, path, body) {
  *
  * @param {object} customer    — customer object from storage.js
  * @param {number} amountCents — invoice total in cents (e.g. 9999 = $99.99)
- * @param {string} locationId  — your Square location ID (from Square Dashboard)
  * @returns {Promise<{invoiceId: string, invoiceUrl: string}>}
  */
-export async function sendSquareInvoice(customer, amountCents, locationId) {
+export async function sendSquareInvoice(customer, amountCents) {
   if (!customer.email) {
     throw new Error(
       `No email address on file for ${customer.name || 'this customer'}.\n\n` +
@@ -264,10 +308,11 @@ export async function sendSquareInvoice(customer, amountCents, locationId) {
     );
   }
 
-  if (!locationId) {
+  const locationId = SQUARE_CONFIG.locationId;
+  if (!locationId || locationId === 'YOUR_SQUARE_LOCATION_ID') {
     throw new Error(
-      'Square location ID is required.\n\n' +
-      'Set your location ID in the app configuration.',
+      'Square location ID is not configured.\n\n' +
+      'Set SQUARE_CONFIG.locationId in squarePlaceholder.js.',
     );
   }
 

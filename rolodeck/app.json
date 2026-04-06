@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "1.3.0",
+    "version": "1.6.0",
     "orientation": "portrait",
     "icon": "./store-assets/icons/icon.png",
     "userInterfaceStyle": "automatic",

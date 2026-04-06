@@ -1,9 +1,9 @@
 // =============================================================================
-// InvoiceButton.js - Square invoice trigger button (UI placeholder)
-// Version: 1.0
-// Last Updated: 2026-04-03
+// InvoiceButton.js - Square invoice trigger button
+// Version: 1.1
+// Last Updated: 2026-04-04
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.4)
 // FILES:        InvoiceButton.js          (this file — UI + modal)
 //               squarePlaceholder.js      (sendSquareInvoice logic)
 //               CustomerDetailScreen.js   (renders this button)
@@ -15,14 +15,15 @@
 // ARCHITECTURE:
 //   - Tap "Send Invoice" → modal sheet slides up with dollar amount input
 //   - Amount entered as dollars (string) → converted to cents for API call
-//   - sendSquareInvoice() from squarePlaceholder.js is called; it throws a
-//     "not yet implemented" error until the Square integration is built
+//   - sendSquareInvoice() handles the full Square order → invoice → publish flow
 //   - Alert.alert surfaces both success and error states
 //   - No inline styles — all via makeStyles(theme)
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold — placeholder modal with amount
 //                           entry; Square integration not yet wired
+// v1.1  2026-04-04  Claude  Removed placeholder comment; wired to live
+//                           sendSquareInvoice() (locationId now in config)
 // =============================================================================
 
 import React, { useState } from 'react';
@@ -120,9 +121,6 @@ export default function InvoiceButton({ customer }) {
                 selectTextOnFocus
               />
             </View>
-
-            {/* PLACEHOLDER: Square integration pending.
-                See src/utils/squarePlaceholder.js for implementation guide. */}
 
             <View style={styles.actions}>
               <Pressable

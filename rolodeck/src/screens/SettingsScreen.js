@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: theme, sort, Square token, version
-// Version: 1.1
-// Last Updated: 2026-04-03
+// Version: 1.4
+// Last Updated: 2026-04-04
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.6)
 // FILES:        SettingsScreen.js     (this file)
 //               colors.js             (Themes, ThemeNames, ThemeKeys)
 //               storage.js            (getSortPreference, saveSortPreference)
@@ -32,6 +32,12 @@
 //         (Name/Address/Zip/Email) matching CustomersScreen sort options
 //       - Fixed memory leak: added cleanup flag to useEffect so setState
 //         calls don't fire after unmount
+// v1.2  2026-04-04  Claude  Updated APP_VERSION to '1.4' to match project bump
+// v1.3  2026-04-04  Claude  Updated APP_VERSION to '1.5' to match project bump
+// v1.4  2026-04-04  Claude  Added Backup & Restore Coming Soon section
+//       - Imported cloudProviderLabel from backup.js for platform-specific copy
+//       - Added backup section UI (Coming Soon badge, platform-specific description)
+//       - Updated APP_VERSION to '1.6'
 // =============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -49,8 +55,9 @@ import { useTheme } from '../styles/theme';
 import { Themes, ThemeNames, ThemeKeys } from '../styles/colors';
 import { FontPresets, FontPresetNames, FontPresetKeys, FontSize } from '../styles/typography';
 import { getSortPreference, saveSortPreference, getShowArchived, saveShowArchived } from '../data/storage';
+import { cloudProviderLabel } from '../utils/backup';
 
-const APP_VERSION = '1.3';
+const APP_VERSION = '1.6';
 
 const SORT_OPTIONS = [
   { key: 'name', label: 'Name',     icon: 'text-outline'     },
@@ -226,6 +233,21 @@ export default function SettingsScreen() {
             <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: knobTranslate }] }]} />
           </Animated.View>
         </Pressable>
+
+        {/* ── Backup & Restore (coming soon) ── */}
+        <View style={[styles.section, styles.comingSoonSection]}>
+          <View style={styles.comingSoonHeader}>
+            <Ionicons name="cloud-upload-outline" size={22} color={theme.textMuted} />
+            <Text style={styles.sectionTitle}>Backup &amp; Restore</Text>
+          </View>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Back up your customer database to {cloudProviderLabel()} and restore
+            it anytime — even after reinstalling the app.
+          </Text>
+        </View>
 
         {/* ── Square integration (coming soon) ── */}
         <View style={[styles.section, styles.comingSoonSection]}>

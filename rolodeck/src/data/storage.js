@@ -1,9 +1,9 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 1.1
-// Last Updated: 2026-04-03
+// Version: 1.2
+// Last Updated: 2026-04-04
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.6)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
@@ -41,6 +41,7 @@
 //       - Added schema version tracking (CURRENT_SCHEMA_VERSION = 1)
 //       - Improved generateId() with better entropy (hex + timestamp)
 //       - Added initStorage() for schema version initialization
+// v1.2  2026-04-04  Claude  Added restoreCustomers() for backup/restore support
 // =============================================================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -240,6 +241,24 @@ export async function getShowArchived() {
 
 export async function saveShowArchived(show) {
   await AsyncStorage.setItem(SHOW_ARCHIVED_KEY, show ? 'true' : 'false');
+}
+
+// ── Backup / restore ──────────────────────────────────────────────────────────
+
+/**
+ * Overwrite the entire customer store with a validated array.
+ * Used exclusively by backup.js during restore. Each customer is passed through
+ * the same defensive normalization as loadCustomers().
+ */
+export async function restoreCustomers(customers) {
+  if (!Array.isArray(customers)) {
+    throw new Error('restoreCustomers: expected an array');
+  }
+  const normalized = customers.map((c) => ({
+    ...c,
+    serviceLog: Array.isArray(c.serviceLog) ? c.serviceLog : [],
+  }));
+  await persistCustomers(normalized);
 }
 
 // ── Dev helpers ───────────────────────────────────────────────────────────────

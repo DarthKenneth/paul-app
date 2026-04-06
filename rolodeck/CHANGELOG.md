@@ -8,6 +8,45 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.6] - 2026-04-04
+
+### Added
+- Backup & Restore framework: `exportBackup()` serializes all customer data to
+  a JSON file and opens the OS share sheet — iOS routes to iCloud Drive via
+  "Save to Files", Android routes to Google Drive or local Files
+- `importBackup()` opens the OS file picker (supports iCloud Drive on iOS,
+  Google Drive on Android), validates the backup format, and restores customers
+- `restoreCustomers()` added to `storage.js` for atomic bulk restore
+- `expo-file-system`, `expo-sharing`, `expo-document-picker` dependencies added
+- Backup & Restore section added to Settings (Coming Soon)
+
+---
+
+## [1.5] - 2026-04-04
+
+### Infrastructure
+- Square OAuth flow now uses PKCE (RFC 7636) — the token exchange happens
+  directly between the app and Square with no backend server required
+- Added `expo-crypto` dependency for SHA-256 code challenge generation
+- Removed Vercel backend (`api/square/token.js`), `vercel.json`, and
+  `.env.example` — no longer needed
+
+---
+
+## [1.4] - 2026-04-04
+
+### Infrastructure
+- Vercel serverless backend added (`api/square/token.js`) — handles OAuth code
+  exchange so the Square client_secret never lives in the app
+- `vercel.json` at repo root configures Node 20 runtime for all `api/**` functions
+- `.env.example` documents required env vars (`SQUARE_CLIENT_ID`,
+  `SQUARE_CLIENT_SECRET`, `SQUARE_ENVIRONMENT`)
+- `squarePlaceholder.js` updated: sandbox/production mode flag with dynamic base
+  URL selection; `locationId` moved into `SQUARE_CONFIG` (no longer a function
+  argument); `backendTokenUrl` now points to the Vercel endpoint pattern
+
+---
+
 ## [1.2] - 2026-04-03
 
 ### Fixed
