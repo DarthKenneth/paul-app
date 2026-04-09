@@ -1,0 +1,97 @@
+# =============================================================================
+# release.yml - Build iOS + Android and submit to both stores simultaneously
+# Version: 1.0
+# Last Updated: 2026-04-09
+#
+# PROJECT:      Rolodeck (project v1.12)
+# FILES:        .github/workflows/release.yml  (this file — production pipeline)
+#               .github/workflows/ci.yml        (PR/push test runner)
+#               rolodeck/eas.json               (EAS build + submit config)
+#
+# ARCHITECTURE:
+#   - Triggers: push a tag matching v* (e.g. git tag v1.12 && git push --tags)
+#     OR kick it off manually from GitHub Actions > "Release" > "Run workflow"
+#   - Two jobs:
+#       1. test — runs npm test first; release is blocked if tests fail
+#       2. build-and-submit — EAS builds iOS (.ipa) and Android (.aab) in
+#          parallel on Expo's cloud, then auto-submits both to their stores
+#   - `eas build --auto-submit` triggers the submit profile named "production"
+#     in eas.json after each build completes
+#   - Build numbers / version codes are managed remotely by EAS (appVersionSource: remote)
+#     so you never need to manually bump them before a release
+#
+# REQUIRED GITHUB SECRETS (Settings → Secrets → Actions):
+#   EXPO_TOKEN     — create at expo.dev/accounts/[username]/settings/access-tokens
+#
+# REQUIRED EAS SECRETS (set once via `eas secret:create --scope project`):
+#   APPLE_ID       — your Apple Developer email
+#   ASC_APP_ID     — numeric App Store Connect App ID (found in App Store Connect)
+#   APPLE_TEAM_ID  — 10-char Apple Team ID (found in developer.apple.com/account)
+#
+# REQUIRED EAS CREDENTIALS (set once via `eas credentials`):
+#   iOS            — distribution certificate + provisioning profile
+#   Android        — upload keystore + Google Play service account JSON
+#
+# CHANGE LOG:
+# v1.0  2026-04-09  Claude  Initial scaffold
+# =============================================================================
+
+name: Release — iOS & Android
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rolodeck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: rolodeck/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  build-and-submit:
+    name: Build & Submit to Both Stores
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rolodeck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: rolodeck/package-lock.json
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build iOS & Android, submit to App Store + Google Play
+        run: eas build --platform all --profile production --non-interactive --auto-submit

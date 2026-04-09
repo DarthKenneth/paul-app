@@ -8,6 +8,51 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.12] - 2026-04-09
+
+### Infrastructure
+- Added `eas.json` — EAS build + submit config for production (iOS App Store +
+  Google Play) and preview (internal distribution) profiles; `autoIncrement: true`
+  so build numbers and version codes are managed automatically per release
+- Added `.github/workflows/release.yml` — push a tag like `git tag v1.12 && git push --tags`
+  (or trigger manually from GitHub Actions) to build iOS + Android and submit
+  to both stores simultaneously via EAS cloud
+- Added `.github/workflows/ci.yml` — runs tests on every push to main and on PRs
+- Added `npm run release` / `build:ios` / `build:android` / `submit` / `preview` scripts
+- Added `.env.example` documenting EAS and Apple/Android credential setup
+
+---
+
+## [1.11] - 2026-04-09
+
+### Changed
+- Upgraded Expo SDK from 51 to 55 (React Native 0.74 → 0.83, React 18 → 19,
+  all peer dependencies aligned via `npx expo install --fix`)
+- Dark mode iOS icon now handled natively via `ios.icon: { any, dark }` in
+  `app.json` (Expo SDK 52+ feature) — `plugins/withDarkIcon.js` removed
+
+### Infrastructure
+- Removed `plugins/withDarkIcon.js` (superseded by Expo SDK 55 native support)
+- Added `expo-font`, `expo-sharing`, `expo-web-browser` as explicit plugins
+  (auto-added by `expo install --fix` for SDK 55 compatibility)
+
+---
+
+## [1.10] - 2026-04-09
+
+### Added
+- Dark mode app icon: iOS automatically shows a dark-themed icon when the
+  device is in dark mode. Designed to match the light icon's composition with
+  a deep teal/near-black palette (`icon-dark.svg`)
+- `plugins/withDarkIcon.js` — Expo config plugin that wires `icon-dark.png`
+  into the iOS `AppIcon.appiconset` during `expo prebuild`
+
+### Infrastructure
+- `scripts/generate-icons.js` updated to also generate `icon-dark.png` from
+  `store-assets/icon-dark.svg`
+
+---
+
 ## [1.9] - 2026-04-06
 
 ### Changed

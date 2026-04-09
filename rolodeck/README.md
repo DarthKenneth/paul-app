@@ -28,7 +28,7 @@ Built with React Native (Expo), runs on iOS and Android, no backend required.
 
 | Layer | Library |
 |---|---|
-| Framework | React Native (Expo managed workflow ~51) |
+| Framework | React Native (Expo managed workflow ~55) |
 | Navigation | React Navigation v6 — Stack + Bottom Tabs |
 | Storage | @react-native-async-storage/async-storage |
 | Typography | DM Serif Display + DM Sans (via @expo-google-fonts) |

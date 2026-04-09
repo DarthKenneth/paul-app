@@ -1,12 +1,14 @@
 // =============================================================================
 // generate-icons.js - Generates all required app icon PNGs from icon.svg
-// Version: 1.0
-// Last Updated: 2026-04-03
+// Version: 1.1
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.0)
-// FILES:        scripts/generate-icons.js  (this file — icon pipeline)
-//               store-assets/icon.svg       (master source)
-//               store-assets/icons/         (output directory)
+// PROJECT:      Rolodeck (project v1.10)
+// FILES:        scripts/generate-icons.js       (this file — icon pipeline)
+//               store-assets/icon.svg            (light icon master source)
+//               store-assets/icon-dark.svg       (dark icon master source)
+//               store-assets/icons/              (output directory)
+//               plugins/withDarkIcon.js          (consumes icon-dark.png)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
@@ -18,17 +20,23 @@
 //   sharp ^0.33 (in devDependencies) — zero system dependency SVG renderer
 //
 // ARCHITECTURE:
-//   - Reads store-assets/icon.svg as source of truth for all icon exports
-//   - Renders each size via sharp (uses libvips + built-in SVG support)
-//   - icon.png (1024) is flattened with brand background — App Store requires
+//   - Reads store-assets/icon.svg (light) and icon-dark.svg (dark) as sources
+//   - Each ICONS entry may override `src` (SVG path) and `flattenBg` (color)
+//   - icon.png (1024) is flattened with light brand bg — App Store requires
 //     no alpha channel on the primary icon
+//   - icon-dark.png (1024) is flattened with dark brand bg — used by the
+//     withDarkIcon config plugin for iOS 18 dark mode icon support
 //   - adaptive-icon-fg.png: icon centered with padding to respect the Android
 //     adaptive icon 72dp safe zone (icon occupies center 72/108 = 66.7%)
 //   - adaptive-icon-bg.png: solid #C6ECEA fill, same dimensions
-//   - Outputs README.md summary to stdout on completion
+//   - Outputs file list summary to stdout on completion
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
+// v1.1  2026-04-09  Claude  Dark icon support
+//         - Added SVG_DARK_SRC and BRAND_BG_DARK constants
+//         - Added icon-dark.png entry with per-entry src/flattenBg overrides
+//         - Updated render loop to use per-icon src and flattenBg if present
 // =============================================================================
 
 'use strict';
@@ -37,19 +45,35 @@ const sharp  = require('sharp');
 const fs     = require('fs');
 const path   = require('path');
 
-const ROOT    = path.join(__dirname, '..');
-const SVG_SRC = path.join(ROOT, 'store-assets', 'icon.svg');
-const OUT_DIR = path.join(ROOT, 'store-assets', 'icons');
+const ROOT         = path.join(__dirname, '..');
+const SVG_SRC      = path.join(ROOT, 'store-assets', 'icon.svg');
+const SVG_DARK_SRC = path.join(ROOT, 'store-assets', 'icon-dark.svg');
+const OUT_DIR      = path.join(ROOT, 'store-assets', 'icons');
+
+// Adaptive icon dimensions: 648px = 108dp @ xxxhdpi (6x baseline)
+// Safe zone = inner 432px (72dp) = center 66.7%
+// Icon fills the safe zone; padding on each side = (648 - 432) / 2 = 108px
+const ADAPTIVE_TOTAL   = 648;
+const ADAPTIVE_ICON_SZ = 432;
+const ADAPTIVE_PAD     = (ADAPTIVE_TOTAL - ADAPTIVE_ICON_SZ) / 2; // 108px each side
+
+// Brand background colors for flatten operations (removes alpha channel)
+const BRAND_BG      = { r: 198, g: 236, b: 234, alpha: 1 }; // #C6ECEA  (light)
+const BRAND_BG_DARK = { r:  14, g:  36, b:  34, alpha: 1 }; // #0E2422  (dark)
 
 // ── Export manifest ───────────────────────────────────────────────────────────
 //
 // flatten: true  → composite onto solid brand bg (removes alpha)
 //                  required for iOS App Store primary icon
+// src:           → override SVG source (defaults to SVG_SRC)
+// flattenBg:     → override flatten background color (defaults to BRAND_BG)
 // note:          → shown in completion summary
 
 const ICONS = [
-  // iOS
+  // iOS — light (default)
   { name: 'icon.png',         size: 1024, flatten: true, note: 'Expo app icon / App Store listing (no alpha)' },
+  // iOS — dark (iOS 18 automatic dark mode icon)
+  { name: 'icon-dark.png',    size: 1024, flatten: true, src: SVG_DARK_SRC, flattenBg: BRAND_BG_DARK, note: 'Dark mode icon for iOS 18+ (no alpha)' },
   { name: 'icon-60@2x.png',   size: 120,                 note: 'iPhone home @2x' },
   { name: 'icon-60@3x.png',   size: 180,                 note: 'iPhone home @3x' },
   { name: 'icon-76.png',      size: 76,                  note: 'iPad home @1x' },
@@ -64,16 +88,6 @@ const ICONS = [
   // Android
   { name: 'icon-512.png',     size: 512,                 note: 'Play Store listing icon' },
 ];
-
-// Adaptive icon dimensions: 648px = 108dp @ xxxhdpi (6x baseline)
-// Safe zone = inner 432px (72dp) = center 66.7%
-// Icon fills the safe zone; padding on each side = (648 - 432) / 2 = 108px
-const ADAPTIVE_TOTAL   = 648;
-const ADAPTIVE_ICON_SZ = 432;
-const ADAPTIVE_PAD     = (ADAPTIVE_TOTAL - ADAPTIVE_ICON_SZ) / 2; // 108px each side
-
-// Brand background color for flatten + adaptive bg
-const BRAND_BG = { r: 198, g: 236, b: 234, alpha: 1 }; // #C6ECEA
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -100,12 +114,13 @@ async function main() {
 
   // ── Standard icon exports ─────────────────────────────────────────────────
 
-  for (const { name, size, flatten, note } of ICONS) {
-    let pipeline = sharp(svgBuffer, { density: Math.ceil((size / 1024) * 300 + 72) })
+  for (const { name, size, flatten, src, flattenBg, note } of ICONS) {
+    const iconBuf = src ? fs.readFileSync(src) : svgBuffer;
+    let pipeline = sharp(iconBuf, { density: Math.ceil((size / 1024) * 300 + 72) })
       .resize(size, size, { fit: 'cover' });
 
     if (flatten) {
-      pipeline = pipeline.flatten({ background: BRAND_BG });
+      pipeline = pipeline.flatten({ background: flattenBg || BRAND_BG });
     }
 
     await pipeline
@@ -152,7 +167,7 @@ async function main() {
   // ── Done ──────────────────────────────────────────────────────────────────
 
   console.log('\n  ─────────────────────────────────────────');
-  console.log(`  ${ICONS.length + 2} files written to store-assets/icons/`);
+  console.log(`  ${ICONS.length + 2} files written to store-assets/icons/`);  // +2 = adaptive-icon-fg + adaptive-icon-bg
   console.log(`  Source: store-assets/icon.svg\n`);
 }
 

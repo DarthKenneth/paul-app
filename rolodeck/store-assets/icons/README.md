@@ -1,9 +1,9 @@
 # Icon Exports
 
-Master source: `../icon.svg` (1024×1024 artboard)
+Master sources: `../icon.svg` (light, 1024×1024) · `../icon-dark.svg` (dark, 1024×1024)
 
-All PNGs in this directory are **generated from the SVG**. Never edit them directly —
-edit `icon.svg` then re-run the generator.
+All PNGs in this directory are **generated from the SVGs**. Never edit them directly —
+edit `icon.svg` or `icon-dark.svg` then re-run the generator.
 
 ---
 
@@ -26,6 +26,7 @@ That's it. All files below will appear in this directory.
 | File | Size | Usage |
 |------|------|-------|
 | `icon.png` | 1024×1024 | Expo app icon + App Store listing (**no alpha channel**) |
+| `icon-dark.png` | 1024×1024 | Dark mode icon (iOS 18+) — auto-shown when system is in dark mode (**no alpha channel**) |
 | `icon-60@2x.png` | 120×120 | iPhone home screen @2x |
 | `icon-60@3x.png` | 180×180 | iPhone home screen @3x |
 | `icon-76.png` | 76×76 | iPad home screen @1x |

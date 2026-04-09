@@ -1,0 +1,50 @@
+# =============================================================================
+# ci.yml - Run tests on every push to main and on PRs
+# Version: 1.0
+# Last Updated: 2026-04-09
+#
+# PROJECT:      Rolodeck (project v1.12)
+# FILES:        .github/workflows/ci.yml     (this file — PR/push validation)
+#               .github/workflows/release.yml (production release pipeline)
+#               rolodeck/eas.json             (EAS build + submit config)
+#
+# ARCHITECTURE:
+#   - Triggers on push to main and on pull_request targeting main
+#   - Runs from the rolodeck/ subdirectory (that's where package.json lives)
+#   - npm ci (clean install from lockfile) then npm test
+#   - Fails fast — if tests fail the build is blocked
+#
+# CHANGE LOG:
+# v1.0  2026-04-09  Claude  Initial scaffold
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rolodeck
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: rolodeck/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
