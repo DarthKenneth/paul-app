@@ -8,6 +8,24 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.13] - 2026-04-09
+
+### Added
+- First-launch onboarding walkthrough — 5-slide modal shown once on install,
+  covering the app's core workflow (customers → services → follow-ups). Dismissed
+  via "Get Started" or "Skip". Completion state persisted to AsyncStorage so it
+  never shows again after the first run.
+- Theme screen — color scheme and font style pickers moved to a dedicated screen
+  pushed from Settings, accessible via the new "Theme" row in the Appearance card.
+
+### Changed
+- Settings screen restructured: Color scheme and font pickers extracted to ThemeScreen;
+  Theme nav row, Show Archived Customers toggle, and Calendar Sync toggle now grouped
+  in a single "Appearance" card positioned between Default Sort Order and Square
+  Invoicing; Backup & Restore moved to last position above copyright.
+
+---
+
 ## [1.12] - 2026-04-09
 
 ### Infrastructure

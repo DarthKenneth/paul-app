@@ -1,13 +1,15 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.1
-// Last Updated: 2026-04-03
+// Version: 1.2
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.13)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
-//               src/components/TabNavigator.js (navigation structure)
-//               src/data/storage.js     (getAllCustomers, initStorage)
+//               src/components/TabNavigator.js   (navigation structure)
+//               src/components/OnboardingModal.js (first-launch walkthrough)
+//               src/data/storage.js     (getAllCustomers, initStorage,
+//                                        getOnboardingComplete, setOnboardingComplete)
 //               src/utils/serviceAlerts.js (getAlertBadgeCount)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
@@ -23,12 +25,18 @@
 //     can call useTheme()
 //   - initStorage() called on mount to ensure schema version is set
 //   - Alert refresh wrapped in try/catch for storage resilience
+//   - Onboarding modal shown once on first launch; dismissed by completing or
+//     skipping; flag persisted to AsyncStorage via setOnboardingComplete()
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Harden + futureproof
 //       - Added initStorage() call on mount (schema version tracking)
 //       - Wrapped refreshAlerts in try/catch (storage resilience)
+// v1.2  2026-04-09  Claude  First-launch onboarding walkthrough
+//       - Added showOnboarding state, checked via getOnboardingComplete on mount
+//       - Imported OnboardingModal and rendered it above NavigationContainer
+//       - handleOnboardingComplete writes flag then hides modal
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -56,14 +64,16 @@ import {
 
 import { ThemeProvider, useTheme } from './src/styles/theme';
 import TabNavigator from './src/components/TabNavigator';
-import { getAllCustomers, initStorage } from './src/data/storage';
+import OnboardingModal from './src/components/OnboardingModal';
+import { getAllCustomers, initStorage, getOnboardingComplete, setOnboardingComplete } from './src/data/storage';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
 // ── Inner component: has ThemeContext access ───────────────────────────────────
 
 function AppInner() {
   const { themeKey } = useTheme();
-  const [alertCount, setAlertCount] = useState(0);
+  const [alertCount, setAlertCount]       = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const appState = useRef(AppState.currentState);
 
   const refreshAlerts = useCallback(async () => {
@@ -75,9 +85,17 @@ function AppInner() {
     }
   }, []);
 
+  const handleOnboardingComplete = useCallback(async () => {
+    await setOnboardingComplete();
+    setShowOnboarding(false);
+  }, []);
+
   useEffect(() => {
     initStorage().catch(() => {});
     refreshAlerts();
+    getOnboardingComplete().then((done) => {
+      if (!done) setShowOnboarding(true);
+    });
 
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
@@ -95,6 +113,7 @@ function AppInner() {
     <NavigationContainer>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <TabNavigator alertCount={alertCount} onAlertsRefresh={refreshAlerts} />
+      <OnboardingModal visible={showOnboarding} onComplete={handleOnboardingComplete} />
     </NavigationContainer>
   );
 }

@@ -1,7 +1,7 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 1.2
-// Last Updated: 2026-04-04
+// Version: 1.3
+// Last Updated: 2026-04-09
 //
 // PROJECT:      Rolodeck (project v1.6)
 // FILES:        storage.js           (this file — all data persistence)
@@ -41,15 +41,18 @@
 //       - Added schema version tracking (CURRENT_SCHEMA_VERSION = 1)
 //       - Improved generateId() with better entropy (hex + timestamp)
 //       - Added initStorage() for schema version initialization
+// v1.3  2026-04-09  Claude  Added getOnboardingComplete / setOnboardingComplete
+//                           for first-launch onboarding flag
 // v1.2  2026-04-04  Claude  Added restoreCustomers() for backup/restore support
 // =============================================================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const CUSTOMERS_KEY      = '@rolodeck_customers';
-const SORT_PREF_KEY      = '@rolodeck_sort_pref';
-const SHOW_ARCHIVED_KEY  = '@rolodeck_show_archived';
-const SCHEMA_VERSION_KEY = '@rolodeck_schema_version';
+const CUSTOMERS_KEY        = '@rolodeck_customers';
+const SORT_PREF_KEY        = '@rolodeck_sort_pref';
+const SHOW_ARCHIVED_KEY    = '@rolodeck_show_archived';
+const SCHEMA_VERSION_KEY   = '@rolodeck_schema_version';
+const ONBOARDING_DONE_KEY  = '@rolodeck_onboarding_complete';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -78,6 +81,21 @@ export async function initStorage() {
 export async function getSchemaVersion() {
   const v = await AsyncStorage.getItem(SCHEMA_VERSION_KEY);
   return v ? Number(v) : null;
+}
+
+// ── Onboarding ────────────────────────────────────────────────────────────────
+
+export async function getOnboardingComplete() {
+  try {
+    const val = await AsyncStorage.getItem(ONBOARDING_DONE_KEY);
+    return val === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export async function setOnboardingComplete() {
+  await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────

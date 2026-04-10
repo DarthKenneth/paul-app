@@ -1,9 +1,9 @@
 // =============================================================================
 // TabNavigator.js - Root navigation: BottomTabNavigator + Stack navigators
-// Version: 1.0
-// Last Updated: 2026-04-03
+// Version: 1.1
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.13)
 // FILES:        TabNavigator.js           (this file — navigation structure)
 //               App.js                    (renders TabNavigator inside
 //                                          NavigationContainer + ThemeProvider)
@@ -18,7 +18,7 @@
 //       Customers → CustomerDetail → AddCustomer / AddService
 //   - Services tab stack: ServicesScreen only (navigates to CustomersTab for
 //       customer detail via cross-tab navigation)
-//   - Settings tab stack: SettingsScreen only
+//   - Settings tab stack: SettingsScreen → ThemeScreen
 //   - alertCount prop drives the Services tab badge (passed from App.js)
 //   - onAlertsRefresh prop is passed to AddServiceScreen via navigation params
 //     so the badge updates after a new service entry is saved
@@ -26,6 +26,7 @@
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
+// v1.1  2026-04-09  Claude  Added ThemeScreen to Settings stack
 // =============================================================================
 
 import React from 'react';
@@ -39,6 +40,7 @@ import AddCustomerScreen    from '../screens/AddCustomerScreen';
 import AddServiceScreen     from '../screens/AddServiceScreen';
 import ServicesScreen       from '../screens/ServicesScreen';
 import SettingsScreen       from '../screens/SettingsScreen';
+import ThemeScreen          from '../screens/ThemeScreen';
 
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
@@ -128,6 +130,11 @@ function SettingsStackNavigator() {
         name="Settings"
         component={SettingsScreen}
         options={{ title: 'Settings' }}
+      />
+      <SettingsStack.Screen
+        name="Theme"
+        component={ThemeScreen}
+        options={{ title: 'Theme' }}
       />
     </SettingsStack.Navigator>
   );

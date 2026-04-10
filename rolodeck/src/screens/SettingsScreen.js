@@ -1,29 +1,29 @@
 // =============================================================================
-// SettingsScreen.js - App preferences: theme, sort, Square token, version
-// Version: 1.5.2
-// Last Updated: 2026-04-06
+// SettingsScreen.js - App preferences: sort, appearance, integrations, version
+// Version: 1.6
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.8)
+// PROJECT:      Rolodeck (project v1.13)
 // FILES:        SettingsScreen.js     (this file)
-//               colors.js             (Themes, ThemeNames, ThemeKeys)
+//               ThemeScreen.js        (color scheme + font pickers; navigated to
+//                                      from the Appearance card's Theme row)
+//               colors.js             (Themes, ThemeNames)
+//               typography.js         (FontPresetNames, FontSize)
 //               storage.js            (getSortPreference, saveSortPreference)
 //               calendarSync.js       (getCalendarSyncEnabled, enableCalendarSync,
-//                                      disableCalendarSync, syncAllCustomers)
+//                                      disableCalendarSync)
 //               squarePlaceholder.js  (get/save/clearSquareAccessToken)
 //               theme.js              (useTheme)
-//               typography.js         (FontFamily, FontSize)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
-//   - Theme picker: grid of options, each showing a color swatch + label;
-//     calls setTheme() from useTheme() which persists to AsyncStorage
-//   - Sort preference: 4-option toggle (Name / Address / Zip Code / Email);
-//     matches the 4 sort options in CustomersScreen; persists via
-//     saveSortPreference(); CustomersScreen reads it on useFocusEffect
-//   - Square token: secureTextEntry field; save/clear with alert feedback;
-//     stored via squarePlaceholder.saveSquareAccessToken()
-//   - App version: read from a constant; matches app.json expo.version
+//   - Layout (top to bottom): Default Sort Order → Appearance card →
+//     Square Invoicing (coming soon) → Backup & Restore (coming soon) → copyright
+//   - Appearance card groups three rows in one surface: Theme (nav to ThemeScreen),
+//     Show Archived Customers (toggle), Calendar Sync (toggle)
+//   - Theme row shows current color + font as subtitle; chevron navigates to ThemeScreen
+//   - Toggle rows share animated spring pattern (toggleAnim / calSyncAnim)
 //   - useEffect cleanup prevents state updates on unmounted component
 //
 // CHANGE LOG:
@@ -40,6 +40,8 @@
 //       - Imported cloudProviderLabel from backup.js for platform-specific copy
 //       - Added backup section UI (Coming Soon badge, platform-specific description)
 //       - Updated APP_VERSION to '1.6'
+// v1.5.3  2026-04-09  Claude  Added flex: 1 to inner text View in both toggle rows
+//                             to prevent description text clipping behind the toggle
 // v1.5.2  2026-04-06  Claude  Added paddingRight: 12 to archiveLeft to prevent
 //                             description text from clipping behind the toggle
 // v1.5.1  2026-04-06  Claude  Platform-specific calendar permission denied message
@@ -54,6 +56,13 @@
 //       - calendarSyncAnim / calendarSyncKnob mirrors archive toggle pattern
 //       - Imported getCalendarSyncEnabled, enableCalendarSync, disableCalendarSync
 //       - Updated APP_VERSION to '1.8'
+// v1.6  2026-04-09  Claude  Restructured layout + extracted theme pickers
+//       - Color scheme and font style pickers moved to ThemeScreen.js
+//       - Appearance card groups Theme nav row + Archive toggle + Calendar toggle
+//         in a single surface between Sort Order and Square Invoicing
+//       - Backup & Restore moved to last (before copyright)
+//       - Added navigation prop; Theme row pushes ThemeScreen onto Settings stack
+//       - Updated APP_VERSION to '1.13'
 // =============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -70,8 +79,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
-import { Themes, ThemeNames, ThemeKeys } from '../styles/colors';
-import { FontPresets, FontPresetNames, FontPresetKeys, FontSize } from '../styles/typography';
+import { Themes, ThemeNames } from '../styles/colors';
+import { FontPresetNames, FontSize } from '../styles/typography';
 import { getSortPreference, saveSortPreference, getShowArchived, saveShowArchived } from '../data/storage';
 import { cloudProviderLabel } from '../utils/backup';
 import {
@@ -80,7 +89,7 @@ import {
   disableCalendarSync,
 } from '../utils/calendarSync';
 
-const APP_VERSION = '1.8';
+const APP_VERSION = '1.13';
 
 const SORT_OPTIONS = [
   { key: 'name', label: 'Name',     icon: 'text-outline'     },
@@ -88,22 +97,26 @@ const SORT_OPTIONS = [
   { key: 'zip',  label: 'Zip Code', icon: 'map-outline'      },
 ];
 
-export default function SettingsScreen() {
-  const { theme, themeKey, setTheme, fontKey, setFont } = useTheme();
+export default function SettingsScreen({ navigation }) {
+  const { theme, themeKey, fontKey } = useTheme();
   const styles = makeStyles(theme);
 
-  const [sortPref, setSortPref]           = useState('name');
-  const [showArchived, setShowArchived]   = useState(false);
-  const [calendarSync, setCalendarSync]   = useState(false);
-  const [calSyncBusy, setCalSyncBusy]     = useState(false);
-  const toggleAnim    = useRef(new Animated.Value(0)).current;
-  const calSyncAnim   = useRef(new Animated.Value(0)).current;
+  const [sortPref, setSortPref]         = useState('name');
+  const [showArchived, setShowArchived] = useState(false);
+  const [calendarSync, setCalendarSync] = useState(false);
+  const [calSyncBusy, setCalSyncBusy]   = useState(false);
+  const toggleAnim  = useRef(new Animated.Value(0)).current;
+  const calSyncAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let active = true;
     getSortPreference().then((p) => { if (active) setSortPref(p); });
-    getShowArchived().then((v) => { if (active) { setShowArchived(v); toggleAnim.setValue(v ? 1 : 0); } });
-    getCalendarSyncEnabled().then((v) => { if (active) { setCalendarSync(v); calSyncAnim.setValue(v ? 1 : 0); } });
+    getShowArchived().then((v) => {
+      if (active) { setShowArchived(v); toggleAnim.setValue(v ? 1 : 0); }
+    });
+    getCalendarSyncEnabled().then((v) => {
+      if (active) { setCalendarSync(v); calSyncAnim.setValue(v ? 1 : 0); }
+    });
     return () => { active = false; };
   }, []);
 
@@ -133,7 +146,6 @@ export default function SettingsScreen() {
         Animated.spring(calSyncAnim, { toValue: 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
         await disableCalendarSync();
       } else {
-        // Optimistically animate then revert if permission denied
         setCalendarSync(true);
         Animated.spring(calSyncAnim, { toValue: 1, useNativeDriver: false, friction: 6, tension: 80 }).start();
         const granted = await enableCalendarSync();
@@ -174,75 +186,7 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
 
-        {/* ── Color scheme ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Color Scheme</Text>
-          <View style={styles.themeGrid}>
-            {ThemeKeys.map((key) => {
-              const isActive = themeKey === key;
-              return (
-                <Pressable
-                  key={key}
-                  style={[styles.themeOption, isActive && styles.themeOptionActive]}
-                  onPress={() => setTheme(key)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${ThemeNames[key]} theme${isActive ? ', selected' : ''}`}
-                >
-                  <View
-                    style={[
-                      styles.themeSwatch,
-                      { backgroundColor: Themes[key].primary },
-                    ]}
-                  />
-                  <Text style={[styles.themeLabel, isActive && styles.themeLabelActive]}>
-                    {ThemeNames[key]}
-                  </Text>
-                  {isActive && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color={theme.primary}
-                    />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ── Font style ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Font Style</Text>
-          <View style={styles.themeGrid}>
-            {FontPresetKeys.map((key) => {
-              const isActive = fontKey === key;
-              const previewFont = FontPresets[key].fontHeading;
-              return (
-                <Pressable
-                  key={key}
-                  style={[styles.themeOption, isActive && styles.themeOptionActive]}
-                  onPress={() => setFont(key)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${FontPresetNames[key]} font${isActive ? ', selected' : ''}`}
-                >
-                  <Text style={[styles.fontPreview, { fontFamily: previewFont }]}>Aa</Text>
-                  <Text style={[styles.themeLabel, isActive && styles.themeLabelActive]}>
-                    {FontPresetNames[key]}
-                  </Text>
-                  {isActive && (
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={16}
-                      color={theme.primary}
-                    />
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ── Sort preference ── */}
+        {/* ── Default Sort Order ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Default Sort Order</Text>
           <Text style={styles.sectionDesc}>
@@ -252,10 +196,7 @@ export default function SettingsScreen() {
             {SORT_OPTIONS.map(({ key, label, icon }) => (
               <Pressable
                 key={key}
-                style={[
-                  styles.sortOption,
-                  sortPref === key && styles.sortOptionActive,
-                ]}
+                style={[styles.sortOption, sortPref === key && styles.sortOptionActive]}
                 onPress={() => handleSortChange(key)}
                 accessibilityRole="button"
                 accessibilityLabel={`Sort by ${label}`}
@@ -265,12 +206,7 @@ export default function SettingsScreen() {
                   size={18}
                   color={sortPref === key ? theme.surface : theme.textSecondary}
                 />
-                <Text
-                  style={[
-                    styles.sortOptionText,
-                    sortPref === key && styles.sortOptionTextActive,
-                  ]}
-                >
+                <Text style={[styles.sortOptionText, sortPref === key && styles.sortOptionTextActive]}>
                   {label}
                 </Text>
               </Pressable>
@@ -278,25 +214,92 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* ── Archived customers ── */}
-        <Pressable
-          style={[styles.section, styles.archiveRow]}
-          onPress={handleArchiveToggle}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: showArchived }}
-          accessibilityLabel="Show archived customers"
-        >
-          <View style={styles.archiveLeft}>
-            <Ionicons name="archive-outline" size={20} color={theme.textSecondary} />
-            <View>
-              <Text style={styles.archiveTitle}>Show Archived Customers</Text>
-              <Text style={styles.archiveDesc}>Display archived customers in the list</Text>
+        {/* ── Appearance card (Theme + Archive + Calendar) ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+
+          {/* Theme nav row */}
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={() => navigation.navigate('Theme')}
+            accessibilityRole="button"
+            accessibilityLabel="Theme settings"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="color-palette-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Theme</Text>
+                <Text style={styles.rowDesc}>
+                  {ThemeNames[themeKey]} · {FontPresetNames[fontKey]}
+                </Text>
+              </View>
             </View>
+            <View style={styles.themeChevron}>
+              <View style={[styles.themeDot, { backgroundColor: Themes[themeKey].primary }]} />
+              <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+            </View>
+          </Pressable>
+
+          <View style={styles.rowDivider} />
+
+          {/* Show archived customers toggle */}
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={handleArchiveToggle}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: showArchived }}
+            accessibilityLabel="Show archived customers"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="archive-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Show Archived Customers</Text>
+                <Text style={styles.rowDesc}>Display archived customers in the list</Text>
+              </View>
+            </View>
+            <Animated.View style={[styles.toggle, { backgroundColor: toggleBg }]}>
+              <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: knobTranslate }] }]} />
+            </Animated.View>
+          </Pressable>
+
+          <View style={styles.rowDivider} />
+
+          {/* Calendar sync toggle */}
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={handleCalendarSyncToggle}
+            disabled={calSyncBusy}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: calendarSync }}
+            accessibilityLabel="Calendar sync"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="calendar-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Calendar Sync</Text>
+                <Text style={styles.rowDesc}>Auto-add service due dates to Apple Calendar</Text>
+              </View>
+            </View>
+            <Animated.View style={[styles.toggle, { backgroundColor: calSyncBg }]}>
+              <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: calSyncKnob }] }]} />
+            </Animated.View>
+          </Pressable>
+        </View>
+
+        {/* ── Square Invoicing (coming soon) ── */}
+        <View style={[styles.section, styles.comingSoonSection]}>
+          <View style={styles.comingSoonHeader}>
+            <Ionicons name="card-outline" size={22} color={theme.textMuted} />
+            <Text style={styles.sectionTitle}>Square Invoicing</Text>
           </View>
-          <Animated.View style={[styles.toggle, { backgroundColor: toggleBg }]}>
-            <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: knobTranslate }] }]} />
-          </Animated.View>
-        </Pressable>
+          <View style={styles.comingSoonBadge}>
+            <Text style={styles.comingSoonText}>Coming Soon</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Connect your Square account to send invoices directly to customers
+            from their profile.
+          </Text>
+        </View>
 
         {/* ── Backup & Restore (coming soon) ── */}
         <View style={[styles.section, styles.comingSoonSection]}>
@@ -310,44 +313,6 @@ export default function SettingsScreen() {
           <Text style={styles.sectionDesc}>
             Back up your customer database to {cloudProviderLabel()} and restore
             it anytime — even after reinstalling the app.
-          </Text>
-        </View>
-
-        {/* ── Calendar sync ── */}
-        <Pressable
-          style={[styles.section, styles.archiveRow]}
-          onPress={handleCalendarSyncToggle}
-          disabled={calSyncBusy}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: calendarSync }}
-          accessibilityLabel="Calendar sync"
-        >
-          <View style={styles.archiveLeft}>
-            <Ionicons name="calendar-outline" size={20} color={theme.textSecondary} />
-            <View>
-              <Text style={styles.archiveTitle}>Calendar Sync</Text>
-              <Text style={styles.archiveDesc}>
-                Auto-add service due dates to Apple Calendar
-              </Text>
-            </View>
-          </View>
-          <Animated.View style={[styles.toggle, { backgroundColor: calSyncBg }]}>
-            <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: calSyncKnob }] }]} />
-          </Animated.View>
-        </Pressable>
-
-        {/* ── Square integration (coming soon) ── */}
-        <View style={[styles.section, styles.comingSoonSection]}>
-          <View style={styles.comingSoonHeader}>
-            <Ionicons name="card-outline" size={22} color={theme.textMuted} />
-            <Text style={styles.sectionTitle}>Square Invoicing</Text>
-          </View>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Coming Soon</Text>
-          </View>
-          <Text style={styles.sectionDesc}>
-            Connect your Square account to send invoices directly to customers
-            from their profile.
           </Text>
         </View>
 
@@ -374,13 +339,13 @@ function makeStyles(theme) {
     section: {
       backgroundColor: theme.surface,
       borderRadius:    16,
-      padding:          18,
-      marginBottom:     14,
+      padding:         18,
+      marginBottom:    14,
       shadowColor:     '#000',
       shadowOffset:    { width: 0, height: 1 },
-      shadowOpacity:    0.05,
-      shadowRadius:      4,
-      elevation:          1,
+      shadowOpacity:   0.05,
+      shadowRadius:    4,
+      elevation:       1,
     },
     sectionTitle: {
       fontFamily:   theme.fontHeading,
@@ -395,55 +360,23 @@ function makeStyles(theme) {
       lineHeight:   FontSize.sm * 1.6,
       marginBottom: 14,
     },
-    themeGrid: {
-      flexDirection: 'row',
-      flexWrap:      'wrap',
-      gap:            10,
-    },
-    themeOption: {
-      width:         '47%',
-      flexDirection: 'row',
-      alignItems:    'center',
-      borderRadius:  12,
-      borderWidth:    1,
-      borderColor:   theme.border,
-      padding:        11,
-      gap:             8,
-    },
-    themeOptionActive: {
-      borderColor:     theme.primary,
-      backgroundColor: theme.primaryPale,
-    },
-    themeSwatch: {
-      width:        22,
-      height:       22,
-      borderRadius: 11,
-    },
-    themeLabel: {
-      fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
-      color:      theme.textSecondary,
-      flex:        1,
-    },
-    themeLabelActive: {
-      color: theme.text,
-    },
+    // ── Sort ──
     sortToggle: {
       flexDirection: 'row',
       flexWrap:      'wrap',
-      gap:            10,
+      gap:           10,
     },
     sortOption: {
-      width:             '47%',
-      flexDirection:     'row',
-      alignItems:        'center',
-      justifyContent:    'center',
-      gap:                7,
-      paddingVertical:   12,
-      borderRadius:      12,
-      borderWidth:        1,
-      borderColor:       theme.border,
-      backgroundColor:   theme.inputBg,
+      width:           '47%',
+      flexDirection:   'row',
+      alignItems:      'center',
+      justifyContent:  'center',
+      gap:             7,
+      paddingVertical: 12,
+      borderRadius:    12,
+      borderWidth:     1,
+      borderColor:     theme.border,
+      backgroundColor: theme.inputBg,
     },
     sortOptionActive: {
       backgroundColor: theme.primary,
@@ -457,29 +390,47 @@ function makeStyles(theme) {
     sortOptionTextActive: {
       color: theme.surface,
     },
-    archiveRow: {
+    // ── Appearance card rows ──
+    appearanceRow: {
       flexDirection:  'row',
       alignItems:     'center',
       justifyContent: 'space-between',
+      paddingVertical: 6,
     },
-    archiveLeft: {
+    rowLeft: {
       flexDirection: 'row',
       alignItems:    'center',
       gap:           12,
       flex:          1,
       paddingRight:  12,
     },
-    archiveTitle: {
+    rowTitle: {
       fontFamily: theme.fontBodyMedium,
       fontSize:   FontSize.base,
       color:      theme.text,
     },
-    archiveDesc: {
+    rowDesc: {
       fontFamily: theme.fontBody,
       fontSize:   FontSize.xs,
       color:      theme.textMuted,
       marginTop:  2,
     },
+    rowDivider: {
+      height:          StyleSheet.hairlineWidth,
+      backgroundColor: theme.border,
+      marginVertical:  12,
+    },
+    themeChevron: {
+      flexDirection: 'row',
+      alignItems:    'center',
+      gap:           8,
+    },
+    themeDot: {
+      width:        14,
+      height:       14,
+      borderRadius: 7,
+    },
+    // ── Toggle ──
     toggle: {
       width:        46,
       height:       28,
@@ -487,7 +438,7 @@ function makeStyles(theme) {
     },
     toggleKnob: {
       position:        'absolute',
-      top:              3,
+      top:             3,
       width:           22,
       height:          22,
       borderRadius:    11,
@@ -498,6 +449,7 @@ function makeStyles(theme) {
       shadowRadius:    2,
       elevation:       2,
     },
+    // ── Coming soon ──
     comingSoonSection: {
       opacity: 0.7,
     },
@@ -505,7 +457,7 @@ function makeStyles(theme) {
       flexDirection: 'row',
       alignItems:    'center',
       gap:           10,
-      marginBottom:   8,
+      marginBottom:  8,
     },
     comingSoonBadge: {
       alignSelf:         'flex-start',
@@ -522,18 +474,12 @@ function makeStyles(theme) {
       textTransform: 'uppercase',
       letterSpacing: 0.8,
     },
-    fontPreview: {
-      fontSize:   FontSize.lg,
-      color:      theme.text,
-      width:      28,
-      textAlign:  'center',
-    },
     copyright: {
-      fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
-      color:      theme.textMuted,
-      textAlign:  'center',
-      marginTop:  10,
+      fontFamily:    theme.fontBody,
+      fontSize:      FontSize.xs,
+      color:         theme.textMuted,
+      textAlign:     'center',
+      marginTop:     10,
       paddingBottom: 8,
     },
   });
