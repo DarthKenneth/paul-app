@@ -8,6 +8,29 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.14] - 2026-04-09
+
+### Added
+- Default Service Interval setting — a new card in Settings (below Default Sort
+  Order) navigates to a dedicated screen with options: 30 Days, 60 Days, 90 Days,
+  6 Months, 1 Year, and Custom. Selection persists to AsyncStorage.
+- Custom interval mode — when "Custom" is selected, a day-count input appears in
+  the Add Service screen when logging a new service. That count is stored on the
+  service entry and used as that customer's due date until a new service is logged.
+- Interval-aware due dates — switching from Custom back to a preset takes effect
+  on the next logged service; the customer's existing due date remains until then.
+
+### Changed
+- Service due dates, alert buckets, calendar sync events, and the overdue badge
+  count all now respect the configured interval (previously hardcoded to 365 days).
+- Font presets renamed and differentiated across two axes: serif (Editorial vs.
+  Refined) and sans (Geometric vs. Rounded). Editorial uses Playfair Display 700 Bold
+  (dramatic, high-contrast) + Inter body; Refined uses DM Serif Display (graceful,
+  airy) + DM Sans body; Geometric is all-Inter (tight, neutral); Rounded is all-DM
+  Sans (wider spacing, softer).
+
+---
+
 ## [1.13] - 2026-04-09
 
 ### Added

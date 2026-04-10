@@ -1,11 +1,14 @@
 // =============================================================================
 // AddServiceScreen.js - Add a service entry: date stamp + notes
-// Version: 1.3
-// Last Updated: 2026-04-06
+// Version: 1.5
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.8)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        AddServiceScreen.js  (this file)
-//               storage.js           (addServiceEntry, getCustomerById)
+//               storage.js           (addServiceEntry, getCustomerById,
+//                                     getServiceIntervalMode,
+//                                     getServiceIntervalCustomDays,
+//                                     modeToIntervalDays)
 //               calendarSync.js      (syncCustomerDueDate)
 //               theme.js             (useTheme)
 //               typography.js        (FontFamily, FontSize)
@@ -13,15 +16,20 @@
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
-//   - Date defaults to today in YYYY-MM-DD format, always editable
-//   - No type toggle — type is stored as 'service' for all entries;
-//     the "Initial Install/Service" label is derived automatically by
-//     ServiceLogEntry when isInitial=true (oldest entry in the log)
+//   - Date input: three separate number-pad boxes (DD · MM · YYYY) with
+//     auto-advance on fill (DD→MM at 2 digits, MM→YYYY at 2 digits)
+//   - Calendar icon opens a modal with react-native-calendars Calendar;
+//     selecting a day populates the three boxes and closes the modal
+//   - No type toggle — type is stored as 'service' for all entries
 //   - Notes field is optional multiline text
+//   - Custom interval: when the global interval mode is 'custom', an additional
+//     "Custom interval" field appears; the entered days are stored as intervalDays
+//     on the service entry; this value persists for that customer's due date
+//     calculation until a new entry is logged without a custom interval
 //   - On save: calls addServiceEntry(), calls onAlertsRefresh if provided
 //     in route.params (keeps Services tab badge current), then goBack()
-//   - Date validation: strict YYYY-MM-DD regex + range check (year 1900–2100,
-//     verifies the parsed Date matches input to catch overflow like month 13)
+//   - Date validation: round-trip check on the assembled date (catches
+//     invalid month/day combos like Feb 30)
 //   - Double-tap protection via saving state
 //   - Storage errors caught and surfaced via Alert
 //
@@ -39,43 +47,53 @@
 //                           - Fetches updated customer via getCustomerById after
 //                             addServiceEntry, then calls syncCustomerDueDate
 //                           - Sync errors are swallowed; never blocks save flow
+// v1.4  2026-04-09  Claude  Custom interval support
+//       - Loads getServiceIntervalMode + getServiceIntervalCustomDays on mount
+//       - Shows "Custom Interval" field (days input) when mode === 'custom'
+//       - Stores intervalDays on the service entry when mode === 'custom';
+//         omits the field for preset modes so the global setting applies
+// v1.5  2026-04-09  Claude  DD/MM/YYYY split inputs + calendar picker
+//       - Replaced single YYYY-MM-DD text field with three separate number-pad
+//         boxes (DD, MM, YYYY); auto-advances focus on fill
+//       - Calendar icon opens a Modal with react-native-calendars Calendar;
+//         tapping a day fills the boxes and closes the modal
+//       - Removed DATE_REGEX / todayString helpers; replaced with todayParts()
+//       [updated ARCHITECTURE]
 // =============================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
   TextInput,
   ScrollView,
   Pressable,
+  Modal,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { addServiceEntry, getCustomerById } from '../data/storage';
+import { Ionicons } from '@expo/vector-icons';
+import { Calendar } from 'react-native-calendars';
+import {
+  addServiceEntry,
+  getCustomerById,
+  getServiceIntervalMode,
+  getServiceIntervalCustomDays,
+} from '../data/storage';
 import { syncCustomerDueDate } from '../utils/calendarSync';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 
-function todayString() {
-  return new Date().toISOString().split('T')[0];
-}
-
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
-function isValidDate(str) {
-  if (!DATE_REGEX.test(str)) return false;
-  const [y, m, d] = str.split('-').map(Number);
-  if (y < 1900 || y > 2100) return false;
-  // Parse and round-trip to catch overflow (e.g. month 13, day 32)
-  const parsed = new Date(y, m - 1, d);
-  return (
-    parsed.getFullYear() === y &&
-    parsed.getMonth() === m - 1 &&
-    parsed.getDate() === d
-  );
+function todayParts() {
+  const t = new Date();
+  return {
+    dd:   String(t.getDate()).padStart(2, '0'),
+    mm:   String(t.getMonth() + 1).padStart(2, '0'),
+    yyyy: String(t.getFullYear()),
+  };
 }
 
 export default function AddServiceScreen({ route, navigation }) {
@@ -83,29 +101,150 @@ export default function AddServiceScreen({ route, navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
-  const [date, setDate]     = useState(todayString());
-  const [notes, setNotes]   = useState('');
-  const [saving, setSaving] = useState(false);
+  const today = todayParts();
+  const [dd, setDd]     = useState(today.dd);
+  const [mm, setMm]     = useState(today.mm);
+  const [yyyy, setYyyy] = useState(today.yyyy);
+  const [calVisible, setCalVisible] = useState(false);
+
+  const [notes, setNotes]       = useState('');
+  const [saving, setSaving]     = useState(false);
+  const [intervalMode, setIntervalMode]   = useState('365');
+  const [customDays, setCustomDays]       = useState('30');
+
+  const ddRef   = useRef(null);
+  const yyyyRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([getServiceIntervalMode(), getServiceIntervalCustomDays()]).then(
+      ([m, d]) => {
+        if (active) {
+          setIntervalMode(m);
+          setCustomDays(String(d));
+        }
+      },
+    );
+    return () => { active = false; };
+  }, []);
+
+  const isCustom = intervalMode === 'custom';
+
+  // ── Date input handlers ─────────────────────────────────────────────────────
+
+  // MM → DD → YYYY order
+  const handleMmChange = (text) => {
+    const nums = text.replace(/\D/g, '').slice(0, 2);
+    setMm(nums);
+    if (nums.length === 2) ddRef.current?.focus();
+  };
+
+  const handleDdChange = (text) => {
+    const nums = text.replace(/\D/g, '').slice(0, 2);
+    setDd(nums);
+    if (nums.length === 2) yyyyRef.current?.focus();
+  };
+
+  const handleYyyyChange = (text) => {
+    setYyyy(text.replace(/\D/g, '').slice(0, 4));
+  };
+
+  // ── Calendar picker ─────────────────────────────────────────────────────────
+
+  const handleDayPress = (day) => {
+    setDd(String(day.day).padStart(2, '0'));
+    setMm(String(day.month).padStart(2, '0'));
+    setYyyy(String(day.year));
+    setCalVisible(false);
+  };
+
+  // Build a YYYY-MM-DD string for the calendar's selected/initial date.
+  // Falls back to today if the current fields aren't a valid full date.
+  const calSelectedDate = useMemo(() => {
+    const y = parseInt(yyyy, 10);
+    const m = parseInt(mm, 10);
+    const d = parseInt(dd, 10);
+    if (yyyy.length === 4 && y >= 1900 && y <= 2100 &&
+        mm.length >= 1 && m >= 1 && m <= 12 &&
+        dd.length >= 1 && d >= 1 && d <= 31) {
+      return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+    }
+    return new Date().toISOString().split('T')[0];
+  }, [dd, mm, yyyy]);
+
+  const calMarked = useMemo(() => ({
+    [calSelectedDate]: { selected: true, selectedColor: theme.primary },
+  }), [calSelectedDate, theme.primary]);
+
+  const calTheme = useMemo(() => ({
+    backgroundColor:            theme.surface,
+    calendarBackground:         theme.surface,
+    textSectionTitleColor:      theme.textMuted,
+    selectedDayBackgroundColor: theme.primary,
+    selectedDayTextColor:       '#fff',
+    todayTextColor:             theme.primary,
+    dayTextColor:               theme.text,
+    textDisabledColor:          theme.border,
+    arrowColor:                 theme.primary,
+    monthTextColor:             theme.text,
+    textDayFontFamily:          theme.fontBody,
+    textMonthFontFamily:        theme.fontUiBold,
+    textDayHeaderFontFamily:    theme.fontUiMedium,
+    textDayFontSize:            FontSize.sm,
+    textMonthFontSize:          FontSize.base,
+    textDayHeaderFontSize:      FontSize.xs,
+  }), [theme]);
+
+  // ── Save ────────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (saving) return;
-    if (!isValidDate(date)) {
-      Alert.alert('Invalid Date', 'Please enter a valid date in YYYY-MM-DD format (e.g. 2026-04-03).');
+
+    const y = parseInt(yyyy, 10);
+    const m = parseInt(mm, 10);
+    const d = parseInt(dd, 10);
+
+    const validParts = !isNaN(y) && !isNaN(m) && !isNaN(d) &&
+                       y >= 1900 && y <= 2100 &&
+                       m >= 1 && m <= 12 &&
+                       d >= 1 && d <= 31;
+
+    if (!validParts) {
+      Alert.alert('Invalid Date', 'Please enter a valid day, month, and year.');
       return;
+    }
+
+    // Round-trip check to catch impossible combos (e.g. Feb 30)
+    const parsed = new Date(y, m - 1, d);
+    if (parsed.getFullYear() !== y || parsed.getMonth() !== m - 1 || parsed.getDate() !== d) {
+      Alert.alert('Invalid Date', 'That date doesn\'t exist — check the day and month.');
+      return;
+    }
+
+    if (isCustom) {
+      const cd = parseInt(customDays, 10);
+      if (isNaN(cd) || cd < 1) {
+        Alert.alert('Invalid Interval', 'Please enter a valid number of days (minimum 1).');
+        return;
+      }
     }
 
     setSaving(true);
     try {
-      const [y, m, d] = date.split('-').map(Number);
-      const parsed = new Date(y, m - 1, d, 12, 0, 0);
+      const dateObj = new Date(y, m - 1, d, 12, 0, 0);
 
-      await addServiceEntry(customerId, {
-        date:  parsed.toISOString(),
+      const entryData = {
+        date:  dateObj.toISOString(),
         type:  'service',
         notes: notes.trim(),
-      });
+      };
 
-      // Fire-and-forget calendar sync — never blocks or throws to the user
+      if (isCustom) {
+        entryData.intervalDays = Math.max(1, parseInt(customDays, 10));
+      }
+
+      await addServiceEntry(customerId, entryData);
+
       getCustomerById(customerId)
         .then((customer) => syncCustomerDueDate(customer))
         .catch(() => {});
@@ -122,6 +261,8 @@ export default function AddServiceScreen({ route, navigation }) {
     }
   };
 
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -134,16 +275,94 @@ export default function AddServiceScreen({ route, navigation }) {
         >
           {/* ── Date ── */}
           <Text style={styles.label}>Date</Text>
-          <TextInput
-            style={styles.input}
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={theme.placeholder}
-            keyboardType="numbers-and-punctuation"
-            returnKeyType="next"
-          />
-          <Text style={styles.hint}>Format: YYYY-MM-DD  ·  Defaults to today</Text>
+          <View style={styles.dateRow}>
+            {/* MM */}
+            <View style={styles.dateSegmentWrap}>
+              <TextInput
+                style={styles.dateBox}
+                value={mm}
+                onChangeText={handleMmChange}
+                placeholder="MM"
+                placeholderTextColor={theme.placeholder}
+                keyboardType="number-pad"
+                maxLength={2}
+                textAlign="center"
+                returnKeyType="next"
+                accessibilityLabel="Month"
+              />
+              <Text style={styles.dateSegmentLabel}>Month</Text>
+            </View>
+
+            <Text style={styles.dateSep}>/</Text>
+
+            {/* DD */}
+            <View style={styles.dateSegmentWrap}>
+              <TextInput
+                ref={ddRef}
+                style={styles.dateBox}
+                value={dd}
+                onChangeText={handleDdChange}
+                placeholder="DD"
+                placeholderTextColor={theme.placeholder}
+                keyboardType="number-pad"
+                maxLength={2}
+                textAlign="center"
+                returnKeyType="next"
+                accessibilityLabel="Day"
+              />
+              <Text style={styles.dateSegmentLabel}>Day</Text>
+            </View>
+
+            <Text style={styles.dateSep}>/</Text>
+
+            {/* YYYY */}
+            <View style={[styles.dateSegmentWrap, styles.dateSegmentYear]}>
+              <TextInput
+                ref={yyyyRef}
+                style={[styles.dateBox, styles.dateBoxYear]}
+                value={yyyy}
+                onChangeText={handleYyyyChange}
+                placeholder="YYYY"
+                placeholderTextColor={theme.placeholder}
+                keyboardType="number-pad"
+                maxLength={4}
+                textAlign="center"
+                returnKeyType="done"
+                accessibilityLabel="Year"
+              />
+              <Text style={styles.dateSegmentLabel}>Year</Text>
+            </View>
+
+            {/* Calendar icon */}
+            <Pressable
+              style={({ pressed }) => [styles.calBtn, pressed && styles.calBtnPressed]}
+              onPress={() => setCalVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Open date picker"
+            >
+              <Ionicons name="calendar-outline" size={22} color={theme.primary} />
+            </Pressable>
+          </View>
+
+          {/* ── Custom interval ── */}
+          {isCustom && (
+            <>
+              <Text style={[styles.label, styles.labelTop]}>Custom Interval</Text>
+              <View style={styles.customIntervalRow}>
+                <TextInput
+                  style={[styles.dateBox, styles.daysInput]}
+                  value={customDays}
+                  onChangeText={setCustomDays}
+                  placeholder="e.g. 45"
+                  placeholderTextColor={theme.placeholder}
+                  keyboardType="number-pad"
+                  returnKeyType="next"
+                  maxLength={4}
+                />
+                <Text style={styles.daysSuffix}>days until next service</Text>
+              </View>
+            </>
+          )}
 
           {/* ── Notes ── */}
           <Text style={[styles.label, styles.labelTop]}>Notes</Text>
@@ -170,6 +389,40 @@ export default function AddServiceScreen({ route, navigation }) {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Calendar picker modal ── */}
+      <Modal
+        visible={calVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setCalVisible(false)}>
+          {/* Prevent taps inside the card from closing the modal */}
+          <Pressable style={styles.calCard} onPress={() => {}}>
+            <View style={styles.calHeader}>
+              <Text style={styles.calTitle}>Pick a Date</Text>
+              <Pressable onPress={() => setCalVisible(false)} hitSlop={12}>
+                <Ionicons name="close" size={22} color={theme.textSecondary} />
+              </Pressable>
+            </View>
+            <Calendar
+              current={calSelectedDate}
+              markedDates={calMarked}
+              onDayPress={handleDayPress}
+              theme={calTheme}
+              enableSwipeMonths
+              renderArrow={(direction) => (
+                <Ionicons
+                  name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
+                  size={26}
+                  color={theme.primary}
+                />
+              )}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -198,6 +451,76 @@ function makeStyles(theme) {
     labelTop: {
       marginTop: 22,
     },
+    // ── Date row ──
+    dateRow: {
+      flexDirection: 'row',
+      alignItems:    'flex-start',
+      gap:            6,
+    },
+    dateSegmentWrap: {
+      alignItems: 'center',
+      gap:         5,
+    },
+    dateSegmentYear: {
+      flex: 1,
+    },
+    dateBox: {
+      fontFamily:        theme.fontBody,
+      fontSize:          FontSize.lg,
+      color:             theme.text,
+      backgroundColor:   theme.inputBg,
+      borderWidth:        1,
+      borderColor:       theme.inputBorder,
+      borderRadius:      12,
+      paddingVertical:   13,
+      width:              64,
+    },
+    dateBoxYear: {
+      width: '100%',
+    },
+    dateSegmentLabel: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.xs,
+      color:      theme.textMuted,
+    },
+    dateSep: {
+      fontFamily:  theme.fontBody,
+      fontSize:    FontSize.xl,
+      color:       theme.border,
+      marginTop:    13,
+    },
+    calBtn: {
+      width:          48,
+      height:         52,
+      borderRadius:   12,
+      backgroundColor: theme.inputBg,
+      borderWidth:     1,
+      borderColor:    theme.inputBorder,
+      alignItems:     'center',
+      justifyContent: 'center',
+      marginTop:       0,
+    },
+    calBtnPressed: {
+      opacity: 0.7,
+    },
+    // ── Custom interval ──
+    customIntervalRow: {
+      flexDirection: 'row',
+      alignItems:    'center',
+      gap:            12,
+    },
+    daysInput: {
+      width:     90,
+      fontSize:  FontSize.base,
+      paddingVertical: 12,
+    },
+    daysSuffix: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.sm,
+      color:      theme.textMuted,
+      flex:        1,
+    },
+    // ── Notes ──
     input: {
       fontFamily:        theme.fontBody,
       fontSize:          FontSize.base,
@@ -209,15 +532,10 @@ function makeStyles(theme) {
       paddingVertical:   12,
       paddingHorizontal: 14,
     },
-    hint: {
-      fontFamily:   theme.fontBody,
-      fontSize:     FontSize.xs,
-      color:        theme.textMuted,
-      marginTop:     6,
-    },
     notesInput: {
       height: 150,
     },
+    // ── Save button ──
     saveBtn: {
       backgroundColor: theme.primary,
       borderRadius:    14,
@@ -232,6 +550,38 @@ function makeStyles(theme) {
       fontFamily: theme.fontBodyBold,
       fontSize:   FontSize.md,
       color:      theme.surface,
+    },
+    // ── Calendar modal ──
+    modalOverlay: {
+      flex:            1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent:  'center',
+      alignItems:      'center',
+      padding:          24,
+    },
+    calCard: {
+      width:           '100%',
+      backgroundColor: theme.surface,
+      borderRadius:    20,
+      overflow:        'hidden',
+      shadowColor:     '#000',
+      shadowOffset:    { width: 0, height: 8 },
+      shadowOpacity:   0.2,
+      shadowRadius:    20,
+      elevation:       10,
+    },
+    calHeader: {
+      flexDirection:  'row',
+      alignItems:     'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18,
+      paddingTop:      16,
+      paddingBottom:    8,
+    },
+    calTitle: {
+      fontFamily: theme.fontUiBold,
+      fontSize:   FontSize.base,
+      color:      theme.text,
     },
   });
 }

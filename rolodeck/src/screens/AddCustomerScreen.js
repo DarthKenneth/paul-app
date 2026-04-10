@@ -1,12 +1,13 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.2
-// Last Updated: 2026-04-03
+// Version: 1.5
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.3)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        AddCustomerScreen.js  (this file)
 //               storage.js            (addCustomer)
 //               zipLookup.js          (lookupZip — city/state from zip code)
+//               placesConfig.js       (GEOAPIFY_API_KEY)
 //               theme.js              (useTheme)
 //               typography.js         (FontFamily, FontSize)
 //
@@ -14,9 +15,17 @@
 //
 // ARCHITECTURE:
 //   - Controlled form with 7 fields; only name is required
-//   - Zip code auto-fill: when the user enters a 5-digit zip code, lookupZip()
-//     fetches city and state from the Zippopotam.us API and fills them in
-//     (only if city/state are currently empty, so user edits aren't overwritten)
+//   - Address autocomplete: as the user types the address field, a debounced
+//     call to the Radar.io Autocomplete API fetches suggestions; selecting one
+//     fills address, city, state, and zip directly from the response (single
+//     call — no separate details fetch needed)
+//   - Autocomplete requires GEOAPIFY_API_KEY in src/config/placesConfig.js;
+//     if the key is empty the address field works as plain text (no suggestions)
+//   - Suggestions render inline (not absolutely positioned) to avoid z-index
+//     issues inside ScrollView — they push city/state/zip down while visible
+//   - Suggestions are debounced 350ms; cleared on blur or selection
+//   - Zip code fallback: when the user enters a 5-digit zip code and city/state
+//     are empty, lookupZip() fetches them from Zippopotam.us as a backup
 //   - City and State rendered side-by-side in a row
 //   - On save: calls addCustomer(), navigates back (list refreshes via
 //     useFocusEffect in CustomersScreen)
@@ -33,6 +42,22 @@
 //                             - Zip code triggers lookupZip() at 5 digits
 //                             - City/State render side-by-side
 //                             - Updated EMPTY_FORM and FIELDS for new schema
+// v1.3  2026-04-09  Claude  Address autocomplete via Google Places API
+//       - Typing in address field calls Places Autocomplete API (debounced 350ms)
+//       - Selecting a suggestion calls Places Details API to fill address,
+//         city, state, zip all at once
+//       - Suggestions rendered inline below the address input
+//       - Requires GOOGLE_PLACES_API_KEY in placesConfig.js; falls back to
+//         plain text if key is empty [updated ARCHITECTURE]
+// v1.4  2026-04-09  Claude  Swap Google Places for Radar.io autocomplete
+//       - fetchSuggestions now calls Radar /v1/search/autocomplete (free tier)
+//       - Removed fetchPlaceDetails — Radar returns full address in one call
+//       - handleSuggestionSelect simplified to sync (no second fetch needed)
+//       - Config import updated to RADAR_PUBLISHABLE_KEY [updated ARCHITECTURE]
+// v1.5  2026-04-09  Claude  Swap Radar for Geoapify (Radar requires sales demo)
+//       - fetchSuggestions now calls Geoapify /v1/geocode/autocomplete
+//       - Response is GeoJSON; address parsed from feature.properties
+//       - Config import updated to GEOAPIFY_API_KEY [updated ARCHITECTURE]
 // =============================================================================
 
 import React, { useState, useRef } from 'react';
@@ -42,16 +67,38 @@ import {
   TextInput,
   ScrollView,
   Pressable,
+  ActivityIndicator,
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { addCustomer } from '../data/storage';
 import { lookupZip } from '../utils/zipLookup';
+import { GEOAPIFY_API_KEY } from '../config/placesConfig';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
+
+// ── Geoapify autocomplete helper ──────────────────────────────────────────────
+
+const GEOAPIFY_AUTOCOMPLETE_URL = 'https://api.geoapify.com/v1/geocode/autocomplete';
+
+async function fetchSuggestions(input) {
+  if (!GEOAPIFY_API_KEY) return [];
+  const params = new URLSearchParams({
+    text:            input,
+    filter:          'countrycode:us',
+    limit:           '5',
+    apiKey:          GEOAPIFY_API_KEY,
+  });
+  const res  = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params}`);
+  const data = await res.json();
+  return Array.isArray(data.features) ? data.features : [];
+}
+
+// ── Form fields (everything except address, which is handled separately) ──────
 
 const FIELDS = [
   {
@@ -73,12 +120,6 @@ const FIELDS = [
     placeholder:  '(555) 555-5555',
     keyboardType: 'phone-pad',
   },
-  {
-    key:           'address',
-    label:         'Address',
-    placeholder:   'Street address',
-    autoCapitalize: 'words',
-  },
 ];
 
 const EMPTY_FORM = {
@@ -86,14 +127,66 @@ const EMPTY_FORM = {
   zipCode: '', city: '', state: '',
 };
 
+// ── Screen ────────────────────────────────────────────────────────────────────
+
 export default function AddCustomerScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const lookupDone = useRef(new Set());
+
+  const [form, setForm]                   = useState(EMPTY_FORM);
+  const [saving, setSaving]               = useState(false);
+  const [suggestions, setSuggestions]     = useState([]);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+
+  const lookupDone      = useRef(new Set());
+  const debounceRef     = useRef(null);
+  const addressInputRef = useRef(null);
 
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  // ── Address autocomplete ─────────────────────────────────────────────────────
+
+  const handleAddressChange = (text) => {
+    setField('address', text);
+    setSuggestions([]);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!GEOAPIFY_API_KEY || text.trim().length < 3) return;
+
+    debounceRef.current = setTimeout(async () => {
+      setSuggestLoading(true);
+      try {
+        const preds = await fetchSuggestions(text);
+        setSuggestions(preds);
+      } catch {
+        // Autocomplete failed — manual entry still works fine
+      } finally {
+        setSuggestLoading(false);
+      }
+    }, 350);
+  };
+
+  const handleSuggestionSelect = (feature) => {
+    setSuggestions([]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    const p = feature.properties;
+    const streetAddr = [p.housenumber, p.street].filter(Boolean).join(' ') || p.address_line1;
+    setForm((f) => ({
+      ...f,
+      address: streetAddr    || f.address,
+      city:    p.city        || f.city,
+      state:   p.state_code  || f.state,
+      zipCode: p.postcode    || f.zipCode,
+    }));
+  };
+
+  const handleAddressBlur = () => {
+    // Small delay so a tap on a suggestion registers before clearing the list
+    setTimeout(() => setSuggestions([]), 150);
+  };
+
+  // ── Zip fallback ─────────────────────────────────────────────────────────────
 
   const handleZipChange = async (zip) => {
     setField('zipCode', zip);
@@ -110,6 +203,8 @@ export default function AddCustomerScreen({ navigation }) {
       }
     }
   };
+
+  // ── Save ─────────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (saving) return;
@@ -132,6 +227,8 @@ export default function AddCustomerScreen({ navigation }) {
     }
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -142,6 +239,7 @@ export default function AddCustomerScreen({ navigation }) {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          {/* ── Name / Email / Phone ── */}
           {FIELDS.map(({ key, label, placeholder, keyboardType, autoCapitalize }) => (
             <View key={key} style={styles.field}>
               <Text style={styles.label}>{label}</Text>
@@ -158,7 +256,72 @@ export default function AddCustomerScreen({ navigation }) {
             </View>
           ))}
 
-          {/* ── City / State / Zip ── */}
+          {/* ── Address (with autocomplete) ── */}
+          <View style={styles.field}>
+            <Text style={styles.label}>Address</Text>
+            <View style={styles.addressInputWrap}>
+              <TextInput
+                ref={addressInputRef}
+                style={[styles.input, styles.addressInput]}
+                value={form.address}
+                onChangeText={handleAddressChange}
+                onBlur={handleAddressBlur}
+                placeholder="Start typing a street address…"
+                placeholderTextColor={theme.placeholder}
+                autoCapitalize="words"
+                returnKeyType="next"
+              />
+              {suggestLoading && (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.primary}
+                  style={styles.addressSpinner}
+                />
+              )}
+            </View>
+
+            {/* Inline suggestion list */}
+            {suggestions.length > 0 && (
+              <View style={styles.suggestionList}>
+                {suggestions.map((feature, idx) => {
+                  const p        = feature.properties;
+                  const mainText = [p.housenumber, p.street].filter(Boolean).join(' ') || p.address_line1;
+                  const subParts = [p.city, [p.state_code, p.postcode].filter(Boolean).join(' ')].filter(Boolean);
+                  const subText  = subParts.join(', ');
+                  return (
+                    <Pressable
+                      key={p.formatted || idx}
+                      style={({ pressed }) => [
+                        styles.suggestionRow,
+                        pressed && styles.suggestionRowPressed,
+                        idx < suggestions.length - 1 && styles.suggestionRowBorder,
+                      ]}
+                      onPress={() => handleSuggestionSelect(feature)}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={16}
+                        color={theme.primary}
+                        style={styles.suggestionIcon}
+                      />
+                      <View style={styles.suggestionTexts}>
+                        <Text style={styles.suggestionMain} numberOfLines={1}>
+                          {mainText}
+                        </Text>
+                        {!!subText && (
+                          <Text style={styles.suggestionSub} numberOfLines={1}>
+                            {subText}
+                          </Text>
+                        )}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+
+          {/* ── City / State ── */}
           <View style={styles.rowFields}>
             <View style={styles.rowField}>
               <Text style={styles.label}>City</Text>
@@ -166,7 +329,7 @@ export default function AddCustomerScreen({ navigation }) {
                 style={styles.input}
                 value={form.city}
                 onChangeText={(v) => setField('city', v)}
-                placeholder="Auto-filled from zip"
+                placeholder="Auto-filled"
                 placeholderTextColor={theme.placeholder}
                 autoCapitalize="words"
                 returnKeyType="next"
@@ -187,7 +350,8 @@ export default function AddCustomerScreen({ navigation }) {
             </View>
           </View>
 
-          <View key="zipCode" style={styles.field}>
+          {/* ── Zip Code ── */}
+          <View style={styles.field}>
             <Text style={styles.label}>Zip Code</Text>
             <TextInput
               style={styles.input}
@@ -262,6 +426,63 @@ function makeStyles(theme) {
       paddingVertical:   12,
       paddingHorizontal: 14,
     },
+    // ── Address autocomplete ──
+    addressInputWrap: {
+      position:       'relative',
+      justifyContent: 'center',
+    },
+    addressInput: {
+      paddingRight: 40, // room for spinner
+    },
+    addressSpinner: {
+      position: 'absolute',
+      right:     14,
+    },
+    suggestionList: {
+      marginTop:       4,
+      backgroundColor: theme.surface,
+      borderRadius:    12,
+      borderWidth:     1,
+      borderColor:     theme.border,
+      overflow:        'hidden',
+      shadowColor:     '#000',
+      shadowOffset:    { width: 0, height: 2 },
+      shadowOpacity:   0.08,
+      shadowRadius:    8,
+      elevation:       4,
+    },
+    suggestionRow: {
+      flexDirection:     'row',
+      alignItems:        'center',
+      paddingVertical:    11,
+      paddingHorizontal: 14,
+      gap:               10,
+    },
+    suggestionRowPressed: {
+      backgroundColor: theme.inputBg,
+    },
+    suggestionRowBorder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    suggestionIcon: {
+      flexShrink: 0,
+    },
+    suggestionTexts: {
+      flex: 1,
+    },
+    suggestionMain: {
+      fontFamily: theme.fontBodyMedium,
+      fontSize:   FontSize.sm,
+      color:      theme.text,
+    },
+    suggestionSub: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.xs,
+      color:      theme.textMuted,
+      marginTop:   1,
+    },
+    // ── Save button ──
     saveBtn: {
       backgroundColor: theme.primary,
       borderRadius:    14,

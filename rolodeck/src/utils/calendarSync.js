@@ -1,12 +1,16 @@
 // =============================================================================
 // calendarSync.js - One-way push of service due dates to the device calendar
-// Version: 1.1
-// Last Updated: 2026-04-06
+// Version: 1.2
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.9)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        calendarSync.js         (this file — calendar sync engine)
-//               storage.js              (getAllCustomers, getCustomerById)
-//               serviceAlerts.js        (getLastServiceDate)
+//               storage.js              (getAllCustomers, getCustomerById,
+//                                        getServiceIntervalMode,
+//                                        getServiceIntervalCustomDays,
+//                                        modeToIntervalDays)
+//               serviceAlerts.js        (getLastServiceDate,
+//                                        getEffectiveIntervalForCustomer)
 //               AddServiceScreen.js     (calls syncCustomerDueDate after save)
 //               SettingsScreen.js       (calls enableCalendarSync, disableCalendarSync,
 //                                        getCalendarSyncEnabled, syncAllCustomers)
@@ -50,6 +54,13 @@
 //       - syncAllCustomers (full sync for initial enable or manual re-sync)
 //       - removeCustomerEvent (for future archive/delete integration)
 //       - buildEventNotes (formats customer contact info for event body)
+// v1.2  2026-04-09  Claude  Respect configurable service interval
+//       - syncCustomerDueDate loads interval preference and uses
+//         getEffectiveIntervalForCustomer to compute due date; removed
+//         hardcoded SERVICE_INTERVAL_MS constant
+//       - Imported getServiceIntervalMode, getServiceIntervalCustomDays,
+//         modeToIntervalDays from storage; getEffectiveIntervalForCustomer
+//         from serviceAlerts
 // v1.1  2026-04-06  Claude  Android Google Calendar support
 //       - getRoledeckCalendar: Android now scans existing calendars for a
 //         Google account source (com.google) so events sync to Google Calendar
@@ -63,15 +74,20 @@
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import { getAllCustomers } from '../data/storage';
-import { getLastServiceDate } from './serviceAlerts';
+import {
+  getAllCustomers,
+  getServiceIntervalMode,
+  getServiceIntervalCustomDays,
+  modeToIntervalDays,
+} from '../data/storage';
+import { getLastServiceDate, getEffectiveIntervalForCustomer } from './serviceAlerts';
 
 const SYNC_ENABLED_KEY = '@rolodeck_calendar_sync_enabled';
 const CALENDAR_ID_KEY  = '@rolodeck_calendar_id';
 const EVENT_IDS_KEY    = '@rolodeck_calendar_event_ids';
 
-const CALENDAR_COLOR        = '#4AACA5'; // Rolodeck teal
-const SERVICE_INTERVAL_MS   = 365 * 24 * 60 * 60 * 1000;
+const CALENDAR_COLOR = '#4AACA5'; // Rolodeck teal
+const MS_PER_DAY     = 1000 * 60 * 60 * 24;
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
@@ -210,7 +226,13 @@ export async function syncCustomerDueDate(customer) {
     const lastService = getLastServiceDate(customer);
     if (!lastService) return; // no service on record — nothing to pin
 
-    const dueDate = new Date(lastService.getTime() + SERVICE_INTERVAL_MS);
+    const [mode, customDays] = await Promise.all([
+      getServiceIntervalMode(),
+      getServiceIntervalCustomDays(),
+    ]);
+    const globalDays  = modeToIntervalDays(mode, customDays);
+    const effectiveDays = getEffectiveIntervalForCustomer(customer, globalDays);
+    const dueDate = new Date(lastService.getTime() + effectiveDays * MS_PER_DAY);
 
     const calendarId = await getRoledeckCalendar();
     const eventIds   = await getEventIds();

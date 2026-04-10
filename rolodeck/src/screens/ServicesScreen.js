@@ -1,9 +1,9 @@
 // =============================================================================
 // ServicesScreen.js - Upcoming and overdue service list, grouped by due window
-// Version: 2.1
-// Last Updated: 2026-04-06
+// Version: 2.2
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.7)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        ServicesScreen.js    (this file)
 //               storage.js           (getAllCustomers)
 //               serviceAlerts.js     (groupCustomersByDueWindow, getServiceStatus,
@@ -37,6 +37,14 @@
 //         - Section headers color-coded by urgency
 //         - Empty state handles both zero customers and all-current cases
 // v2.0.1  2026-04-03  Claude  Added try/catch on storage load in useFocusEffect
+// v2.2  2026-04-09  Claude  Respect configurable service interval
+//       - Loads interval preference (mode + customDays) in useFocusEffect
+//       - Passes intervalDays to groupCustomersByDueWindow, getServiceStatus
+//       - dueDateString() now accepts globalIntervalDays and uses
+//         getEffectiveIntervalForCustomer to respect per-entry overrides
+//       - Imported getServiceIntervalMode, getServiceIntervalCustomDays,
+//         modeToIntervalDays from storage; getEffectiveIntervalForCustomer
+//         from serviceAlerts
 // v2.1    2026-04-06  Claude  Calendar view toggle
 //         - Added List/Calendar segment bar at top of screen
 //         - Calendar view shows each customer's due date as an urgency-colored dot
@@ -59,17 +67,22 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
-import { getAllCustomers } from '../data/storage';
+import {
+  getAllCustomers,
+  getServiceIntervalMode,
+  getServiceIntervalCustomDays,
+  modeToIntervalDays,
+} from '../data/storage';
 import {
   groupCustomersByDueWindow,
   getServiceStatus,
   getLastServiceDate,
+  getEffectiveIntervalForCustomer,
 } from '../utils/serviceAlerts';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
-const SERVICE_INTERVAL_DAYS = 365;
 
 // Color key per section — maps to theme properties
 const SECTION_COLOR_KEY = {
@@ -89,10 +102,12 @@ function dotColorForLevel(level, theme) {
   }
 }
 
-function dueDateString(customer) {
+// Uses per-entry intervalDays if present, else the provided global interval
+function dueDateString(customer, globalIntervalDays) {
   const last = getLastServiceDate(customer);
   if (!last) return null;
-  const due = new Date(last.getTime() + SERVICE_INTERVAL_DAYS * MS_PER_DAY);
+  const effectiveDays = getEffectiveIntervalForCustomer(customer, globalIntervalDays);
+  const due = new Date(last.getTime() + effectiveDays * MS_PER_DAY);
   return due.toISOString().split('T')[0]; // YYYY-MM-DD
 }
 
@@ -105,15 +120,22 @@ export default function ServicesScreen({ navigation }) {
   const [allCustomers, setAllCustomers]   = React.useState([]);
   const [totalCustomers, setTotalCustomers] = React.useState(0);
   const [selectedDate, setSelectedDate]   = React.useState(null);
+  const [intervalDays, setIntervalDays]   = React.useState(365);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      getAllCustomers()
-        .then((all) => {
+      Promise.all([
+        getAllCustomers(),
+        getServiceIntervalMode(),
+        getServiceIntervalCustomDays(),
+      ])
+        .then(([all, mode, customDays]) => {
           if (active) {
+            const days    = modeToIntervalDays(mode, customDays);
             const active_ = all.filter((c) => !c.archived);
-            setSections(groupCustomersByDueWindow(active_));
+            setIntervalDays(days);
+            setSections(groupCustomersByDueWindow(active_, days));
             setAllCustomers(active_);
             setTotalCustomers(active_.length);
           }
@@ -137,9 +159,9 @@ export default function ServicesScreen({ navigation }) {
   const markedDates = useMemo(() => {
     const result = {};
     for (const customer of allCustomers) {
-      const dateStr = dueDateString(customer);
+      const dateStr = dueDateString(customer, intervalDays);
       if (!dateStr) continue; // skip never-serviced
-      const status = getServiceStatus(customer);
+      const status = getServiceStatus(customer, intervalDays);
       if (!result[dateStr]) result[dateStr] = { dots: [] };
       // Cap at 3 dots per day to avoid visual overflow
       if (result[dateStr].dots.length < 3) {
@@ -158,12 +180,12 @@ export default function ServicesScreen({ navigation }) {
       };
     }
     return result;
-  }, [allCustomers, selectedDate, theme]);
+  }, [allCustomers, selectedDate, theme, intervalDays]);
 
   const customersOnSelectedDay = useMemo(() => {
     if (!selectedDate) return [];
-    return allCustomers.filter((c) => dueDateString(c) === selectedDate);
-  }, [allCustomers, selectedDate]);
+    return allCustomers.filter((c) => dueDateString(c, intervalDays) === selectedDate);
+  }, [allCustomers, selectedDate, intervalDays]);
 
   const calendarTheme = useMemo(() => ({
     backgroundColor:            theme.surface,
@@ -233,7 +255,7 @@ export default function ServicesScreen({ navigation }) {
   };
 
   const renderItem = ({ item, section }) => {
-    const status = getServiceStatus(item);
+    const status = getServiceStatus(item, intervalDays);
     const lastDate = getLastServiceDate(item);
     const colorKey = SECTION_COLOR_KEY[section.key] || 'textMuted';
     const accentColor = theme[colorKey];
@@ -268,7 +290,7 @@ export default function ServicesScreen({ navigation }) {
   };
 
   const renderCalendarRow = ({ item }) => {
-    const status = getServiceStatus(item);
+    const status = getServiceStatus(item, intervalDays);
     const accentColor = dotColorForLevel(status.level, theme);
     return (
       <Pressable

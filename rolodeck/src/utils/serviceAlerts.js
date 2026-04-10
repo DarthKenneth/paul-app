@@ -1,25 +1,32 @@
 // =============================================================================
 // serviceAlerts.js - Service due-date calculations and filter utilities
-// Version: 1.1
-// Last Updated: 2026-04-03
+// Version: 1.2
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        serviceAlerts.js     (this file — pure alert/filter logic)
 //               storage.js           (Customer data source)
 //               ServicesScreen.js    (groupCustomersByDueWindow, getServiceStatus)
 //               CustomerCard.js      (getServiceStatus)
 //               CustomerDetailScreen.js (getServiceStatus)
 //               App.js               (getAlertBadgeCount)
+//               calendarSync.js      (getLastServiceDate, getEffectiveIntervalForCustomer)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
 //   - All functions are pure — no storage access, no side effects
 //   - "Last service date" = date of the most recent serviceLog entry
-//   - Service interval: 365 days
+//   - Service interval: configurable; functions accept intervalDays param
+//     (default 365); callers load interval from storage and pass it in
+//   - Per-entry interval: if a service entry has an intervalDays field (set
+//     when logged under custom interval mode), that value overrides the global
+//     interval for that customer until a new entry is logged without one
+//   - getEffectiveIntervalForCustomer(customer, globalIntervalDays) returns the
+//     interval to use: most recent entry's intervalDays if present, else global
 //   - Customers with no serviceLog entries are treated as never serviced
 //     (most urgent) so they surface in all alert/overdue buckets
-//   - Due windows: a customer is "due within N days" if (365 - daysAgo) <= N
+//   - Due windows: a customer is "due within N days" if (interval - daysAgo) <= N
 //     and they are not yet overdue
 //   - groupCustomersByDueWindow: buckets customers into SectionList-ready
 //     sections (Overdue / Next 30 / Next 31-60 / Next 61-90 / Later),
@@ -29,9 +36,15 @@
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added groupCustomersByDueWindow() for ServicesScreen
 //                           section-based layout [updated ARCHITECTURE]
+// v1.2  2026-04-09  Claude  Configurable service interval
+//       - Removed hardcoded SERVICE_INTERVAL_DAYS = 365 constant
+//       - Added getEffectiveIntervalForCustomer() — checks most recent service
+//         entry's intervalDays field, falls back to globalIntervalDays param
+//       - All exported functions now accept intervalDays param (default 365)
+//       - groupCustomersByDueWindow and internal sort pass intervalDays through
+//         [updated ARCHITECTURE]
 // =============================================================================
 
-const SERVICE_INTERVAL_DAYS = 365;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -43,6 +56,22 @@ export function getLastServiceDate(customer) {
   return dates.reduce((latest, d) => (d > latest ? d : latest), dates[0]);
 }
 
+/**
+ * Returns the effective interval (in days) for a customer.
+ * If the most recent service entry has an intervalDays field, that takes
+ * precedence — it persists until a new entry is logged without one.
+ */
+export function getEffectiveIntervalForCustomer(customer, globalIntervalDays) {
+  const log = customer.serviceLog;
+  if (Array.isArray(log) && log.length > 0) {
+    const latest = log[0]; // prepended on write, so index 0 = most recent
+    if (typeof latest.intervalDays === 'number' && latest.intervalDays > 0) {
+      return latest.intervalDays;
+    }
+  }
+  return globalIntervalDays;
+}
+
 /** Returns whole days since last service, or Infinity if no record. */
 export function daysSinceLastService(customer) {
   const last = getLastServiceDate(customer);
@@ -50,24 +79,26 @@ export function daysSinceLastService(customer) {
   return Math.floor((Date.now() - last.getTime()) / MS_PER_DAY);
 }
 
-/** Returns whole days until 1-year service is due. Negative means overdue. */
-export function daysUntilDue(customer) {
+/** Returns whole days until service is due. Negative means overdue. */
+export function daysUntilDue(customer, intervalDays = 365) {
+  const effective = getEffectiveIntervalForCustomer(customer, intervalDays);
   const days = daysSinceLastService(customer);
   if (!isFinite(days)) return -Infinity;
-  return SERVICE_INTERVAL_DAYS - days;
+  return effective - days;
 }
 
 // ── Status predicates ─────────────────────────────────────────────────────────
 
 /** True if the customer is currently overdue for service. */
-export function isOverdue(customer) {
+export function isOverdue(customer, intervalDays = 365) {
+  const effective = getEffectiveIntervalForCustomer(customer, intervalDays);
   const days = daysSinceLastService(customer);
-  return !isFinite(days) || days > SERVICE_INTERVAL_DAYS;
+  return !isFinite(days) || days > effective;
 }
 
 /** True if service is due within `windowDays` days (and not yet overdue). */
-export function isDueWithin(customer, windowDays) {
-  const until = daysUntilDue(customer);
+export function isDueWithin(customer, windowDays, intervalDays = 365) {
+  const until = daysUntilDue(customer, intervalDays);
   return isFinite(until) && until >= 0 && until <= windowDays;
 }
 
@@ -77,16 +108,17 @@ export function isDueWithin(customer, windowDays) {
  * Filter customers by due status.
  * @param {object[]} customers
  * @param {'overdue'|30|60|90|'all'} filter
+ * @param {number} intervalDays
  */
-export function filterByDueStatus(customers, filter) {
+export function filterByDueStatus(customers, filter, intervalDays = 365) {
   if (filter === 'all') return customers;
-  if (filter === 'overdue') return customers.filter(isOverdue);
-  return customers.filter((c) => isOverdue(c) || isDueWithin(c, filter));
+  if (filter === 'overdue') return customers.filter((c) => isOverdue(c, intervalDays));
+  return customers.filter((c) => isOverdue(c, intervalDays) || isDueWithin(c, filter, intervalDays));
 }
 
 /** Badge count: number of customers currently overdue. */
-export function getAlertBadgeCount(customers) {
-  return customers.filter(isOverdue).length;
+export function getAlertBadgeCount(customers, intervalDays = 365) {
+  return customers.filter((c) => isOverdue(c, intervalDays)).length;
 }
 
 // ── Status label ──────────────────────────────────────────────────────────────
@@ -95,14 +127,15 @@ export function getAlertBadgeCount(customers) {
  * Returns a human-readable status label + severity level.
  * level: 'overdue' | 'warning' | 'upcoming' | 'ok'
  */
-export function getServiceStatus(customer) {
+export function getServiceStatus(customer, intervalDays = 365) {
+  const effective = getEffectiveIntervalForCustomer(customer, intervalDays);
   const days = daysSinceLastService(customer);
 
   if (!isFinite(days)) {
     return { label: 'No service on record', level: 'overdue' };
   }
 
-  const until = SERVICE_INTERVAL_DAYS - days;
+  const until = effective - days;
 
   if (until < 0)   return { label: `Overdue by ${Math.abs(until)} days`, level: 'overdue' };
   if (until === 0) return { label: 'Due today',                          level: 'overdue' };
@@ -139,7 +172,7 @@ export function sortByUrgency(customers) {
  *   Next 61–90 Days — due in 61–90 days
  *   Later          — due in 91+ days
  */
-export function groupCustomersByDueWindow(customers) {
+export function groupCustomersByDueWindow(customers, intervalDays = 365) {
   const overdue = [];
   const next30  = [];
   const next60  = [];
@@ -147,13 +180,13 @@ export function groupCustomersByDueWindow(customers) {
   const later   = [];
 
   for (const c of customers) {
-    if (isOverdue(c)) {
+    if (isOverdue(c, intervalDays)) {
       overdue.push(c);
-    } else if (isDueWithin(c, 30)) {
+    } else if (isDueWithin(c, 30, intervalDays)) {
       next30.push(c);
-    } else if (isDueWithin(c, 60)) {
+    } else if (isDueWithin(c, 60, intervalDays)) {
       next60.push(c);
-    } else if (isDueWithin(c, 90)) {
+    } else if (isDueWithin(c, 90, intervalDays)) {
       next90.push(c);
     } else {
       later.push(c);
@@ -162,8 +195,8 @@ export function groupCustomersByDueWindow(customers) {
 
   // Sort each bucket: smallest daysUntilDue first (most urgent)
   const byUrgency = (a, b) => {
-    const da = daysUntilDue(a);
-    const db = daysUntilDue(b);
+    const da = daysUntilDue(a, intervalDays);
+    const db = daysUntilDue(b, intervalDays);
     const ia = isFinite(da) ? da : -Number.MAX_SAFE_INTEGER;
     const ib = isFinite(db) ? db : -Number.MAX_SAFE_INTEGER;
     return ia - ib;
@@ -178,8 +211,8 @@ export function groupCustomersByDueWindow(customers) {
   const sections = [
     { key: 'overdue', title: 'Overdue',         data: overdue },
     { key: 'next30',  title: 'Next 30 Days',    data: next30  },
-    { key: 'next60',  title: 'Next 60 Days',  data: next60  },
-    { key: 'next90',  title: 'Next 90 Days',  data: next90  },
+    { key: 'next60',  title: 'Next 60 Days',    data: next60  },
+    { key: 'next90',  title: 'Next 90 Days',    data: next90  },
     { key: 'later',   title: 'Later',            data: later   },
   ];
 

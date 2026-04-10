@@ -1,17 +1,28 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 1.3
+// Version: 1.4
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.6)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
 //               CustomerDetailScreen.js (getCustomerById, updateCustomer,
 //                                        deleteCustomer)
 //               AddCustomerScreen.js (addCustomer)
-//               AddServiceScreen.js  (addServiceEntry)
-//               SettingsScreen.js    (getSortPreference, saveSortPreference)
+//               AddServiceScreen.js  (addServiceEntry, getServiceIntervalMode,
+//                                     getServiceIntervalCustomDays)
+//               SettingsScreen.js    (getSortPreference, saveSortPreference,
+//                                     getServiceIntervalMode,
+//                                     getServiceIntervalCustomDays)
+//               ServiceIntervalScreen.js (getServiceIntervalMode,
+//                                         saveServiceIntervalMode,
+//                                         getServiceIntervalCustomDays,
+//                                         saveServiceIntervalCustomDays,
+//                                         modeToIntervalDays)
+//               calendarSync.js      (getServiceIntervalMode,
+//                                     getServiceIntervalCustomDays,
+//                                     modeToIntervalDays)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
@@ -27,11 +38,15 @@
 //   - All exported functions are async and resolve with the result or throw
 //   - loadCustomers() defensively handles corrupted JSON and ensures every
 //     customer has a serviceLog array
+//   - Service interval: mode stored as '30'|'60'|'90'|'180'|'365'|'custom';
+//     custom mode stores a separate days value; modeToIntervalDays() is a
+//     pure sync helper for converting to a day count
 //
 // SCHEMA:
 //   Customer: { id, name, email, phone, address, city, state, zipCode,
 //               archived (bool), serviceLog }
-//   ServiceEntry: { id, date (ISO string), type ('service'|'install'), notes }
+//   ServiceEntry: { id, date (ISO string), type ('service'|'install'), notes,
+//                   intervalDays? (number, present only for custom-interval entries) }
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
@@ -44,15 +59,23 @@
 // v1.3  2026-04-09  Claude  Added getOnboardingComplete / setOnboardingComplete
 //                           for first-launch onboarding flag
 // v1.2  2026-04-04  Claude  Added restoreCustomers() for backup/restore support
+// v1.4  2026-04-09  Claude  Service interval preference storage
+//       - Added SERVICE_INTERVAL_MODE_KEY, SERVICE_INTERVAL_CUSTOM_DAYS_KEY
+//       - Added getServiceIntervalMode, saveServiceIntervalMode
+//       - Added getServiceIntervalCustomDays, saveServiceIntervalCustomDays
+//       - Added modeToIntervalDays() pure sync helper [updated SCHEMA,
+//         ARCHITECTURE]
 // =============================================================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const CUSTOMERS_KEY        = '@rolodeck_customers';
-const SORT_PREF_KEY        = '@rolodeck_sort_pref';
-const SHOW_ARCHIVED_KEY    = '@rolodeck_show_archived';
-const SCHEMA_VERSION_KEY   = '@rolodeck_schema_version';
-const ONBOARDING_DONE_KEY  = '@rolodeck_onboarding_complete';
+const CUSTOMERS_KEY                    = '@rolodeck_customers';
+const SORT_PREF_KEY                    = '@rolodeck_sort_pref';
+const SHOW_ARCHIVED_KEY                = '@rolodeck_show_archived';
+const SCHEMA_VERSION_KEY               = '@rolodeck_schema_version';
+const ONBOARDING_DONE_KEY              = '@rolodeck_onboarding_complete';
+const SERVICE_INTERVAL_MODE_KEY        = '@rolodeck_service_interval_mode';
+const SERVICE_INTERVAL_CUSTOM_DAYS_KEY = '@rolodeck_service_interval_custom_days';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -259,6 +282,40 @@ export async function getShowArchived() {
 
 export async function saveShowArchived(show) {
   await AsyncStorage.setItem(SHOW_ARCHIVED_KEY, show ? 'true' : 'false');
+}
+
+// ── Service interval preference ───────────────────────────────────────────────
+
+/**
+ * Maps an interval mode ('30'|'60'|'90'|'180'|'365'|'custom') + optional
+ * customDays number to a concrete day count. Pure sync helper.
+ */
+export function modeToIntervalDays(mode, customDays) {
+  if (mode === 'custom') return Math.max(1, Math.round(Number(customDays) || 30));
+  return Number(mode) || 365;
+}
+
+/** Returns the saved interval mode. Defaults to '365' (1 year). */
+export async function getServiceIntervalMode() {
+  const val = await AsyncStorage.getItem(SERVICE_INTERVAL_MODE_KEY);
+  return val || '365';
+}
+
+export async function saveServiceIntervalMode(mode) {
+  await AsyncStorage.setItem(SERVICE_INTERVAL_MODE_KEY, mode);
+}
+
+/** Returns the saved custom interval in days. Defaults to 30. */
+export async function getServiceIntervalCustomDays() {
+  const val = await AsyncStorage.getItem(SERVICE_INTERVAL_CUSTOM_DAYS_KEY);
+  return val ? Number(val) : 30;
+}
+
+export async function saveServiceIntervalCustomDays(days) {
+  await AsyncStorage.setItem(
+    SERVICE_INTERVAL_CUSTOM_DAYS_KEY,
+    String(Math.max(1, Math.round(Number(days) || 30))),
+  );
 }
 
 // ── Backup / restore ──────────────────────────────────────────────────────────

@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.2
+// Version: 1.3
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.13)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -33,6 +33,8 @@
 // v1.1  2026-04-03  Claude  Harden + futureproof
 //       - Added initStorage() call on mount (schema version tracking)
 //       - Wrapped refreshAlerts in try/catch (storage resilience)
+// v1.3  2026-04-09  Claude  Load interval preference in refreshAlerts so badge
+//                           count respects the configured service interval
 // v1.2  2026-04-09  Claude  First-launch onboarding walkthrough
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
@@ -65,7 +67,15 @@ import {
 import { ThemeProvider, useTheme } from './src/styles/theme';
 import TabNavigator from './src/components/TabNavigator';
 import OnboardingModal from './src/components/OnboardingModal';
-import { getAllCustomers, initStorage, getOnboardingComplete, setOnboardingComplete } from './src/data/storage';
+import {
+  getAllCustomers,
+  initStorage,
+  getOnboardingComplete,
+  setOnboardingComplete,
+  getServiceIntervalMode,
+  getServiceIntervalCustomDays,
+  modeToIntervalDays,
+} from './src/data/storage';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
 // ── Inner component: has ThemeContext access ───────────────────────────────────
@@ -78,8 +88,13 @@ function AppInner() {
 
   const refreshAlerts = useCallback(async () => {
     try {
-      const customers = await getAllCustomers();
-      setAlertCount(getAlertBadgeCount(customers.filter((c) => !c.archived)));
+      const [customers, mode, customDays] = await Promise.all([
+        getAllCustomers(),
+        getServiceIntervalMode(),
+        getServiceIntervalCustomDays(),
+      ]);
+      const intervalDays = modeToIntervalDays(mode, customDays);
+      setAlertCount(getAlertBadgeCount(customers.filter((c) => !c.archived), intervalDays));
     } catch {
       // Storage read failed — keep stale badge count
     }

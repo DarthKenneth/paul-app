@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomerCard.js - Pressable card displaying a customer summary row
-// Version: 1.1
-// Last Updated: 2026-04-03
+// Version: 1.2
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        CustomerCard.js         (this file)
 //               CustomersScreen.js      (renders this in a FlatList)
 //               serviceAlerts.js        (getServiceStatus)
@@ -23,6 +23,8 @@
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
+// v1.2  2026-04-09  Claude  Accept intervalDays prop; pass to getServiceStatus
+//                           so status badge respects the configured interval
 // v1.1  2026-04-03  Claude  Optimize + harden
 //       - Wrapped component with React.memo to avoid unnecessary re-renders
 //         in FlatList when other cards change
@@ -50,15 +52,25 @@ function getSortValue(customer, sortMode) {
       return customer.zipCode || '';
     case 'city':
       return [customer.city, customer.state].filter(Boolean).join(', ') || '';
+    case 'firstName': {
+      // Show the rest of the name (last name) as a hint
+      const parts = (customer.name || '').trim().split(/\s+/);
+      return parts.length > 1 ? parts.slice(1).join(' ') : '';
+    }
+    case 'lastName': {
+      // Show the first name as a hint
+      const parts = (customer.name || '').trim().split(/\s+/);
+      return parts.length > 1 ? parts[0] : '';
+    }
     default:
       return '';
   }
 }
 
-function CustomerCard({ customer, onPress, sortMode }) {
+function CustomerCard({ customer, onPress, sortMode, intervalDays = 365 }) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
-  const status = getServiceStatus(customer);
+  const status = getServiceStatus(customer, intervalDays);
   const badgeColor = theme[LEVEL_COLORS[status.level]] || theme.textMuted;
   const sortValue = getSortValue(customer, sortMode);
 

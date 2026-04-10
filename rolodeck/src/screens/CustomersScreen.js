@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomersScreen.js - Customer list with search, sort filter, and add button
-// Version: 1.2
-// Last Updated: 2026-04-03
+// Version: 1.3
+// Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v1.14)
 // FILES:        CustomersScreen.js      (this file)
 //               CustomerCard.js         (list item component)
 //               storage.js              (getAllCustomers, getSortPreference,
@@ -29,6 +29,8 @@
 // v1.1  2026-04-03  Claude  Replaced FAB with top Add Customer button; replaced
 //                           two-option sort with 4-way sort filter modal
 //                           (name, address, zip code, email)
+// v1.3  2026-04-09  Claude  Load interval preference, pass to CustomerCard
+//                           so status badges respect the configured interval
 // v1.2  2026-04-03  Claude  Optimize + harden
 //                           - Memoized filtered+sorted list with useMemo
 //                           - Added try/catch on storage calls in useFocusEffect
@@ -49,16 +51,33 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert } from 'react-native';
 import CustomerCard from '../components/CustomerCard';
-import { getAllCustomers, getSortPreference, saveSortPreference, getShowArchived, addCustomer, addServiceEntry, deleteCustomer } from '../data/storage';
+import {
+  getAllCustomers,
+  getSortPreference,
+  saveSortPreference,
+  getShowArchived,
+  addCustomer,
+  addServiceEntry,
+  deleteCustomer,
+  getServiceIntervalMode,
+  getServiceIntervalCustomDays,
+  modeToIntervalDays,
+} from '../data/storage';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 import { SEED_CUSTOMERS } from '../../scripts/seed-data';
 
 const SORT_OPTIONS = [
-  { key: 'name', label: 'Name'     },
-  { key: 'city', label: 'City'     },
-  { key: 'zip',  label: 'Zip Code' },
+  { key: 'firstName', label: 'First Name' },
+  { key: 'lastName',  label: 'Last Name'  },
+  { key: 'city',      label: 'City'       },
+  { key: 'zip',       label: 'Zip Code'   },
 ];
+
+function getLastName(name) {
+  const parts = (name || '').trim().split(/\s+/);
+  return parts.length > 1 ? parts[parts.length - 1] : parts[0] || '';
+}
 
 function sortCustomers(customers, mode) {
   return [...customers].sort((a, b) => {
@@ -67,6 +86,13 @@ function sortCustomers(customers, mode) {
         return (a.zipCode || '').localeCompare(b.zipCode || '', undefined, { numeric: true });
       case 'city':
         return (a.city || '').localeCompare(b.city || '');
+      case 'firstName': {
+        const fa = (a.name || '').trim().split(/\s+/)[0] || '';
+        const fb = (b.name || '').trim().split(/\s+/)[0] || '';
+        return fa.localeCompare(fb);
+      }
+      case 'lastName':
+        return getLastName(a.name).localeCompare(getLastName(b.name));
       default:
         return (a.name || '').localeCompare(b.name || '');
     }
@@ -82,19 +108,25 @@ export default function CustomersScreen({ navigation }) {
   const [sortMode, setSortMode]     = useState('name');
   const [sortModal, setSortModal]   = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [intervalDays, setIntervalDays] = useState(365);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         try {
-          const [all, pref, archived] = await Promise.all([
-            getAllCustomers(), getSortPreference(), getShowArchived(),
+          const [all, pref, archived, mode, customDays] = await Promise.all([
+            getAllCustomers(),
+            getSortPreference(),
+            getShowArchived(),
+            getServiceIntervalMode(),
+            getServiceIntervalCustomDays(),
           ]);
           if (active) {
             setCustomers(all);
             setSortMode(pref);
             setShowArchived(archived);
+            setIntervalDays(modeToIntervalDays(mode, customDays));
           }
         } catch {
           // Storage read failed — keep stale data rather than crashing
@@ -137,6 +169,12 @@ export default function CustomersScreen({ navigation }) {
           break;
         case 'zip':
           groupKey = c.zipCode || '#';
+          break;
+        case 'firstName':
+          groupKey = ((c.name || '').trim().split(/\s+/)[0] || '').charAt(0).toUpperCase() || '#';
+          break;
+        case 'lastName':
+          groupKey = getLastName(c.name).charAt(0).toUpperCase() || '#';
           break;
         default:
           groupKey = (c.name || '').charAt(0).toUpperCase() || '#';
@@ -270,6 +308,7 @@ export default function CustomersScreen({ navigation }) {
           <CustomerCard
             customer={item}
             sortMode={sortMode}
+            intervalDays={intervalDays}
             onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id })}
           />
         )}

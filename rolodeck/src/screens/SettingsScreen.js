@@ -1,25 +1,32 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 1.6
+// Version: 1.7
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.13)
-// FILES:        SettingsScreen.js     (this file)
-//               ThemeScreen.js        (color scheme + font pickers; navigated to
-//                                      from the Appearance card's Theme row)
-//               colors.js             (Themes, ThemeNames)
-//               typography.js         (FontPresetNames, FontSize)
-//               storage.js            (getSortPreference, saveSortPreference)
-//               calendarSync.js       (getCalendarSyncEnabled, enableCalendarSync,
-//                                      disableCalendarSync)
-//               squarePlaceholder.js  (get/save/clearSquareAccessToken)
-//               theme.js              (useTheme)
+// PROJECT:      Rolodeck (project v1.14)
+// FILES:        SettingsScreen.js         (this file)
+//               ThemeScreen.js            (color scheme + font pickers; navigated
+//                                          to from the Appearance card's Theme row)
+//               ServiceIntervalScreen.js  (interval picker; navigated to from the
+//                                          Default Service Interval row)
+//               colors.js                 (Themes, ThemeNames)
+//               typography.js             (FontPresetNames, FontSize)
+//               storage.js                (getSortPreference, saveSortPreference,
+//                                          getServiceIntervalMode,
+//                                          getServiceIntervalCustomDays,
+//                                          modeToIntervalDays)
+//               calendarSync.js           (getCalendarSyncEnabled, enableCalendarSync,
+//                                          disableCalendarSync)
+//               theme.js                  (useTheme)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
-//   - Layout (top to bottom): Default Sort Order → Appearance card →
-//     Square Invoicing (coming soon) → Backup & Restore (coming soon) → copyright
+//   - Layout (top to bottom): Default Sort Order → Default Service Interval →
+//     Appearance card → Square Invoicing (coming soon) →
+//     Backup & Restore (coming soon) → copyright
+//   - Service Interval row shows current value as subtitle (e.g. "1 Year",
+//     "Custom (45 days)"); chevron navigates to ServiceIntervalScreen
 //   - Appearance card groups three rows in one surface: Theme (nav to ThemeScreen),
 //     Show Archived Customers (toggle), Calendar Sync (toggle)
 //   - Theme row shows current color + font as subtitle; chevron navigates to ThemeScreen
@@ -63,9 +70,19 @@
 //       - Backup & Restore moved to last (before copyright)
 //       - Added navigation prop; Theme row pushes ThemeScreen onto Settings stack
 //       - Updated APP_VERSION to '1.13'
+// v1.7  2026-04-09  Claude  Default Service Interval row
+//       - Added Default Service Interval card between Sort Order and Appearance
+//       - Row shows current interval as subtitle; chevron navigates to
+//         ServiceIntervalScreen
+//       - Loads intervalMode + intervalCustomDays in useEffect (with active flag)
+//       - Refreshes interval display on useFocusEffect (so it updates after
+//         returning from ServiceIntervalScreen)
+//       - Imported getServiceIntervalMode, getServiceIntervalCustomDays,
+//         modeToIntervalDays from storage.js [updated ARCHITECTURE]
+//       - Updated APP_VERSION to '1.14'
 // =============================================================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -77,11 +94,20 @@ import {
   Alert,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
 import { Themes, ThemeNames } from '../styles/colors';
 import { FontPresetNames, FontSize } from '../styles/typography';
-import { getSortPreference, saveSortPreference, getShowArchived, saveShowArchived } from '../data/storage';
+import {
+  getSortPreference,
+  saveSortPreference,
+  getShowArchived,
+  saveShowArchived,
+  getServiceIntervalMode,
+  getServiceIntervalCustomDays,
+  modeToIntervalDays,
+} from '../data/storage';
 import { cloudProviderLabel } from '../utils/backup';
 import {
   getCalendarSyncEnabled,
@@ -89,22 +115,39 @@ import {
   disableCalendarSync,
 } from '../utils/calendarSync';
 
-const APP_VERSION = '1.13';
+const APP_VERSION = '1.14';
+
+const INTERVAL_MODE_LABELS = {
+  '30':   '30 Days',
+  '60':   '60 Days',
+  '90':   '90 Days',
+  '180':  '6 Months',
+  '365':  '1 Year',
+  'custom': null, // built dynamically
+};
+
+function intervalLabel(mode, customDays) {
+  if (mode === 'custom') return `Custom (${customDays} days)`;
+  return INTERVAL_MODE_LABELS[mode] || '1 Year';
+}
 
 const SORT_OPTIONS = [
-  { key: 'name', label: 'Name',     icon: 'text-outline'     },
-  { key: 'city', label: 'City',     icon: 'business-outline' },
-  { key: 'zip',  label: 'Zip Code', icon: 'map-outline'      },
+  { key: 'firstName', label: 'First Name', icon: 'person-outline'        },
+  { key: 'lastName',  label: 'Last Name',  icon: 'person-circle-outline' },
+  { key: 'city',      label: 'City',       icon: 'business-outline'      },
+  { key: 'zip',       label: 'Zip Code',   icon: 'map-outline'           },
 ];
 
 export default function SettingsScreen({ navigation }) {
   const { theme, themeKey, fontKey } = useTheme();
   const styles = makeStyles(theme);
 
-  const [sortPref, setSortPref]         = useState('name');
-  const [showArchived, setShowArchived] = useState(false);
-  const [calendarSync, setCalendarSync] = useState(false);
-  const [calSyncBusy, setCalSyncBusy]   = useState(false);
+  const [sortPref, setSortPref]               = useState('name');
+  const [showArchived, setShowArchived]       = useState(false);
+  const [calendarSync, setCalendarSync]       = useState(false);
+  const [calSyncBusy, setCalSyncBusy]         = useState(false);
+  const [intervalMode, setIntervalMode]       = useState('365');
+  const [intervalCustomDays, setIntervalCustomDays] = useState(30);
   const toggleAnim  = useRef(new Animated.Value(0)).current;
   const calSyncAnim = useRef(new Animated.Value(0)).current;
 
@@ -119,6 +162,17 @@ export default function SettingsScreen({ navigation }) {
     });
     return () => { active = false; };
   }, []);
+
+  // Refresh interval display when returning from ServiceIntervalScreen
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      Promise.all([getServiceIntervalMode(), getServiceIntervalCustomDays()]).then(
+        ([m, d]) => { if (active) { setIntervalMode(m); setIntervalCustomDays(d); } },
+      );
+      return () => { active = false; };
+    }, []),
+  );
 
   const handleSortChange = async (pref) => {
     setSortPref(pref);
@@ -212,6 +266,28 @@ export default function SettingsScreen({ navigation }) {
               </Pressable>
             ))}
           </View>
+        </View>
+
+        {/* ── Default Service Interval ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Default Service Interval</Text>
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={() => navigation.navigate('ServiceInterval')}
+            accessibilityRole="button"
+            accessibilityLabel="Default service interval settings"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="timer-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Reminder Interval</Text>
+                <Text style={styles.rowDesc}>
+                  {intervalLabel(intervalMode, intervalCustomDays)}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </Pressable>
         </View>
 
         {/* ── Appearance card (Theme + Archive + Calendar) ── */}
