@@ -1,9 +1,9 @@
 // =============================================================================
 // calendarSync.js - One-way push of service due dates to the device calendar
-// Version: 1.2
-// Last Updated: 2026-04-09
+// Version: 1.3
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.18)
 // FILES:        calendarSync.js         (this file — calendar sync engine)
 //               storage.js              (getAllCustomers, getCustomerById,
 //                                        getServiceIntervalMode,
@@ -43,8 +43,12 @@
 //   - Archived customers are excluded from syncAllCustomers
 //   - disableCalendarSync only persists the preference — it does NOT delete
 //     existing calendar events (non-destructive)
-//   - Permission is re-checked on every sync call; if denied, sync silently
-//     no-ops rather than crashing
+//   - Permission is re-checked on every sync call; if denied, sync records
+//     a 'permission-denied' status so Settings can surface it to the user
+//   - Each sync operation writes a status record to AsyncStorage:
+//       { status: 'ok' | 'permission-denied' | 'error', message?, at: ISO }
+//     Settings reads this via getCalendarSyncStatus() and shows a banner
+//     when status !== 'ok' and sync is enabled
 //
 // CHANGE LOG:
 // v1.0  2026-04-06  Claude  Initial scaffold
@@ -54,6 +58,13 @@
 //       - syncAllCustomers (full sync for initial enable or manual re-sync)
 //       - removeCustomerEvent (for future archive/delete integration)
 //       - buildEventNotes (formats customer contact info for event body)
+// v1.3  2026-04-10  Claude  Surface sync errors to user
+//       - Added LAST_SYNC_STATUS_KEY with { status, message, at } record
+//       - setSyncStatus() helper writes on every success/failure
+//       - getCalendarSyncStatus() export for Settings to read
+//       - syncCustomerDueDate, syncAllCustomers, removeCustomerEvent all now
+//         record status instead of swallowing errors silently. Permission
+//         denials are distinguished from other errors.
 // v1.2  2026-04-09  Claude  Respect configurable service interval
 //       - syncCustomerDueDate loads interval preference and uses
 //         getEffectiveIntervalForCustomer to compute due date; removed
@@ -81,13 +92,14 @@ import {
   modeToIntervalDays,
 } from '../data/storage';
 import { getLastServiceDate, getEffectiveIntervalForCustomer } from './serviceAlerts';
+import { addDaysLocal } from './dateUtils';
 
-const SYNC_ENABLED_KEY = '@rolodeck_calendar_sync_enabled';
-const CALENDAR_ID_KEY  = '@rolodeck_calendar_id';
-const EVENT_IDS_KEY    = '@rolodeck_calendar_event_ids';
+const SYNC_ENABLED_KEY   = '@rolodeck_calendar_sync_enabled';
+const CALENDAR_ID_KEY    = '@rolodeck_calendar_id';
+const EVENT_IDS_KEY      = '@rolodeck_calendar_event_ids';
+const LAST_SYNC_STATUS_KEY = '@rolodeck_calendar_last_sync_status';
 
 const CALENDAR_COLOR = '#4AACA5'; // Rolodeck teal
-const MS_PER_DAY     = 1000 * 60 * 60 * 24;
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
@@ -95,6 +107,52 @@ const MS_PER_DAY     = 1000 * 60 * 60 * 24;
 export async function requestCalendarPermission() {
   const { status } = await Calendar.requestCalendarPermissionsAsync();
   return status === 'granted';
+}
+
+// ── Sync status tracking ──────────────────────────────────────────────────────
+//
+// Every sync operation writes a status record so Settings can show the user
+// whether their data is actually making it to the calendar. Status values:
+//   'ok'                — last sync succeeded
+//   'permission-denied' — calendar permission not granted (or revoked)
+//   'error'             — sync threw an unexpected error
+//
+// The record is cleared when sync is disabled.
+
+async function setSyncStatus(status, message = '') {
+  const record = { status, message, at: new Date().toISOString() };
+  try {
+    await AsyncStorage.setItem(LAST_SYNC_STATUS_KEY, JSON.stringify(record));
+  } catch {
+    // If we can't even write the status, there's not much we can do
+  }
+}
+
+async function clearSyncStatus() {
+  try {
+    await AsyncStorage.removeItem(LAST_SYNC_STATUS_KEY);
+  } catch {
+    // Swallow
+  }
+}
+
+/**
+ * Returns the last sync status record, or null if sync has never run or is
+ * disabled. Shape: { status, message, at } — see setSyncStatus for values.
+ * Settings should display a warning banner when status is not 'ok'.
+ */
+export async function getCalendarSyncStatus() {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_SYNC_STATUS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && parsed.status) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // ── Preferences ───────────────────────────────────────────────────────────────
@@ -110,7 +168,10 @@ export async function getCalendarSyncEnabled() {
  */
 export async function enableCalendarSync() {
   const granted = await requestCalendarPermission();
-  if (!granted) return false;
+  if (!granted) {
+    await setSyncStatus('permission-denied', 'Calendar permission was denied.');
+    return false;
+  }
   await AsyncStorage.setItem(SYNC_ENABLED_KEY, 'true');
   await syncAllCustomers();
   return true;
@@ -119,6 +180,8 @@ export async function enableCalendarSync() {
 /** Disable calendar sync. Does NOT delete existing calendar events. */
 export async function disableCalendarSync() {
   await AsyncStorage.setItem(SYNC_ENABLED_KEY, 'false');
+  // Clear any stale status — no point warning about sync when it's disabled
+  await clearSyncStatus();
 }
 
 // ── Rolodeck calendar management ──────────────────────────────────────────────
@@ -221,7 +284,10 @@ export async function syncCustomerDueDate(customer) {
     if (!enabled) return;
 
     const granted = await requestCalendarPermission();
-    if (!granted) return;
+    if (!granted) {
+      await setSyncStatus('permission-denied', 'Calendar access was revoked.');
+      return;
+    }
 
     const lastService = getLastServiceDate(customer);
     if (!lastService) return; // no service on record — nothing to pin
@@ -232,7 +298,9 @@ export async function syncCustomerDueDate(customer) {
     ]);
     const globalDays  = modeToIntervalDays(mode, customDays);
     const effectiveDays = getEffectiveIntervalForCustomer(customer, globalDays);
-    const dueDate = new Date(lastService.getTime() + effectiveDays * MS_PER_DAY);
+    // addDaysLocal (not millisecond arithmetic) so DST transitions don't
+    // shift the due date by an hour → potentially wrong day
+    const dueDate = addDaysLocal(lastService, effectiveDays);
 
     const calendarId = await getRoledeckCalendar();
     const eventIds   = await getEventIds();
@@ -262,8 +330,9 @@ export async function syncCustomerDueDate(customer) {
       eventIds[customer.id] = eventId;
       await saveEventIds(eventIds);
     }
-  } catch {
-    // Calendar sync is non-critical — swallow all errors
+    await setSyncStatus('ok');
+  } catch (err) {
+    await setSyncStatus('error', err?.message || 'Calendar sync failed.');
   }
 }
 
@@ -277,7 +346,10 @@ export async function syncAllCustomers() {
     if (!enabled) return;
 
     const granted = await requestCalendarPermission();
-    if (!granted) return;
+    if (!granted) {
+      await setSyncStatus('permission-denied', 'Calendar access was revoked.');
+      return;
+    }
 
     const all = await getAllCustomers();
     const active = all.filter((c) => !c.archived);
@@ -285,8 +357,11 @@ export async function syncAllCustomers() {
     for (const customer of active) {
       await syncCustomerDueDate(customer);
     }
-  } catch {
-    // Swallow — sync is non-critical
+    // syncCustomerDueDate already writes status per-customer, but if the
+    // loop ran without any per-customer errors, mark the whole batch ok
+    await setSyncStatus('ok');
+  } catch (err) {
+    await setSyncStatus('error', err?.message || 'Calendar sync failed.');
   }
 }
 
@@ -303,12 +378,12 @@ export async function removeCustomerEvent(customerId) {
     try {
       await Calendar.deleteEventAsync(eventId);
     } catch {
-      // Already deleted externally — fine
+      // Already deleted externally — fine, not a failure mode worth surfacing
     }
 
     delete eventIds[customerId];
     await saveEventIds(eventIds);
-  } catch {
-    // Swallow
+  } catch (err) {
+    await setSyncStatus('error', err?.message || 'Failed to remove calendar event.');
   }
 }

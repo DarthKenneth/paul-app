@@ -1,10 +1,11 @@
 // =============================================================================
 // backup.js - Cloud backup and restore for customer data
-// Version: 1.0
-// Last Updated: 2026-04-04
+// Version: 1.1
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.6)
+// PROJECT:      Rolodeck (project v0.18)
 // FILES:        backup.js             (this file — export/import logic)
+//               appVersion.js         (APP_VERSION — written into backup metadata)
 //               storage.js            (getAllCustomers, restoreCustomers)
 //               SettingsScreen.js     (Back Up / Restore buttons)
 //
@@ -24,9 +25,9 @@
 //
 // BACKUP FILE FORMAT:
 //   {
-//     "backupVersion": "1",      schema version for future migrations
-//     "appVersion":    "1.6",    app version that created the backup
-//     "exportedAt":    ISO-8601, timestamp
+//     "backupVersion": "1",         schema version for future migrations
+//     "appVersion":    "0.18",      app version that created the backup
+//     "exportedAt":    ISO-8601,    timestamp
 //     "platform":      "ios" | "android",
 //     "customers":     Customer[]
 //   }
@@ -37,6 +38,9 @@
 //       - importBackup(): file picker → validate → restoreCustomers()
 //       - getLastBackupDate() / saveLastBackupDate() via AsyncStorage
 //       - cloudProviderLabel() returns platform-appropriate label for UI
+// v1.1  2026-04-10  Claude  APP_VERSION now imported from shared src/appVersion.js
+//                            (was hardcoded '1.6' — stale by 10+ versions — which
+//                            meant backup files had lying metadata)
 // =============================================================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -45,9 +49,9 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import { getAllCustomers, restoreCustomers } from '../data/storage';
+import { APP_VERSION } from '../appVersion';
 
 const BACKUP_VERSION   = '1';
-const APP_VERSION      = '1.6';
 const LAST_BACKUP_KEY  = '@rolodeck_last_backup';
 
 // ── Cloud provider label ──────────────────────────────────────────────────────

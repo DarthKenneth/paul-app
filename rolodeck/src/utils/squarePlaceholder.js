@@ -3,7 +3,7 @@
 // Version: 3.0
 // Last Updated: 2026-04-04
 //
-// PROJECT:      Rolodeck (project v1.5)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        squarePlaceholder.js  (this file — OAuth flow + invoice API)
 //               SettingsScreen.js     (Connect to Square button, disconnect)
 //               InvoiceButton.js      (calls sendSquareInvoice)

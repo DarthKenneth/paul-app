@@ -3,7 +3,7 @@
 // Version: 1.1.1
 // Last Updated: 2026-04-03
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        ServiceLogEntry.js       (this file)
 //               CustomerDetailScreen.js  (renders these in a list)
 //               theme.js                 (useTheme)
@@ -28,7 +28,7 @@
 //                              re-renders when sibling log entries change
 // =============================================================================
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
@@ -41,7 +41,7 @@ const TYPE_CONFIG = {
 
 function ServiceLogEntry({ entry, isInitial, isLast }) {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.service;
   const label = isInitial ? 'Initial Install/Service' : config.label;
 

@@ -3,7 +3,7 @@
 // Version: 1.3
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)

@@ -8,6 +8,81 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.18] - 2026-04-10
+
+### Added
+- **AsyncStorage envelope + migration runner.** Customer data is now stored in a `{ schemaVersion, customers: [] }` envelope so the version travels with the data. Legacy raw-array installs auto-migrate on next load. Future schema changes just need a new entry in `MIGRATIONS` and a bump to `CURRENT_SCHEMA_VERSION`. Downgrade-protection prevents older builds from clobbering newer data. (storage.js)
+- **Calendar sync status banner.** When calendar sync is enabled but the last sync failed (permission revoked or other error), a warning banner under the Calendar Sync toggle in Settings shows the reason and lets the user tap to retry. (SettingsScreen.js, calendarSync.js)
+- **Timezone-safe date utilities** (`src/utils/dateUtils.js`). Local-calendar day helpers replace the scattered `toISOString().split('T')[0]` calls that were returning UTC dates — scheduled customers now show up on the calendar day the user actually picked, regardless of their timezone. DST-safe `addDaysLocal` used for due-date computation.
+- **Shared `appVersion.js` module** — single source of truth for the app version, imported by both SettingsScreen (footer display) and backup.js (backup metadata). Both used to hardcode the version and drift out of sync.
+
+### Changed
+- **Geoapify API key moved out of source** — now loaded from `.env` via `EXPO_PUBLIC_GEOAPIFY_API_KEY`, bundled at build time by Expo. Restrict the key in the Geoapify dashboard to your bundle ID for defense-in-depth. (placesConfig.js, .env.example)
+- **Service tab badge semantics clarified** — the failing test was counting "overdue + 30-day window" but the code only counted overdue. Per user preference, the badge now only counts overdue services; test updated to match. (serviceAlerts.test.js)
+- **`makeStyles(theme)` memoized** across all 13 screens and components that use the pattern (`useMemo(() => makeStyles(theme), [theme])`). Small perf win — styles object is no longer re-allocated on every render.
+
+### Fixed
+- **backup.js `APP_VERSION` was hardcoded as `'1.6'`** — stale by 10+ versions, so backup metadata was lying. Now imports from shared `appVersion.js`. (backup.js)
+- **Calendar sync errors were swallowed silently** — `enableCalendarSync`, `syncCustomerDueDate`, `syncAllCustomers`, `removeCustomerEvent` now write a status record that Settings reads to show the user when sync is broken. (calendarSync.js)
+
+### Infrastructure
+- Root `.gitignore` added at repo root for `.DS_Store` and editor crap. The rolodeck subfolder had one but the parent didn't.
+
+---
+
+## [0.17] - 2026-04-10
+
+### Changed
+- Calendar day panel now distinguishes scheduled services from due-date matches. Scheduled customers render with the blue "Scheduled" styling (matching the list view's Scheduled section) plus their notes; due-date customers keep urgency-colored styling. When a customer is both scheduled and due on the same day, the scheduled entry takes priority. (ServicesScreen.js)
+- Day panel title dropped the "Due" prefix (it was misleading when the day also contained scheduled entries). Empty-state copy updated: "Nothing on this date." / "Tap a date to see who's due or scheduled." (ServicesScreen.js)
+- Calendar month navigation arrows redesigned — larger Ionicons chevrons inside a primaryPale-filled circle. The default tiny arrows were easy to miss; new buttons are clearly tappable. (ServicesScreen.js)
+
+---
+
+## [0.16] - 2026-04-10
+
+### Added
+- Smooth tab swap animation — each tab's content fades in and slides from the right over 220ms when switched, so tab changes feel like the stack push animation instead of an instant swap. (TabNavigator.js)
+
+### Fixed
+- Phantom "Customer" back button on the Customers list is gone. The root Customers screen now explicitly has no header back button, regardless of the underlying stack state. (TabNavigator.js)
+- GO_BACK console errors after cross-tab navigation. CustomerDetail, AddCustomer, and AddService now guard `goBack()` with a `canGoBack()` check and fall back to resetting the stack to the Customers root — previously these could throw `"action 'GO_BACK' was not handled by any navigator"` when the stack only had one screen. (CustomerDetailScreen.js, AddCustomerScreen.js, AddServiceScreen.js)
+
+---
+
+## [0.15.1] - 2026-04-10
+
+### Fixed
+- Back button on CustomerDetail now correctly returns to ServicesTab when navigated from the Services screen — previously `goBack()` always went to CustomersScreen regardless of origin. (CustomerDetailScreen.js, ServicesScreen.js)
+- Tapping a bottom tab now always resets that tab's navigation stack to its root screen — switching away and back no longer leaves CustomerDetail open with a stale "Services" back label. (TabNavigator.js)
+
+---
+
+## [0.15] - 2026-04-10
+
+### Added
+- Schedule Service button on every customer card — opens a bottom-sheet modal with the same MM/DD/YYYY date picker and calendar picker as Add Service, restricted to tomorrow and forward. Uses blue throughout.
+- Scheduled section at the top of the Services list — shows all upcoming scheduled appointments, sorted soonest first, in blue.
+
+---
+
+## [0.14.1] - 2026-04-10
+
+### Infrastructure
+- Versioning scheme normalized to 0.x pre-release (was 1.x). Adopted 0.14.1 continuing from 1.14.1; prior history entries remain as-is.
+
+---
+
+## [1.14.1] - 2026-04-10
+
+### Changed
+- "Later" section color on Services screen changed from teal to green across all themes (freeing teal/blue for future use).
+
+### Fixed
+- Add Service date picker now restricts to past and today — future dates are grayed out in the calendar and rejected on save.
+
+---
+
 ## [1.14] - 2026-04-09
 
 ### Added

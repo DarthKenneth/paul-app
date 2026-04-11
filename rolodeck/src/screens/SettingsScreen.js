@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 1.7
-// Last Updated: 2026-04-09
+// Version: 1.8
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.16)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -18,6 +18,8 @@
 //               calendarSync.js           (getCalendarSyncEnabled, enableCalendarSync,
 //                                          disableCalendarSync)
 //               theme.js                  (useTheme)
+//               appVersion.js             (APP_VERSION — single source of truth,
+//                                          derived from package.json)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
@@ -80,9 +82,25 @@
 //       - Imported getServiceIntervalMode, getServiceIntervalCustomDays,
 //         modeToIntervalDays from storage.js [updated ARCHITECTURE]
 //       - Updated APP_VERSION to '1.14'
+// v1.7.1 2026-04-10  Claude  Updated APP_VERSION to '0.14.1' (scheme normalized to 0.x pre-release)
+// v1.7.2 2026-04-10  Claude  Updated APP_VERSION to '0.16' (covers missing 0.15 and
+//                             0.15.1 bumps that weren't logged in prior sessions)
+// v1.7.3 2026-04-10  Claude  APP_VERSION now derived from package.json instead of
+//                             hardcoded, stripping trailing ".0" — never goes stale
+//                             on future bumps [updated ARCHITECTURE dependency]
+// v1.7.4 2026-04-10  Claude  APP_VERSION import moved to shared src/appVersion.js
+//                             so backup.js (and future callers) share one source
+// v1.8  2026-04-10  Claude  Calendar sync status banner
+//       - Loads calendar sync status on mount via getCalendarSyncStatus()
+//       - Renders a warning banner under the Calendar Sync toggle when sync
+//         is enabled AND last sync didn't succeed; distinct copy for
+//         'permission-denied' vs generic 'error' states
+//       - Tapping the banner calls handleCalSyncRetry which runs syncAllCustomers
+//         and refreshes the status
+//       - Toggling sync off clears the stale status [updated ARCHITECTURE]
 // =============================================================================
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -113,9 +131,10 @@ import {
   getCalendarSyncEnabled,
   enableCalendarSync,
   disableCalendarSync,
+  getCalendarSyncStatus,
+  syncAllCustomers,
 } from '../utils/calendarSync';
-
-const APP_VERSION = '1.14';
+import { APP_VERSION } from '../appVersion';
 
 const INTERVAL_MODE_LABELS = {
   '30':   '30 Days',
@@ -140,11 +159,12 @@ const SORT_OPTIONS = [
 
 export default function SettingsScreen({ navigation }) {
   const { theme, themeKey, fontKey } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [sortPref, setSortPref]               = useState('name');
   const [showArchived, setShowArchived]       = useState(false);
   const [calendarSync, setCalendarSync]       = useState(false);
+  const [calSyncStatus, setCalSyncStatus]     = useState(null); // { status, message, at } | null
   const [calSyncBusy, setCalSyncBusy]         = useState(false);
   const [intervalMode, setIntervalMode]       = useState('365');
   const [intervalCustomDays, setIntervalCustomDays] = useState(30);
@@ -159,6 +179,9 @@ export default function SettingsScreen({ navigation }) {
     });
     getCalendarSyncEnabled().then((v) => {
       if (active) { setCalendarSync(v); calSyncAnim.setValue(v ? 1 : 0); }
+    });
+    getCalendarSyncStatus().then((s) => {
+      if (active) setCalSyncStatus(s);
     });
     return () => { active = false; };
   }, []);
@@ -199,6 +222,7 @@ export default function SettingsScreen({ navigation }) {
         setCalendarSync(false);
         Animated.spring(calSyncAnim, { toValue: 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
         await disableCalendarSync();
+        setCalSyncStatus(null);
       } else {
         setCalendarSync(true);
         Animated.spring(calSyncAnim, { toValue: 1, useNativeDriver: false, friction: 6, tension: 80 }).start();
@@ -213,7 +237,20 @@ export default function SettingsScreen({ navigation }) {
               : 'Rolodeck needs access to your calendar to sync service due dates. Enable it in Settings > Apps > Rolodeck > Permissions > Calendar.',
           );
         }
+        setCalSyncStatus(await getCalendarSyncStatus());
       }
+    } finally {
+      setCalSyncBusy(false);
+    }
+  };
+
+  // Manual retry — user taps the sync-error banner
+  const handleCalSyncRetry = async () => {
+    if (calSyncBusy) return;
+    setCalSyncBusy(true);
+    try {
+      await syncAllCustomers();
+      setCalSyncStatus(await getCalendarSyncStatus());
     } finally {
       setCalSyncBusy(false);
     }
@@ -360,6 +397,33 @@ export default function SettingsScreen({ navigation }) {
               <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: calSyncKnob }] }]} />
             </Animated.View>
           </Pressable>
+
+          {/* Calendar sync error banner — only shown when sync is enabled AND
+              the last sync did not succeed. Tap to retry. */}
+          {calendarSync && calSyncStatus && calSyncStatus.status !== 'ok' && (
+            <Pressable
+              style={styles.syncBanner}
+              onPress={handleCalSyncRetry}
+              disabled={calSyncBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Calendar sync is offline, tap to retry"
+            >
+              <Ionicons name="warning-outline" size={18} color={theme.warning} style={styles.syncBannerIcon} />
+              <View style={styles.syncBannerBody}>
+                <Text style={styles.syncBannerTitle}>
+                  {calSyncStatus.status === 'permission-denied'
+                    ? 'Calendar access was revoked'
+                    : 'Calendar sync is offline'}
+                </Text>
+                <Text style={styles.syncBannerDesc} numberOfLines={2}>
+                  {calSyncStatus.status === 'permission-denied'
+                    ? 'Re-enable calendar access in system Settings, then tap to retry.'
+                    : calSyncStatus.message || 'Tap to retry the sync.'}
+                </Text>
+              </View>
+              <Ionicons name="refresh-outline" size={18} color={theme.primary} />
+            </Pressable>
+          )}
         </View>
 
         {/* ── Square Invoicing (coming soon) ── */}
@@ -495,6 +559,33 @@ function makeStyles(theme) {
       height:          StyleSheet.hairlineWidth,
       backgroundColor: theme.border,
       marginVertical:  12,
+    },
+    syncBanner: {
+      flexDirection:    'row',
+      alignItems:       'center',
+      backgroundColor:  theme.warning + '18', // ~9% alpha tint
+      borderRadius:     10,
+      paddingVertical:  10,
+      paddingHorizontal: 12,
+      marginTop:        10,
+      gap:              10,
+    },
+    syncBannerIcon: {
+      marginTop: 1,
+    },
+    syncBannerBody: {
+      flex: 1,
+    },
+    syncBannerTitle: {
+      fontFamily: theme.fontBodyBold,
+      fontSize:   FontSize.sm,
+      color:      theme.warning,
+    },
+    syncBannerDesc: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.xs,
+      color:      theme.textSecondary,
+      marginTop:  2,
     },
     themeChevron: {
       flexDirection: 'row',

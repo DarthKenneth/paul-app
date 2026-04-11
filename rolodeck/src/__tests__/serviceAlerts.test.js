@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-03
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v0.14.1)
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial adversarial test suite
@@ -293,14 +293,14 @@ describe('getAlertBadgeCount', () => {
     expect(getAlertBadgeCount([])).toBe(0);
   });
 
-  test('counts overdue + 30-day window', () => {
+  test('counts overdue only (not upcoming)', () => {
     const customers = [
       makeCustomer({ serviceLog: makeServiceLog([400]) }),  // overdue
-      makeCustomer({ serviceLog: makeServiceLog([350]) }),  // due in 15 days
-      makeCustomer({ serviceLog: makeServiceLog([100]) }),  // ok
+      makeCustomer({ serviceLog: makeServiceLog([350]) }),  // due in 15 days (not counted)
+      makeCustomer({ serviceLog: makeServiceLog([100]) }),  // ok (not counted)
       makeCustomer({ serviceLog: [] }),                      // never serviced (overdue)
     ];
-    expect(getAlertBadgeCount(customers)).toBe(3);
+    expect(getAlertBadgeCount(customers)).toBe(2);
   });
 
   test('returns 0 when all customers are healthy', () => {

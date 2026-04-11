@@ -1,9 +1,9 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.5
-// Last Updated: 2026-04-09
+// Version: 1.5.1
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.16)
 // FILES:        AddCustomerScreen.js  (this file)
 //               storage.js            (addCustomer)
 //               zipLookup.js          (lookupZip — city/state from zip code)
@@ -58,9 +58,12 @@
 //       - fetchSuggestions now calls Geoapify /v1/geocode/autocomplete
 //       - Response is GeoJSON; address parsed from feature.properties
 //       - Config import updated to GEOAPIFY_API_KEY [updated ARCHITECTURE]
+// v1.5.1 2026-04-10  Claude  Guard goBack with canGoBack check; reset to Customers
+//                             root when the stack is orphaned — avoids GO_BACK
+//                             errors after save from an empty back stack
 // =============================================================================
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -131,7 +134,7 @@ const EMPTY_FORM = {
 
 export default function AddCustomerScreen({ navigation }) {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [form, setForm]                   = useState(EMPTY_FORM);
   const [saving, setSaving]               = useState(false);
@@ -219,7 +222,11 @@ export default function AddCustomerScreen({ navigation }) {
         trimmed[key] = (form[key] || '').trim();
       }
       await addCustomer(trimmed);
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'Customers' }] });
+      }
     } catch {
       Alert.alert('Error', 'Failed to save customer.');
     } finally {

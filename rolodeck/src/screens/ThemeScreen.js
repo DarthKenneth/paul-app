@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.13)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        ThemeScreen.js   (this file — theme/font pickers)
 //               SettingsScreen.js (parent nav, links here via "Theme" row)
 //               TabNavigator.js   (registers this screen in SettingsStack)
@@ -24,7 +24,7 @@
 //                           style pickers now live on their own stack screen
 // =============================================================================
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -40,7 +40,7 @@ import { FontPresets, FontPresetNames, FontPresetKeys, FontSize } from '../style
 
 export default function ThemeScreen() {
   const { theme, themeKey, setTheme, fontKey, setFont } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   return (
     <SafeAreaView style={styles.safe}>

@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-03
 //
-// PROJECT:      Rolodeck (project v1.3)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        zipLookup.js          (this file — zip code API utility)
 //               AddCustomerScreen.js  (calls lookupZip on zip input)
 //               CustomerDetailScreen.js (calls lookupZip in edit mode)

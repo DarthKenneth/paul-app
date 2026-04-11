@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-03
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v0.14.1)
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial adversarial date validation tests

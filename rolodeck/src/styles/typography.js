@@ -3,7 +3,7 @@
 // Version: 1.2
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        colors.js       (palette + theme objects)
 //               typography.js   (this file — font constants)
 //               theme.js        (ThemeContext + ThemeProvider)

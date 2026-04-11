@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-03
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v0.14.1)
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial adversarial test suite
@@ -288,12 +288,12 @@ describe('addServiceEntry', () => {
 
   test('handles customer with corrupted serviceLog (non-array)', async () => {
     const c = await addCustomer({ name: 'Test' });
-    // Corrupt the serviceLog directly in storage
-    const all = JSON.parse(store['@rolodeck_customers']);
-    all[0].serviceLog = 'corrupted';
-    store['@rolodeck_customers'] = JSON.stringify(all);
+    // Corrupt the serviceLog directly in the envelope
+    const envelope = JSON.parse(store['@rolodeck_customers']);
+    envelope.customers[0].serviceLog = 'corrupted';
+    store['@rolodeck_customers'] = JSON.stringify(envelope);
 
-    // addServiceEntry should recover because loadCustomers fixes serviceLog
+    // addServiceEntry should recover because loadCustomers normalizes serviceLog
     const entry = await addServiceEntry(c.id, { date: new Date().toISOString() });
     expect(entry.id).toBeTruthy();
 
@@ -407,22 +407,64 @@ describe('clearAllData', () => {
 // ── Schema version ───────────────────────────────────────────────────────────
 
 describe('schema version', () => {
-  test('initStorage sets schema version when not present', async () => {
+  test('initStorage writes an empty envelope on fresh install', async () => {
     await initStorage();
     const version = await getSchemaVersion();
     expect(version).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  test('initStorage does not overwrite existing version', async () => {
-    store['@rolodeck_schema_version'] = '99';
+  test('initStorage does not downgrade data with a newer schema version', async () => {
+    // Simulate a newer app version writing the envelope
+    store['@rolodeck_customers'] = JSON.stringify({
+      schemaVersion: 99,
+      customers: [{ id: 'abc', name: 'From Future Build', serviceLog: [], scheduledServices: [] }],
+    });
     await initStorage();
     const version = await getSchemaVersion();
     expect(version).toBe(99);
+    // Data must remain intact
+    const customers = await getAllCustomers();
+    expect(customers).toHaveLength(1);
+    expect(customers[0].name).toBe('From Future Build');
   });
 
-  test('getSchemaVersion returns null when not set', async () => {
+  test('initStorage migrates legacy raw-array format to envelope', async () => {
+    // Pre-envelope format: customers stored as a raw array
+    store['@rolodeck_customers'] = JSON.stringify([
+      { id: '1', name: 'Legacy A', serviceLog: [] },
+      { id: '2', name: 'Legacy B' }, // missing serviceLog entirely
+    ]);
+    await initStorage();
+    const version = await getSchemaVersion();
+    expect(version).toBe(CURRENT_SCHEMA_VERSION);
+    // After migration, the envelope wraps the customers
+    const raw = JSON.parse(store['@rolodeck_customers']);
+    expect(raw.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(Array.isArray(raw.customers)).toBe(true);
+    // Missing fields were normalized
+    const customers = await getAllCustomers();
+    expect(customers[0].serviceLog).toEqual([]);
+    expect(customers[0].scheduledServices).toEqual([]);
+    expect(customers[1].serviceLog).toEqual([]);
+    expect(customers[1].scheduledServices).toEqual([]);
+  });
+
+  test('initStorage removes orphaned legacy SCHEMA_VERSION_KEY', async () => {
+    // Pre-envelope era stored version in a separate key
+    store['@rolodeck_schema_version'] = '1';
+    await initStorage();
+    expect(store['@rolodeck_schema_version']).toBeUndefined();
+  });
+
+  test('getSchemaVersion returns null when customers key is missing', async () => {
     const version = await getSchemaVersion();
     expect(version).toBeNull();
+  });
+
+  test('getSchemaVersion returns 0 for legacy raw-array format', async () => {
+    store['@rolodeck_customers'] = JSON.stringify([{ id: '1', name: 'Legacy' }]);
+    const version = await getSchemaVersion();
+    expect(version).toBe(0);
   });
 });
 

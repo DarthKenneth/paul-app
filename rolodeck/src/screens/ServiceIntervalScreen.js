@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        ServiceIntervalScreen.js  (this file)
 //               storage.js               (getServiceIntervalMode,
 //                                          saveServiceIntervalMode,
@@ -31,7 +31,7 @@
 // v1.0  2026-04-09  Claude  Initial implementation
 // =============================================================================
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -64,7 +64,7 @@ const INTERVAL_OPTIONS = [
 
 export default function ServiceIntervalScreen() {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [mode, setMode]             = useState('365');
   const [customDays, setCustomDays] = useState('30');

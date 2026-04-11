@@ -3,7 +3,7 @@
 // Version: 1.1
 // Last Updated: 2026-04-04
 //
-// PROJECT:      Rolodeck (project v1.4)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        InvoiceButton.js          (this file — UI + modal)
 //               squarePlaceholder.js      (sendSquareInvoice logic)
 //               CustomerDetailScreen.js   (renders this button)
@@ -26,7 +26,7 @@
 //                           sendSquareInvoice() (locationId now in config)
 // =============================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -45,7 +45,7 @@ import { sendSquareInvoice } from '../utils/squarePlaceholder';
 
 export default function InvoiceButton({ customer }) {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [modalVisible, setModalVisible] = useState(false);
   const [amount, setAmount] = useState('');
   const [sending, setSending] = useState(false);

@@ -1,9 +1,9 @@
 // =============================================================================
 // ServicesScreen.js - Upcoming and overdue service list, grouped by due window
-// Version: 2.2
-// Last Updated: 2026-04-09
+// Version: 2.5
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.17)
 // FILES:        ServicesScreen.js    (this file)
 //               storage.js           (getAllCustomers)
 //               serviceAlerts.js     (groupCustomersByDueWindow, getServiceStatus,
@@ -23,13 +23,36 @@
 //   - CALENDAR MODE:
 //       react-native-calendars Calendar component
 //       Each customer's due date (last service + 365 days) shown as a dot
-//       Dot color = urgency level: overdue=red, warning=orange, upcoming=rust, ok=teal
+//       Dot color = urgency level: overdue=red, warning=orange, upcoming=rust, ok=green
+//       Day panel items are kind-tagged: 'scheduled' rows use blue accent +
+//       "Scheduled" label (plus notes if present); 'due' rows use urgency color.
+//       Scheduled takes priority when a customer is both scheduled and due
+//       on the same day.
+//   - SCHEDULED SECTION: collected from customer.scheduledServices[], sorted soonest-
+//     first, rendered at top of list with blue (theme.scheduled) chrome
 //       Never-serviced customers omitted from calendar (no pinnable due date)
-//       Tapping a day shows a panel of customers due on that date
+//       Tapping a day shows a panel of items (scheduled + due) for that date
 //   - Tapping a customer row navigates cross-tab to CustomersTab → CustomerDetail
 //   - Section headers color-coded by urgency (list mode)
 //
 // CHANGE LOG:
+// v2.5  2026-04-10  Claude  Calendar view: scheduled distinction + visible arrows
+//       - Reworked customersOnSelectedDay → itemsOnSelectedDay, tagging each
+//         item with kind ('scheduled' | 'due') plus the matching scheduledEntry
+//       - renderCalendarRow now branches on kind: scheduled rows render blue
+//         accent + "Scheduled" label + notes meta line (matches list view);
+//         due rows keep urgency accent + status label
+//       - Scheduled takes priority when a customer is both scheduled and due
+//         on the same day (deduped via seen Set)
+//       - Dropped misleading "Due" prefix from day panel title — now just the
+//         date, since the panel can contain both kinds
+//       - Empty-state copy updated: "Nothing on this date." and
+//         "Tap a date to see who's due or scheduled."
+//       - keyExtractor changed from item.id to `${kind}-${customer.id}`
+//       - Month navigation arrows now render as Ionicons chevrons inside a
+//         34×34 primaryPale-filled circle (renderArrow prop) so they're
+//         clearly visible against the surface background — the default tiny
+//         arrows were easy to miss [updated ARCHITECTURE]
 // v1.0    2026-04-03  Claude  Initial scaffold — flat FlatList with filter chips
 // v2.0    2026-04-03  Claude  Full rewrite as section-based SectionList
 //         - Replaced filter chips with automatic due-window sections
@@ -37,6 +60,20 @@
 //         - Section headers color-coded by urgency
 //         - Empty state handles both zero customers and all-current cases
 // v2.0.1  2026-04-03  Claude  Added try/catch on storage load in useFocusEffect
+// v2.4.1 2026-04-10  Claude  Pass backTab: 'ServicesTab' in handleRowPress so back
+//                            button on CustomerDetail returns to ServicesTab
+// v2.4  2026-04-10  Claude  Scheduled services on calendar view
+//       - markedDates now adds blue (theme.scheduled) dots for each customer's
+//         scheduledServices entries in addition to due-date dots
+//       - customersOnSelectedDay includes customers matched by scheduled entry
+//         date as well as by due-date; deduped via Set
+// v2.3  2026-04-10  Claude  Scheduled section at top of list
+//       - Collects scheduledServices from all customers; sorts by date ascending
+//       - Prepends { key: 'scheduled', title: 'Scheduled' } section when non-empty
+//       - renderItem delegates to renderScheduledItem for scheduled section
+//       - SECTION_COLOR_KEY.scheduled = 'scheduled' (blue) [updated ARCHITECTURE]
+// v2.2.1 2026-04-10  Claude  Updated architecture comment: ok dot color teal → green
+//                            (follows colors.js v1.1 success color change) [updated ARCHITECTURE]
 // v2.2  2026-04-09  Claude  Respect configurable service interval
 //       - Loads interval preference (mode + customDays) in useFocusEffect
 //       - Passes intervalDays to groupCustomersByDueWindow, getServiceStatus
@@ -79,18 +116,18 @@ import {
   getLastServiceDate,
   getEffectiveIntervalForCustomer,
 } from '../utils/serviceAlerts';
+import { toLocalDateKey, localDateKeyFromISO, addDaysLocal } from '../utils/dateUtils';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
-
 // Color key per section — maps to theme properties
 const SECTION_COLOR_KEY = {
-  overdue: 'overdue',
-  next30:  'warning',
-  next60:  'accent',
-  next90:  'accent',
-  later:   'success',
+  scheduled: 'scheduled',
+  overdue:   'overdue',
+  next30:    'warning',
+  next60:    'accent',
+  next90:    'accent',
+  later:     'success',
 };
 
 function dotColorForLevel(level, theme) {
@@ -102,18 +139,20 @@ function dotColorForLevel(level, theme) {
   }
 }
 
-// Uses per-entry intervalDays if present, else the provided global interval
+// Uses per-entry intervalDays if present, else the provided global interval.
+// Returns the LOCAL-calendar due date key (YYYY-MM-DD). Previously this used
+// toISOString() which returned UTC — shifted by 1 day for users in non-UTC
+// timezones whose last service happened near local midnight.
 function dueDateString(customer, globalIntervalDays) {
   const last = getLastServiceDate(customer);
   if (!last) return null;
   const effectiveDays = getEffectiveIntervalForCustomer(customer, globalIntervalDays);
-  const due = new Date(last.getTime() + effectiveDays * MS_PER_DAY);
-  return due.toISOString().split('T')[0]; // YYYY-MM-DD
+  return toLocalDateKey(addDaysLocal(last, effectiveDays));
 }
 
 export default function ServicesScreen({ navigation }) {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [viewMode, setViewMode]           = React.useState('list');
   const [sections, setSections]           = React.useState([]);
@@ -134,8 +173,29 @@ export default function ServicesScreen({ navigation }) {
           if (active) {
             const days    = modeToIntervalDays(mode, customDays);
             const active_ = all.filter((c) => !c.archived);
+
+            // Build scheduled section — flatten all scheduledServices, sort soonest first
+            const scheduledItems = [];
+            for (const c of active_) {
+              for (const entry of (c.scheduledServices || [])) {
+                scheduledItems.push({
+                  id:            entry.id,
+                  customerId:    c.id,
+                  customerName:  c.name || 'Unnamed',
+                  scheduledDate: entry.date,
+                  notes:         entry.notes,
+                });
+              }
+            }
+            scheduledItems.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+
+            const baseSections = groupCustomersByDueWindow(active_, days);
+            const allSections  = scheduledItems.length > 0
+              ? [{ key: 'scheduled', title: 'Scheduled', data: scheduledItems }, ...baseSections]
+              : baseSections;
+
             setIntervalDays(days);
-            setSections(groupCustomersByDueWindow(active_, days));
+            setSections(allSections);
             setAllCustomers(active_);
             setTotalCustomers(active_.length);
           }
@@ -150,7 +210,7 @@ export default function ServicesScreen({ navigation }) {
   const handleRowPress = (customerId) => {
     navigation.navigate('CustomersTab', {
       screen: 'CustomerDetail',
-      params: { customerId },
+      params: { customerId, backLabel: 'Services', backTab: 'ServicesTab' },
     });
   };
 
@@ -158,12 +218,13 @@ export default function ServicesScreen({ navigation }) {
 
   const markedDates = useMemo(() => {
     const result = {};
+
+    // Due-date dots (service interval based)
     for (const customer of allCustomers) {
       const dateStr = dueDateString(customer, intervalDays);
-      if (!dateStr) continue; // skip never-serviced
+      if (!dateStr) continue;
       const status = getServiceStatus(customer, intervalDays);
       if (!result[dateStr]) result[dateStr] = { dots: [] };
-      // Cap at 3 dots per day to avoid visual overflow
       if (result[dateStr].dots.length < 3) {
         result[dateStr].dots.push({
           key:   customer.id,
@@ -171,6 +232,22 @@ export default function ServicesScreen({ navigation }) {
         });
       }
     }
+
+    // Scheduled service dots (blue) — extract LOCAL date from stored ISO
+    for (const customer of allCustomers) {
+      for (const entry of (customer.scheduledServices || [])) {
+        const dateStr = localDateKeyFromISO(entry.date);
+        if (!dateStr) continue;
+        if (!result[dateStr]) result[dateStr] = { dots: [] };
+        if (result[dateStr].dots.length < 3) {
+          result[dateStr].dots.push({
+            key:   `sched-${entry.id}`,
+            color: theme.scheduled,
+          });
+        }
+      }
+    }
+
     if (selectedDate) {
       if (!result[selectedDate]) result[selectedDate] = { dots: [] };
       result[selectedDate] = {
@@ -182,9 +259,39 @@ export default function ServicesScreen({ navigation }) {
     return result;
   }, [allCustomers, selectedDate, theme, intervalDays]);
 
-  const customersOnSelectedDay = useMemo(() => {
+  // Day-panel items: each tagged with kind so the renderer can style scheduled
+  // entries differently (blue + "Scheduled" label) from due-date matches (urgency
+  // color + status label). Scheduled entries take priority over due-date for the
+  // same customer — a customer scheduled on their due day renders as scheduled.
+  const itemsOnSelectedDay = useMemo(() => {
     if (!selectedDate) return [];
-    return allCustomers.filter((c) => dueDateString(c, intervalDays) === selectedDate);
+    const seen = new Set();
+    const result = [];
+
+    // Scheduled first (more concrete — the user explicitly put it on this day).
+    // Compare via local date key so users near midnight in non-UTC timezones
+    // still see their scheduled entries on the day they picked.
+    for (const c of allCustomers) {
+      if (seen.has(c.id)) continue;
+      const entry = (c.scheduledServices || []).find(
+        (e) => localDateKeyFromISO(e.date) === selectedDate,
+      );
+      if (entry) {
+        seen.add(c.id);
+        result.push({ customer: c, kind: 'scheduled', scheduledEntry: entry });
+      }
+    }
+
+    // Due-date matches after, skipping customers already added as scheduled
+    for (const c of allCustomers) {
+      if (seen.has(c.id)) continue;
+      if (dueDateString(c, intervalDays) === selectedDate) {
+        seen.add(c.id);
+        result.push({ customer: c, kind: 'due' });
+      }
+    }
+
+    return result;
   }, [allCustomers, selectedDate, intervalDays]);
 
   const calendarTheme = useMemo(() => ({
@@ -254,7 +361,35 @@ export default function ServicesScreen({ navigation }) {
     );
   };
 
+  const renderScheduledItem = ({ item }) => {
+    const blue = theme.scheduled;
+    const dateStr = new Date(item.scheduledDate).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+    });
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        onPress={() => handleRowPress(item.customerId)}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.customerName}, scheduled ${dateStr}`}
+      >
+        <View style={[styles.rowAccent, { backgroundColor: blue }]} />
+        <View style={styles.rowBody}>
+          <Text style={styles.rowName} numberOfLines={1}>{item.customerName}</Text>
+          <View style={styles.rowMeta}>
+            <Ionicons name="calendar-outline" size={13} color={theme.textMuted} style={styles.metaIcon} />
+            <Text style={styles.rowLastDate}>{dateStr}</Text>
+          </View>
+          <Text style={[styles.rowStatus, { color: blue }]} numberOfLines={1}>Scheduled</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={theme.border} />
+      </Pressable>
+    );
+  };
+
   const renderItem = ({ item, section }) => {
+    if (section.key === 'scheduled') return renderScheduledItem({ item });
+
     const status = getServiceStatus(item, intervalDays);
     const lastDate = getLastServiceDate(item);
     const colorKey = SECTION_COLOR_KEY[section.key] || 'textMuted';
@@ -290,19 +425,51 @@ export default function ServicesScreen({ navigation }) {
   };
 
   const renderCalendarRow = ({ item }) => {
-    const status = getServiceStatus(item, intervalDays);
+    const { customer, kind, scheduledEntry } = item;
+
+    // ── Scheduled row — blue accent + "Scheduled" label, matches list view ──
+    if (kind === 'scheduled') {
+      const blue = theme.scheduled;
+      const noteText = (scheduledEntry?.notes || '').trim();
+      return (
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => handleRowPress(customer.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`${customer.name || 'Customer'}, scheduled`}
+        >
+          <View style={[styles.rowAccent, { backgroundColor: blue }]} />
+          <View style={styles.rowBody}>
+            <Text style={styles.rowName} numberOfLines={1}>
+              {customer.name || 'Unnamed'}
+            </Text>
+            {noteText ? (
+              <View style={styles.rowMeta}>
+                <Ionicons name="document-text-outline" size={13} color={theme.textMuted} style={styles.metaIcon} />
+                <Text style={styles.rowLastDate} numberOfLines={1}>{noteText}</Text>
+              </View>
+            ) : null}
+            <Text style={[styles.rowStatus, { color: blue }]} numberOfLines={1}>Scheduled</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.border} />
+        </Pressable>
+      );
+    }
+
+    // ── Due-date row — urgency accent + status label ──
+    const status = getServiceStatus(customer, intervalDays);
     const accentColor = dotColorForLevel(status.level, theme);
     return (
       <Pressable
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-        onPress={() => handleRowPress(item.id)}
+        onPress={() => handleRowPress(customer.id)}
         accessibilityRole="button"
-        accessibilityLabel={`${item.name || 'Customer'}, ${status.label}`}
+        accessibilityLabel={`${customer.name || 'Customer'}, ${status.label}`}
       >
         <View style={[styles.rowAccent, { backgroundColor: accentColor }]} />
         <View style={styles.rowBody}>
           <Text style={styles.rowName} numberOfLines={1}>
-            {item.name || 'Unnamed'}
+            {customer.name || 'Unnamed'}
           </Text>
           <Text style={[styles.rowStatus, { color: accentColor }]} numberOfLines={1}>
             {status.label}
@@ -344,18 +511,27 @@ export default function ServicesScreen({ navigation }) {
           )}
           theme={calendarTheme}
           style={styles.calendar}
+          renderArrow={(direction) => (
+            <View style={styles.calendarArrowBtn}>
+              <Ionicons
+                name={direction === 'left' ? 'chevron-back' : 'chevron-forward'}
+                size={20}
+                color={theme.primary}
+              />
+            </View>
+          )}
         />
         {selectedDate ? (
-          customersOnSelectedDay.length > 0 ? (
+          itemsOnSelectedDay.length > 0 ? (
             <View style={styles.dayPanel}>
               <Text style={styles.dayPanelTitle}>
-                Due {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', {
                   weekday: 'short', month: 'short', day: 'numeric'
                 })}
               </Text>
               <FlatList
-                data={customersOnSelectedDay}
-                keyExtractor={(item) => item.id}
+                data={itemsOnSelectedDay}
+                keyExtractor={(item) => `${item.kind}-${item.customer.id}`}
                 renderItem={renderCalendarRow}
                 ItemSeparatorComponent={() => <View style={styles.separator} />}
                 contentContainerStyle={styles.dayPanelList}
@@ -363,12 +539,12 @@ export default function ServicesScreen({ navigation }) {
             </View>
           ) : (
             <View style={styles.dayPanelEmpty}>
-              <Text style={styles.dayPanelEmptyText}>No customers due on this date.</Text>
+              <Text style={styles.dayPanelEmptyText}>Nothing on this date.</Text>
             </View>
           )
         ) : (
           <View style={styles.dayPanelEmpty}>
-            <Text style={styles.dayPanelEmptyText}>Tap a date to see who's due.</Text>
+            <Text style={styles.dayPanelEmptyText}>Tap a date to see who's due or scheduled.</Text>
           </View>
         )}
       </SafeAreaView>
@@ -454,6 +630,14 @@ function makeStyles(theme) {
       marginHorizontal: 12,
       borderRadius:      12,
       overflow:         'hidden',
+    },
+    calendarArrowBtn: {
+      width:           34,
+      height:          34,
+      borderRadius:    17,
+      backgroundColor: theme.primaryPale,
+      alignItems:      'center',
+      justifyContent:  'center',
     },
     dayPanel: {
       flex:             1,

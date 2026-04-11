@@ -3,7 +3,7 @@
 // Version: 1.0
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.13)
+// PROJECT:      Rolodeck (project v0.14.1)
 // FILES:        OnboardingModal.js  (this file — first-launch overlay)
 //               App.js              (mounts this modal, owns visible state)
 //               storage.js          (getOnboardingComplete, setOnboardingComplete)

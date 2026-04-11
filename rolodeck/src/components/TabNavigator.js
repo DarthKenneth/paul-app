@@ -1,9 +1,9 @@
 // =============================================================================
 // TabNavigator.js - Root navigation: BottomTabNavigator + Stack navigators
-// Version: 1.2
-// Last Updated: 2026-04-09
+// Version: 1.3
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.16)
 // FILES:        TabNavigator.js           (this file — navigation structure)
 //               App.js                    (renders TabNavigator inside
 //                                          NavigationContainer + ThemeProvider)
@@ -14,6 +14,8 @@
 // ARCHITECTURE:
 //   - Three bottom tabs: CustomersTab, ServicesTab, SettingsTab
 //   - Each tab has its own Stack.Navigator to support push navigation
+//   - Each stack is wrapped in AnimatedTabScreen so tab swaps fade + slide
+//     on focus (v6 bottom-tabs has no built-in screen transition)
 //   - Customers tab stack:
 //       Customers → CustomerDetail → AddCustomer / AddService
 //   - Services tab stack: ServicesScreen only (navigates to CustomersTab for
@@ -23,16 +25,33 @@
 //   - onAlertsRefresh prop is passed to AddServiceScreen via navigation params
 //     so the badge updates after a new service entry is saved
 //   - Header styling: font, color, border, and background all from useTheme()
+//   - Customers root screen has headerLeft: () => null so the phantom "Customer"
+//     back label from stack state never renders on the list
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-09  Claude  Added ThemeScreen to Settings stack
 // v1.2  2026-04-09  Claude  Added ServiceIntervalScreen to Settings stack
+// v1.2.1 2026-04-10  Claude  Added unmountOnBlur: true to all tab screens so
+//                            switching tabs always resets that tab's stack to root
+// v1.2.2 2026-04-10  Claude  Added tabPress listener on CustomersTab that forces
+//                            navigate to Customers root screen, fixing the case
+//                            where cross-tab navigate left CustomerDetail active
+// v1.3  2026-04-10  Claude  Smooth tab swaps + phantom back button fix
+//       - Added AnimatedTabScreen wrapper: fades opacity 0→1 and translateX 12→0
+//         over 220ms via useFocusEffect, so tab swaps feel like the stack push
+//         animation (v6 bottom-tabs has no native transition)
+//       - Wrapped CustomersStack, ServiceStack, SettingsStack in AnimatedTabScreen
+//       - Added headerLeft: () => null on the Customers root screen so the
+//         phantom "Customer" back label from stack state can never render
+//         [updated ARCHITECTURE]
 // =============================================================================
 
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
+import { Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import CustomersScreen      from '../screens/CustomersScreen';
@@ -51,6 +70,43 @@ const Tab   = createBottomTabNavigator();
 const CustStack     = createStackNavigator();
 const ServiceStack  = createStackNavigator();
 const SettingsStack = createStackNavigator();
+
+// ── Animated tab wrapper ──────────────────────────────────────────────────────
+// React Navigation v6 bottom-tabs has no built-in screen transition, so each
+// tab's stack is wrapped in an Animated.View that fades + slides in on focus.
+// This makes tab swaps feel like the stack push animation (short, smooth).
+// Works well with unmountOnBlur: true — the wrapper remounts on each tab
+// switch, so the animation re-runs every time.
+
+function AnimatedTabScreen({ children }) {
+  const opacity    = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(12)).current;
+
+  useFocusEffect(
+    useCallback(() => {
+      opacity.setValue(0);
+      translateX.setValue(12);
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }, [opacity, translateX]),
+  );
+
+  return (
+    <Animated.View style={{ flex: 1, opacity, transform: [{ translateX }] }}>
+      {children}
+    </Animated.View>
+  );
+}
 
 // ── Per-stack header options ──────────────────────────────────────────────────
 
@@ -81,29 +137,31 @@ function CustomersStackNavigator({ route }) {
   const onAlertsRefresh = route?.params?.onAlertsRefresh;
 
   return (
-    <CustStack.Navigator screenOptions={headerOptions}>
-      <CustStack.Screen
-        name="Customers"
-        component={CustomersScreen}
-        options={{ title: 'Customers' }}
-      />
-      <CustStack.Screen
-        name="CustomerDetail"
-        component={CustomerDetailScreen}
-        options={{ title: 'Customer' }}
-      />
-      <CustStack.Screen
-        name="AddCustomer"
-        component={AddCustomerScreen}
-        options={{ title: 'New Customer' }}
-      />
-      <CustStack.Screen
-        name="AddService"
-        component={AddServiceScreen}
-        initialParams={{ onAlertsRefresh }}
-        options={{ title: 'Add Service' }}
-      />
-    </CustStack.Navigator>
+    <AnimatedTabScreen>
+      <CustStack.Navigator screenOptions={headerOptions}>
+        <CustStack.Screen
+          name="Customers"
+          component={CustomersScreen}
+          options={{ title: 'Customers', headerLeft: () => null }}
+        />
+        <CustStack.Screen
+          name="CustomerDetail"
+          component={CustomerDetailScreen}
+          options={{ title: 'Customer' }}
+        />
+        <CustStack.Screen
+          name="AddCustomer"
+          component={AddCustomerScreen}
+          options={{ title: 'New Customer' }}
+        />
+        <CustStack.Screen
+          name="AddService"
+          component={AddServiceScreen}
+          initialParams={{ onAlertsRefresh }}
+          options={{ title: 'Add Service' }}
+        />
+      </CustStack.Navigator>
+    </AnimatedTabScreen>
   );
 }
 
@@ -112,13 +170,15 @@ function CustomersStackNavigator({ route }) {
 function ServiceStackNavigator() {
   const headerOptions = useHeaderOptions();
   return (
-    <ServiceStack.Navigator screenOptions={headerOptions}>
-      <ServiceStack.Screen
-        name="Services"
-        component={ServicesScreen}
-        options={{ title: 'Services' }}
-      />
-    </ServiceStack.Navigator>
+    <AnimatedTabScreen>
+      <ServiceStack.Navigator screenOptions={headerOptions}>
+        <ServiceStack.Screen
+          name="Services"
+          component={ServicesScreen}
+          options={{ title: 'Services' }}
+        />
+      </ServiceStack.Navigator>
+    </AnimatedTabScreen>
   );
 }
 
@@ -127,23 +187,25 @@ function ServiceStackNavigator() {
 function SettingsStackNavigator() {
   const headerOptions = useHeaderOptions();
   return (
-    <SettingsStack.Navigator screenOptions={headerOptions}>
-      <SettingsStack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{ title: 'Settings' }}
-      />
-      <SettingsStack.Screen
-        name="Theme"
-        component={ThemeScreen}
-        options={{ title: 'Theme' }}
-      />
-      <SettingsStack.Screen
-        name="ServiceInterval"
-        component={ServiceIntervalScreen}
-        options={{ title: 'Service Interval' }}
-      />
-    </SettingsStack.Navigator>
+    <AnimatedTabScreen>
+      <SettingsStack.Navigator screenOptions={headerOptions}>
+        <SettingsStack.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{ title: 'Settings' }}
+        />
+        <SettingsStack.Screen
+          name="Theme"
+          component={ThemeScreen}
+          options={{ title: 'Theme' }}
+        />
+        <SettingsStack.Screen
+          name="ServiceInterval"
+          component={ServiceIntervalScreen}
+          options={{ title: 'Service Interval' }}
+        />
+      </SettingsStack.Navigator>
+    </AnimatedTabScreen>
   );
 }
 
@@ -186,14 +248,21 @@ export default function TabNavigator({ alertCount, onAlertsRefresh }) {
       <Tab.Screen
         name="CustomersTab"
         component={CustomersStackNavigator}
-        options={{ title: 'Customers' }}
+        options={{ title: 'Customers', unmountOnBlur: true }}
         initialParams={{ onAlertsRefresh }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('CustomersTab', { screen: 'Customers' });
+          },
+        })}
       />
       <Tab.Screen
         name="ServicesTab"
         component={ServiceStackNavigator}
         options={{
           title: 'Services',
+          unmountOnBlur: true,
           tabBarBadge:      alertCount > 0 ? alertCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: theme.badge,
@@ -209,7 +278,7 @@ export default function TabNavigator({ alertCount, onAlertsRefresh }) {
       <Tab.Screen
         name="SettingsTab"
         component={SettingsStackNavigator}
-        options={{ title: 'Settings' }}
+        options={{ title: 'Settings', unmountOnBlur: true }}
       />
     </Tab.Navigator>
   );

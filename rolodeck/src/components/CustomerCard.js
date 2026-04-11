@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomerCard.js - Pressable card displaying a customer summary row
-// Version: 1.2
-// Last Updated: 2026-04-09
+// Version: 1.2.1
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.15)
 // FILES:        CustomerCard.js         (this file)
 //               CustomersScreen.js      (renders this in a FlatList)
 //               serviceAlerts.js        (getServiceStatus)
@@ -23,6 +23,8 @@
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
+// v1.2.1 2026-04-10  Claude  Reverted column layout; schedule button moved to
+//                             CustomerDetailScreen footer instead
 // v1.2  2026-04-09  Claude  Accept intervalDays prop; pass to getServiceStatus
 //                           so status badge respects the configured interval
 // v1.1  2026-04-03  Claude  Optimize + harden
@@ -32,7 +34,7 @@
 //         pushing chevron off-screen with long status labels
 // =============================================================================
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
@@ -69,7 +71,7 @@ function getSortValue(customer, sortMode) {
 
 function CustomerCard({ customer, onPress, sortMode, intervalDays = 365 }) {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const status = getServiceStatus(customer, intervalDays);
   const badgeColor = theme[LEVEL_COLORS[status.level]] || theme.textMuted;
   const sortValue = getSortValue(customer, sortMode);

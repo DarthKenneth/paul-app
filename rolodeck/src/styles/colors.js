@@ -1,9 +1,9 @@
 // =============================================================================
 // colors.js - Brand color palette and multi-theme definitions
-// Version: 1.0
-// Last Updated: 2026-04-03
+// Version: 1.2
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.2)
+// PROJECT:      Rolodeck (project v0.15)
 // FILES:        colors.js       (this file — palette + theme objects)
 //               typography.js   (font family + size constants)
 //               theme.js        (ThemeContext + ThemeProvider)
@@ -20,6 +20,13 @@
 //   - ThemeNames / ThemeKeys: used by SettingsScreen for the theme picker
 //
 // CHANGE LOG:
+// v1.2  2026-04-10  Claude  Added scheduled (blue) semantic color
+//       - Added Palette.blue (#2B7FF0)
+//       - Added scheduled: blue to BASE_THEME; midnight override: #60A5FA
+// v1.1  2026-04-10  Claude  Changed success color to green across all themes
+//       - Added Palette.green (#3DAA6A)
+//       - BASE_THEME success: teal → green (affects default, ocean, forest)
+//       - Midnight success override: purple (#9D96FF) → bright green (#4CC87A)
 // v1.0  2026-04-03  Claude  Initial scaffold — 4 themes (default, ocean,
 //                           forest, midnight)
 // =============================================================================
@@ -45,6 +52,8 @@ export const Palette = {
   white:      '#FFFFFF',
   red:        '#E53E3E',
   orange:     '#DD7700',
+  green:      '#3DAA6A',
+  blue:       '#2B7FF0',
 };
 
 // All themes must define every key in this base shape
@@ -71,7 +80,8 @@ const BASE_THEME = {
   badgeText:        Palette.white,
   overdue:          Palette.red,
   warning:          Palette.orange,
-  success:          Palette.teal,
+  success:          Palette.green,
+  scheduled:        Palette.blue,
   inputBg:          Palette.white,
   inputBorder:      Palette.creamDark,
   placeholder:      Palette.grayLight,
@@ -168,7 +178,8 @@ export const Themes = {
     badgeText:        '#FFFFFF',
     overdue:          '#FF6B6B',
     warning:          '#FFAA44',
-    success:          '#9D96FF',
+    success:          '#4CC87A',
+    scheduled:        '#60A5FA',
     inputBg:          '#13111D',
     inputBorder:      '#2E2A44',
     placeholder:      '#666688',

@@ -3,7 +3,7 @@
 // Version: 1.3
 // Last Updated: 2026-04-09
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.15)
 // FILES:        CustomersScreen.js      (this file)
 //               CustomerCard.js         (list item component)
 //               storage.js              (getAllCustomers, getSortPreference,
@@ -101,7 +101,7 @@ function sortCustomers(customers, mode) {
 
 export default function CustomersScreen({ navigation }) {
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [customers, setCustomers]   = useState([]);
   const [query, setQuery]           = useState('');
@@ -309,7 +309,7 @@ export default function CustomersScreen({ navigation }) {
             customer={item}
             sortMode={sortMode}
             intervalDays={intervalDays}
-            onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id })}
+            onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id, backLabel: 'Customers' })}
           />
         )}
         contentContainerStyle={styles.listContent}

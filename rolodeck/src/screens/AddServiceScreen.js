@@ -1,9 +1,9 @@
 // =============================================================================
 // AddServiceScreen.js - Add a service entry: date stamp + notes
-// Version: 1.5
-// Last Updated: 2026-04-09
+// Version: 1.5.2
+// Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v1.14)
+// PROJECT:      Rolodeck (project v0.16)
 // FILES:        AddServiceScreen.js  (this file)
 //               storage.js           (addServiceEntry, getCustomerById,
 //                                     getServiceIntervalMode,
@@ -52,6 +52,11 @@
 //       - Shows "Custom Interval" field (days input) when mode === 'custom'
 //       - Stores intervalDays on the service entry when mode === 'custom';
 //         omits the field for preset modes so the global setting applies
+// v1.5.2 2026-04-10  Claude  Guard goBack with canGoBack check; reset to Customers
+//                             root when the stack is orphaned — avoids GO_BACK
+//                             errors after save from an empty back stack
+// v1.5.1 2026-04-10  Claude  Restrict service date to past/today only — added
+//                            future-date guard in handleSave and maxDate on Calendar
 // v1.5  2026-04-09  Claude  DD/MM/YYYY split inputs + calendar picker
 //       - Replaced single YYYY-MM-DD text field with three separate number-pad
 //         boxes (DD, MM, YYYY); auto-advances focus on fill
@@ -77,6 +82,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
+import { todayLocalKey } from '../utils/dateUtils';
 import {
   addServiceEntry,
   getCustomerById,
@@ -99,7 +105,7 @@ function todayParts() {
 export default function AddServiceScreen({ route, navigation }) {
   const { customerId, onAlertsRefresh } = route.params;
   const { theme } = useTheme();
-  const styles = makeStyles(theme);
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const today = todayParts();
   const [dd, setDd]     = useState(today.dd);
@@ -169,7 +175,7 @@ export default function AddServiceScreen({ route, navigation }) {
         dd.length >= 1 && d >= 1 && d <= 31) {
       return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
     }
-    return new Date().toISOString().split('T')[0];
+    return todayLocalKey();
   }, [dd, mm, yyyy]);
 
   const calMarked = useMemo(() => ({
@@ -221,6 +227,14 @@ export default function AddServiceScreen({ route, navigation }) {
       return;
     }
 
+    // Reject future dates
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (parsed > today) {
+      Alert.alert('Invalid Date', 'Service date can\'t be in the future.');
+      return;
+    }
+
     if (isCustom) {
       const cd = parseInt(customDays, 10);
       if (isNaN(cd) || cd < 1) {
@@ -253,7 +267,11 @@ export default function AddServiceScreen({ route, navigation }) {
         onAlertsRefresh();
       }
 
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'Customers' }] });
+      }
     } catch {
       Alert.alert('Error', 'Failed to save service entry.');
     } finally {
@@ -408,6 +426,7 @@ export default function AddServiceScreen({ route, navigation }) {
             </View>
             <Calendar
               current={calSelectedDate}
+              maxDate={todayLocalKey()}
               markedDates={calMarked}
               onDayPress={handleDayPress}
               theme={calTheme}
