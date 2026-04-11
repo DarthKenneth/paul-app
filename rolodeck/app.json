@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.18.0",
+    "version": "0.19.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "splash": {

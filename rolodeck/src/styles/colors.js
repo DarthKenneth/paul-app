@@ -1,9 +1,9 @@
 // =============================================================================
 // colors.js - Brand color palette and multi-theme definitions
-// Version: 1.2
+// Version: 1.3
 // Last Updated: 2026-04-10
 //
-// PROJECT:      Rolodeck (project v0.15)
+// PROJECT:      Rolodeck (project v0.19)
 // FILES:        colors.js       (this file — palette + theme objects)
 //               typography.js   (font family + size constants)
 //               theme.js        (ThemeContext + ThemeProvider)
@@ -20,6 +20,10 @@
 //   - ThemeNames / ThemeKeys: used by SettingsScreen for the theme picker
 //
 // CHANGE LOG:
+// v1.3  2026-04-10  Claude  Added Stone (grey) and Ember (dark warm) themes
+//       - Added Stone theme: cool grey background, slate-blue primary, amber accent
+//       - Added Ember theme: dark warm charcoal, amber primary, pink-red accent
+//       - Added ThemeNames entries for both new themes
 // v1.2  2026-04-10  Claude  Added scheduled (blue) semantic color
 //       - Added Palette.blue (#2B7FF0)
 //       - Added scheduled: blue to BASE_THEME; midnight override: #60A5FA
@@ -187,6 +191,68 @@ export const Themes = {
     headerText:       '#F0EEFF',
     headerBorder:     '#2E2A44',
   }),
+
+  stone: buildTheme({
+    primary:          '#6878A0',
+    primaryDark:      '#4D5C82',
+    primaryLight:     '#8D9DC0',
+    primaryPale:      '#DDE2EF',
+    accent:           '#C8743A',
+    accentLight:      '#DFA070',
+    background:       '#EDEDF0',
+    surface:          '#F7F7F9',
+    border:           '#D4D4DB',
+    borderLight:      '#E8E8EC',
+    text:             '#1C1C24',
+    textSecondary:    '#50506A',
+    textMuted:        '#9090A8',
+    cardBg:           '#F7F7F9',
+    tabBar:           '#F7F7F9',
+    tabBarBorder:     '#D4D4DB',
+    tabIconActive:    '#6878A0',
+    tabIconInactive:  '#9090A8',
+    badge:            '#C8743A',
+    badgeText:        '#FFFFFF',
+    inputBg:          '#FFFFFF',
+    inputBorder:      '#D4D4DB',
+    placeholder:      '#9090A8',
+    headerBg:         '#F7F7F9',
+    headerText:       '#1C1C24',
+    headerBorder:     '#D4D4DB',
+  }),
+
+  ember: buildTheme({
+    primary:          '#F59E3A',
+    primaryDark:      '#C97B1A',
+    primaryLight:     '#F7C070',
+    primaryPale:      '#2E2010',
+    accent:           '#E85D75',
+    accentLight:      '#F0808F',
+    background:       '#0E0B07',
+    surface:          '#1A1510',
+    border:           '#2E2518',
+    borderLight:      '#3A3020',
+    text:             '#F5EDD8',
+    textSecondary:    '#BBAA88',
+    textMuted:        '#776655',
+    cardBg:           '#1A1510',
+    tabBar:           '#140F0A',
+    tabBarBorder:     '#2E2518',
+    tabIconActive:    '#F59E3A',
+    tabIconInactive:  '#776655',
+    badge:            '#E85D75',
+    badgeText:        '#FFFFFF',
+    overdue:          '#FF6B6B',
+    warning:          '#FFAA44',
+    success:          '#4CC87A',
+    scheduled:        '#60A5FA',
+    inputBg:          '#0E0B07',
+    inputBorder:      '#2E2518',
+    placeholder:      '#776655',
+    headerBg:         '#140F0A',
+    headerText:       '#F5EDD8',
+    headerBorder:     '#2E2518',
+  }),
 };
 
 export const ThemeNames = {
@@ -194,6 +260,8 @@ export const ThemeNames = {
   ocean:    'Ocean Blue',
   forest:   'Forest Green',
   midnight: 'Midnight',
+  stone:    'Stone',
+  ember:    'Ember',
 };
 
 export const ThemeKeys = Object.keys(Themes);

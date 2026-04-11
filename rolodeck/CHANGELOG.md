@@ -8,6 +8,14 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.19] - 2026-04-10
+
+### Added
+- **Stone theme** — neutral cool-grey palette with a slate-blue primary and warm amber accent. Good middle ground between the warm Classic and the colored themes. (colors.js)
+- **Ember theme** — dark warm theme with deep charcoal-brown background, amber/orange primary, and pink-red accent. Second dark option alongside Midnight. (colors.js)
+
+---
+
 ## [0.18] - 2026-04-10
 
 ### Added
