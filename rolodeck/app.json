@@ -3,7 +3,10 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.22.0",
+    "version": "0.22.4",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -30,8 +33,7 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-secure-store",
-      "expo-updates",
-      "@sentry/react-native"
+      "expo-updates"
     ],
     "ios": {
       "supportsTablet": true,

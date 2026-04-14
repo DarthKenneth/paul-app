@@ -1,6 +1,6 @@
 // =============================================================================
 // AddServiceModal.js - Centered modal for logging a completed service entry
-// Version: 1.2
+// Version: 1.2.1
 // Last Updated: 2026-04-14
 //
 // PROJECT:      Rolodeck (project v0.22)
@@ -47,6 +47,9 @@
 //         - Backdrop/X tap in invoice phase now prompts "Leave without sending
 //           invoice?" before closing — prevents accidental loss of the invoice flow
 //           [updated ARCHITECTURE]
+// v1.2.1 2026-04-14  Claude  Fixed syntax error from unescaped apostrophe in the
+//                            invoice-leave Alert message (customer's profile); swapped
+//                            string delimiters from single to double quotes
 // =============================================================================
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
@@ -192,7 +195,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
     } else if (phase === 'invoice') {
       Alert.alert(
         'Leave without sending invoice?',
-        'The service has been saved. You can send an invoice later from the customer's profile.',
+        "The service has been saved. You can send an invoice later from the customer's profile.",
         [
           { text: 'Stay', style: 'cancel' },
           { text: 'Leave', style: 'destructive', onPress: onSave },

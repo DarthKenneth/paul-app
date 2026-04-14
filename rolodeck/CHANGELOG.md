@@ -8,6 +8,37 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.22.4] - 2026-04-14
+
+### Fixed
+- **Runtime crash in Expo Go — `NativeJSLogger.addListener is not a function`** — `expo-modules-core/src/sweet/setUpJsLogger.fx.ts` calls `.addListener` on an optional native module without guarding for the case where the module resolves but has no event-emitter methods (Expo Go registers a stub that lacks them). Patched via `patch-package` to check `typeof addListener === 'function'` before iterating listeners. (`patches/expo-modules-core+55.0.22.patch`)
+
+### Infrastructure
+- Added `patch-package` dev-dep and a `postinstall` script so the patch re-applies automatically on `npm install`. (`package.json`)
+
+---
+
+## [0.22.3] - 2026-04-14
+
+### Fixed
+- **App crash on launch — missing `promise` module** — `@sentry/react-native`'s error-handler utils `require('promise/setimmediate/done')`, but `promise` was only installed as a nested dep of `react-native` and Metro's resolver couldn't reach it from Sentry's location. Added `promise@8.3.0` as a direct dependency (matched to the version React Native ships). (`package.json`)
+
+---
+
+## [0.22.2] - 2026-04-14
+
+### Fixed
+- **Bundle failed with SyntaxError** — `AddServiceModal.js` had an unescaped apostrophe (`customer's profile`) inside a single-quoted string, breaking the Metro bundle with `Unexpected token, expected ","`. Swapped the outer delimiters to double quotes. (`AddServiceModal.js`)
+
+---
+
+## [0.22.1] - 2026-04-14
+
+### Fixed
+- **Expo Go manifest crash** — `ExpoGoManifestHandlerMiddleware` was throwing `getRuntimeVersionAsync is not a function` whenever Expo Go requested the manifest, because app.json had no `runtimeVersion` and the middleware's fallback path blew up in the running Metro process. Added an explicit `runtimeVersion: { policy: "appVersion" }` so the expo-updates CLI resolves the version directly and the broken fallback is never invoked. (`app.json`)
+
+---
+
 ## [0.22] - 2026-04-14
 
 ### Added

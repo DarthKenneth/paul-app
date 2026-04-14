@@ -20,3 +20,7 @@
 | v1.6   | 2026-04-12 | Claude | Bumped version to 0.20.0 — Square customer sync feature release |
 | v1.7   | 2026-04-12 | Claude | Bumped version to 0.21.0 — post-save invoice prompt |
 | v1.8   | 2026-04-14 | Claude | Bumped version to 0.22.0; added expo-secure-store ~55.0.13, @sentry/react-native ~8.7.0, @react-native-community/netinfo ~12.0.1 |
+| v1.8.1 | 2026-04-14 | Claude | Bumped version to 0.22.1 to match app.json after runtimeVersion fix |
+| v1.8.2 | 2026-04-14 | Claude | Bumped version to 0.22.2 to match `AddServiceModal.js` syntax-error patch |
+| v1.8.3 | 2026-04-14 | Claude | Added `promise@8.3.0` dependency (required by `@sentry/react-native`); bumped version to 0.22.3 |
+| v1.8.4 | 2026-04-14 | Claude | Added `patch-package` dev-dep + `postinstall` script; bumped version to 0.22.4 |

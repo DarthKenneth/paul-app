@@ -1,6 +1,6 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.4
+// Version: 1.4.1
 // Last Updated: 2026-04-14
 //
 // PROJECT:      Rolodeck (project v0.22)
@@ -39,6 +39,7 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v1.4.1 2026-04-14  Claude  Added temp Sentry test button (floating, remove after verify)
 // v1.4  2026-04-14  Claude  Error boundary, Sentry, hardcoded color fixes
 //       - Wrapped AppInner in ErrorBoundary (catches render crashes, shows restart)
 //       - Initialized @sentry/react-native with EXPO_PUBLIC_SENTRY_DSN env var
@@ -50,7 +51,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, ActivityIndicator, AppState, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, AppState, StyleSheet, Button } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
@@ -152,17 +153,23 @@ function AppInner() {
   const isDark = themeKey === 'midnight';
 
   return (
-    <NavigationContainer>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <TabNavigator alertCount={alertCount} onAlertsRefresh={refreshAlerts} />
-      <OnboardingModal visible={showOnboarding} onComplete={handleOnboardingComplete} />
-    </NavigationContainer>
+    <>
+      <NavigationContainer>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <TabNavigator alertCount={alertCount} onAlertsRefresh={refreshAlerts} />
+        <OnboardingModal visible={showOnboarding} onComplete={handleOnboardingComplete} />
+      </NavigationContainer>
+      {/* TEMP: Sentry test button — remove after confirming events appear in dashboard */}
+      <View style={styles.sentryTest}>
+        <Button title='Try!' onPress={() => { Sentry.captureException(new Error('First error')); }} />
+      </View>
+    </>
   );
 }
 
 // ── Root component: font loading + ThemeProvider ───────────────────────────────
 
-export default function App() {
+export default Sentry.wrap(function App() {
   const [fontsLoaded] = useFonts({
     DMSerifDisplay_400Regular,
     DMSans_400Regular,
@@ -190,7 +197,7 @@ export default function App() {
       </ThemeProvider>
     </ErrorBoundary>
   );
-}
+});
 
 const styles = StyleSheet.create({
   splash: {
@@ -198,5 +205,10 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     backgroundColor: SPLASH_BG,
+  },
+  sentryTest: {
+    position:   'absolute',
+    bottom:     60,
+    alignSelf:  'center',
   },
 });

@@ -19,3 +19,7 @@
 | v1.6 | 2026-04-12 | Claude | Bumped expo.version to 0.20.0 — Square customer sync feature release |
 | v1.7 | 2026-04-12 | Claude | Bumped expo.version to 0.21.0 — post-save invoice prompt |
 | v1.8 | 2026-04-14 | Claude | Bumped expo.version to 0.22.0; expo install auto-added expo-secure-store and @sentry/react-native to plugins array |
+| v1.8.1 | 2026-04-14 | Claude | Added `runtimeVersion: { policy: "appVersion" }` and bumped expo.version to 0.22.1 — Expo Go manifest middleware was crashing on `getRuntimeVersionAsync` fallback when no runtime version was defined |
+| v1.8.2 | 2026-04-14 | Claude | Bumped expo.version to 0.22.2 to match `AddServiceModal.js` syntax-error patch |
+| v1.8.3 | 2026-04-14 | Claude | Bumped expo.version to 0.22.3 to match the `promise` dependency fix |
+| v1.8.4 | 2026-04-14 | Claude | Bumped expo.version to 0.22.4 to match the expo-modules-core `addListener` patch |

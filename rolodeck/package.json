@@ -1,6 +1,6 @@
 {
   "name": "rolodeck",
-  "version": "0.22.0",
+  "version": "0.22.4",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -9,6 +9,7 @@
     "web": "expo start --web",
     "icons": "node scripts/generate-icons.js",
     "test": "jest --no-cache",
+    "postinstall": "patch-package",
     "release": "eas build --platform all --profile production --non-interactive --auto-submit",
     "build:ios": "eas build --platform ios --profile production --non-interactive",
     "build:android": "eas build --platform android --profile production --non-interactive",
@@ -54,6 +55,7 @@
     "expo-status-bar": "~55.0.5",
     "expo-updates": "~55.0.20",
     "expo-web-browser": "~55.0.14",
+    "promise": "8.3.0",
     "react": "19.2.0",
     "react-native": "0.83.4",
     "react-native-calendars": "^1.1314.0",
@@ -67,6 +69,7 @@
     "babel-jest": "^29.7.0",
     "babel-preset-expo": "^55.0.16",
     "jest": "^29.7.0",
+    "patch-package": "^8.0.1",
     "sharp": "^0.33.0"
   },
   "private": true
