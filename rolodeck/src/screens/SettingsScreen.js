@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 1.8
-// Last Updated: 2026-04-10
+// Version: 2.0
+// Last Updated: 2026-04-12
 //
-// PROJECT:      Rolodeck (project v0.16)
+// PROJECT:      Rolodeck (project v0.21)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -25,7 +25,7 @@
 //
 // ARCHITECTURE:
 //   - Layout (top to bottom): Default Sort Order → Default Service Interval →
-//     Appearance card → Square Invoicing (coming soon) →
+//     Appearance card → Square (coming soon) →
 //     Backup & Restore (coming soon) → copyright
 //   - Service Interval row shows current value as subtitle (e.g. "1 Year",
 //     "Custom (45 days)"); chevron navigates to ServiceIntervalScreen
@@ -98,6 +98,13 @@
 //       - Tapping the banner calls handleCalSyncRetry which runs syncAllCustomers
 //         and refreshes the status
 //       - Toggling sync off clears the stale status [updated ARCHITECTURE]
+// v2.0  2026-04-12  Claude  Reverted Square to coming-soon placeholder
+//       - Removed live Square section (state, handlers, imports, JSX)
+//       - Replaced with coming-soon card matching Backup & Restore style
+//       - Removed squarePlaceholder/squareSync/storage Square imports
+//       - Removed squareConnected, squareSyncMeta, squareAutoSync, squareSyncing,
+//         squareConnecting state and autoSyncAnim ref [updated ARCHITECTURE]
+// v1.9  2026-04-12  Claude  Square section — live rows replacing coming-soon
 // =============================================================================
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -107,6 +114,7 @@ import {
   ScrollView,
   Pressable,
   Animated,
+  ActivityIndicator,
   StyleSheet,
   SafeAreaView,
   Alert,
@@ -168,8 +176,8 @@ export default function SettingsScreen({ navigation }) {
   const [calSyncBusy, setCalSyncBusy]         = useState(false);
   const [intervalMode, setIntervalMode]       = useState('365');
   const [intervalCustomDays, setIntervalCustomDays] = useState(30);
-  const toggleAnim  = useRef(new Animated.Value(0)).current;
-  const calSyncAnim = useRef(new Animated.Value(0)).current;
+  const toggleAnim    = useRef(new Animated.Value(0)).current;
+  const calSyncAnim   = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let active = true;
@@ -272,7 +280,6 @@ export default function SettingsScreen({ navigation }) {
     inputRange:  [0, 1],
     outputRange: [2, 20],
   });
-
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -426,18 +433,17 @@ export default function SettingsScreen({ navigation }) {
           )}
         </View>
 
-        {/* ── Square Invoicing (coming soon) ── */}
+        {/* ── Square (coming soon) ── */}
         <View style={[styles.section, styles.comingSoonSection]}>
           <View style={styles.comingSoonHeader}>
             <Ionicons name="card-outline" size={22} color={theme.textMuted} />
-            <Text style={styles.sectionTitle}>Square Invoicing</Text>
+            <Text style={styles.sectionTitle}>Square</Text>
           </View>
           <View style={styles.comingSoonBadge}>
             <Text style={styles.comingSoonText}>Coming Soon</Text>
           </View>
           <Text style={styles.sectionDesc}>
-            Connect your Square account to send invoices directly to customers
-            from their profile.
+            Sync customers and send invoices directly through your Square account.
           </Text>
         </View>
 

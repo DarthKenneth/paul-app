@@ -1,9 +1,9 @@
 // =============================================================================
 // TabNavigator.js - Root navigation: BottomTabNavigator + Stack navigators
-// Version: 1.3
-// Last Updated: 2026-04-10
+// Version: 1.4
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.16)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        TabNavigator.js           (this file — navigation structure)
 //               App.js                    (renders TabNavigator inside
 //                                          NavigationContainer + ThemeProvider)
@@ -45,6 +45,9 @@
 //       - Added headerLeft: () => null on the Customers root screen so the
 //         phantom "Customer" back label from stack state can never render
 //         [updated ARCHITECTURE]
+// v1.3.1  2026-04-12  Claude  Added SquareSyncScreen to Settings stack
+// v1.4    2026-04-14  Claude  Accessibility: Services badge announces count to
+//                             screen readers via tabBarAccessibilityLabel
 // =============================================================================
 
 import React, { useRef, useCallback } from 'react';
@@ -62,6 +65,7 @@ import ServicesScreen       from '../screens/ServicesScreen';
 import SettingsScreen          from '../screens/SettingsScreen';
 import ThemeScreen             from '../screens/ThemeScreen';
 import ServiceIntervalScreen   from '../screens/ServiceIntervalScreen';
+import SquareSyncScreen        from '../screens/SquareSyncScreen';
 
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
@@ -204,6 +208,11 @@ function SettingsStackNavigator() {
           component={ServiceIntervalScreen}
           options={{ title: 'Service Interval' }}
         />
+        <SettingsStack.Screen
+          name="SquareSync"
+          component={SquareSyncScreen}
+          options={{ title: 'Square Sync' }}
+        />
       </SettingsStack.Navigator>
     </AnimatedTabScreen>
   );
@@ -261,8 +270,11 @@ export default function TabNavigator({ alertCount, onAlertsRefresh }) {
         name="ServicesTab"
         component={ServiceStackNavigator}
         options={{
-          title: 'Services',
+          title:         'Services',
           unmountOnBlur: true,
+          tabBarAccessibilityLabel: alertCount > 0
+            ? `Services, ${alertCount} customer${alertCount === 1 ? '' : 's'} due`
+            : 'Services',
           tabBarBadge:      alertCount > 0 ? alertCount : undefined,
           tabBarBadgeStyle: {
             backgroundColor: theme.badge,

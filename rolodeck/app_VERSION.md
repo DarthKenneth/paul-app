@@ -1,7 +1,7 @@
 # app.json — Version History
 
 **File:** `app.json`
-**Project:** Rolodeck (project v1.12)
+**Project:** Rolodeck (project v0.22)
 **Copyright:** © 2026 ArdinGate Studios LLC. All rights reserved.
 
 > JSON does not support inline comments. Version history is tracked here.
@@ -16,3 +16,6 @@
 | v1.3 | 2026-04-09 | Claude | Added withDarkIcon config plugin to plugins array for iOS 18 dark mode icon support |
 | v1.4 | 2026-04-09 | Claude | Expo SDK 55 upgrade — removed withDarkIcon plugin, added ios.icon { any, dark } native dark icon config; expo-font/sharing/web-browser added as plugins; bumped expo.version to 1.11.0 |
 | v1.5 | 2026-04-09 | Claude | Bumped expo.version to 1.12.0 — release pipeline infrastructure |
+| v1.6 | 2026-04-12 | Claude | Bumped expo.version to 0.20.0 — Square customer sync feature release |
+| v1.7 | 2026-04-12 | Claude | Bumped expo.version to 0.21.0 — post-save invoice prompt |
+| v1.8 | 2026-04-14 | Claude | Bumped expo.version to 0.22.0; expo install auto-added expo-secure-store and @sentry/react-native to plugins array |

@@ -1,9 +1,9 @@
 // =============================================================================
 // OnboardingModal.js - First-launch walkthrough shown once per install
-// Version: 1.0
-// Last Updated: 2026-04-09
+// Version: 1.1
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.14.1)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        OnboardingModal.js  (this file — first-launch overlay)
 //               App.js              (mounts this modal, owns visible state)
 //               storage.js          (getOnboardingComplete, setOnboardingComplete)
@@ -24,6 +24,8 @@
 //
 // CHANGE LOG:
 // v1.0  2026-04-09  Claude  Initial 5-slide onboarding walkthrough
+// v1.1  2026-04-14  Claude  Android back button now prompts to skip rather
+//                           than silently doing nothing (was onRequestClose no-op)
 // =============================================================================
 
 import React, { useRef, useState, useCallback } from 'react';
@@ -35,6 +37,7 @@ import {
   StyleSheet,
   Animated,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
@@ -105,7 +108,17 @@ export default function OnboardingModal({ visible, onComplete }) {
       visible={visible}
       animationType="slide"
       statusBarTranslucent
-      onRequestClose={() => {}}
+      onRequestClose={() => {
+        // Android back button — prompt to skip rather than silently no-op
+        Alert.alert(
+          'Skip walkthrough?',
+          'You can always refer to the app itself to get started.',
+          [
+            { text: 'Continue setup', style: 'cancel' },
+            { text: 'Skip',          style: 'destructive', onPress: onComplete },
+          ],
+        );
+      }}
     >
       <View style={styles.container}>
 

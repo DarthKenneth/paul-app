@@ -1,9 +1,9 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.5.1
-// Last Updated: 2026-04-10
+// Version: 1.6
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.16)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        AddCustomerScreen.js  (this file)
 //               storage.js            (addCustomer)
 //               zipLookup.js          (lookupZip — city/state from zip code)
@@ -61,6 +61,10 @@
 // v1.5.1 2026-04-10  Claude  Guard goBack with canGoBack check; reset to Customers
 //                             root when the stack is orphaned — avoids GO_BACK
 //                             errors after save from an empty back stack
+// v1.6  2026-04-14  Claude  AbortController on autocomplete fetch
+//       - abortRef cancels the in-flight Geoapify request when a new keystroke
+//         fires; prevents stale responses from overwriting fresh suggestions
+//       - fetchSuggestions() now accepts a signal and passes it to fetch()
 // =============================================================================
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -88,15 +92,15 @@ import { FontSize } from '../styles/typography';
 
 const GEOAPIFY_AUTOCOMPLETE_URL = 'https://api.geoapify.com/v1/geocode/autocomplete';
 
-async function fetchSuggestions(input) {
+async function fetchSuggestions(input, signal) {
   if (!GEOAPIFY_API_KEY) return [];
   const params = new URLSearchParams({
-    text:            input,
-    filter:          'countrycode:us',
-    limit:           '5',
-    apiKey:          GEOAPIFY_API_KEY,
+    text:   input,
+    filter: 'countrycode:us',
+    limit:  '5',
+    apiKey: GEOAPIFY_API_KEY,
   });
-  const res  = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params}`);
+  const res  = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params}`, { signal });
   const data = await res.json();
   return Array.isArray(data.features) ? data.features : [];
 }
@@ -143,6 +147,7 @@ export default function AddCustomerScreen({ navigation }) {
 
   const lookupDone      = useRef(new Set());
   const debounceRef     = useRef(null);
+  const abortRef        = useRef(null); // AbortController for in-flight autocomplete
   const addressInputRef = useRef(null);
 
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -157,12 +162,18 @@ export default function AddCustomerScreen({ navigation }) {
     if (!GEOAPIFY_API_KEY || text.trim().length < 3) return;
 
     debounceRef.current = setTimeout(async () => {
+      // Cancel any previous in-flight request before starting a new one
+      if (abortRef.current) abortRef.current.abort();
+      abortRef.current = new AbortController();
+
       setSuggestLoading(true);
       try {
-        const preds = await fetchSuggestions(text);
+        const preds = await fetchSuggestions(text, abortRef.current.signal);
         setSuggestions(preds);
-      } catch {
-        // Autocomplete failed — manual entry still works fine
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          // Autocomplete failed — manual entry still works fine
+        }
       } finally {
         setSuggestLoading(false);
       }

@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomerDetailScreen.js - Customer info, divider, service log, add service
-// Version: 1.6
-// Last Updated: 2026-04-10
+// Version: 1.6.3
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.16)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        CustomerDetailScreen.js  (this file)
 //               ServiceLogEntry.js       (renders each log entry)
 //               storage.js               (getCustomerById, updateCustomer,
@@ -17,8 +17,8 @@
 //   - Layout: info section → visual divider → service log → sticky footer
 //   - Sticky footer: "Add a Service" (teal) + "Schedule" (blue) side by side;
 //     both open centered overlay modals (AddServiceModal / ScheduleServiceModal)
-//   - Service log: rendered newest-to-oldest (storage prepends new entries);
-//     the last entry in the displayed list (oldest) receives isInitial=true
+//   - Service log: sorted by date descending at render time (sortedLog useMemo);
+//     the last entry in the sorted list (oldest date) receives isInitial=true
 //     so ServiceLogEntry labels it "Initial Install/Service"
 //   - Edit mode: pencil icon in top-right toggles inline edit form
 //   - Delete: trash icon with Alert confirmation
@@ -30,6 +30,16 @@
 //   - All storage operations wrapped in try/catch
 //
 // CHANGE LOG:
+// v1.6.3 2026-04-14  Claude  Clear zipLookedUp Set on each focus so it doesn't
+//                            grow unbounded across navigation cycles
+// v1.6.2 2026-04-12  Claude  Schedule refresh + badge propagation
+//       - handleScheduleSave now reloads customer from storage after saving so
+//         scheduled services appear without requiring back-navigation
+//       - handleAddSave calls route.params.onAlertsRefresh() after reload so the
+//         Services tab badge updates immediately when a service is logged
+// v1.6.1 2026-04-12  Claude  Sort service log by date descending at render time so
+//                            retroactive entries appear in correct position; fixed
+//                            architecture comment [updated ARCHITECTURE]
 // v1.6  2026-04-10  Claude  Safe back navigation
 //       - Added safeGoBack callback: navigates backTab if set, else goBack()
 //         if canGoBack(), else reset to Customers root — avoids GO_BACK errors
@@ -167,6 +177,10 @@ export default function CustomerDetailScreen({ route, navigation }) {
 
   useFocusEffect(
     useCallback(() => {
+      // Clear the zip lookup cache on each navigation focus so it doesn't
+      // grow unbounded if the user edits many different zip codes across sessions.
+      zipLookedUp.current.clear();
+
       let active = true;
       (async () => {
         try {
@@ -249,11 +263,14 @@ export default function CustomerDetailScreen({ route, navigation }) {
       const c = await getCustomerById(customerId);
       if (c) setCustomer(c);
     } catch {}
+    route.params?.onAlertsRefresh?.();
   };
 
   const handleScheduleSave = async (cId, data) => {
     try {
       await addScheduledService(cId, data);
+      const c = await getCustomerById(customerId);
+      if (c) setCustomer(c);
     } catch {
       Alert.alert('Error', 'Could not save scheduled service.');
     }
@@ -282,6 +299,12 @@ export default function CustomerDetailScreen({ route, navigation }) {
     );
   };
 
+  const sortedLog = useMemo(
+    () => (customer ? [...customer.serviceLog].sort((a, b) => new Date(b.date) - new Date(a.date)) : []),
+    [customer],
+  );
+  const logCount = sortedLog.length;
+
   if (!customer) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -291,8 +314,6 @@ export default function CustomerDetailScreen({ route, navigation }) {
       </SafeAreaView>
     );
   }
-
-  const logCount = customer.serviceLog.length;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -526,7 +547,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
               </View>
             ) : (
               <View style={styles.logCard}>
-                {customer.serviceLog.map((entry, idx) => (
+                {sortedLog.map((entry, idx) => (
                   <ServiceLogEntry
                     key={entry.id}
                     entry={entry}

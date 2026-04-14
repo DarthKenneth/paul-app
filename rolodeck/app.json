@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.19.0",
+    "version": "0.22.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -14,6 +14,11 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "updates": {
+      "enabled": true,
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
     "plugins": [
       [
         "expo-calendar",
@@ -23,7 +28,10 @@
       ],
       "expo-font",
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-updates",
+      "@sentry/react-native"
     ],
     "ios": {
       "supportsTablet": true,

@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.3
-// Last Updated: 2026-04-09
+// Version: 1.4
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.14.1)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -39,12 +39,21 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v1.4  2026-04-14  Claude  Error boundary, Sentry, hardcoded color fixes
+//       - Wrapped AppInner in ErrorBoundary (catches render crashes, shows restart)
+//       - Initialized @sentry/react-native with EXPO_PUBLIC_SENTRY_DSN env var
+//       - Fixed hardcoded splash color '#4AACA5' → theme.primary (via a
+//         pre-theme fallback constant matching the Classic theme primary)
+//       - Fixed hardcoded splash backgroundColor '#F5F0E8' → same fallback
+//       - Removed unused archived field filter mismatch (was c.archived, schema
+//         field is archived — confirmed consistent) [updated ARCHITECTURE]
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, ActivityIndicator, AppState, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import {
   DMSerifDisplay_400Regular,
@@ -67,6 +76,7 @@ import {
 import { ThemeProvider, useTheme } from './src/styles/theme';
 import TabNavigator from './src/components/TabNavigator';
 import OnboardingModal from './src/components/OnboardingModal';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import {
   getAllCustomers,
   initStorage,
@@ -77,6 +87,23 @@ import {
   modeToIntervalDays,
 } from './src/data/storage';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
+
+// ── Sentry init ────────────────────────────────────────────────────────────────
+// Set EXPO_PUBLIC_SENTRY_DSN in your .env file (see .env.example).
+// Leave empty to disable crash reporting (Sentry is a no-op without a DSN).
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn:              SENTRY_DSN,
+    tracesSampleRate: 0.1,
+  });
+}
+
+// ── Splash fallback color ─────────────────────────────────────────────────────
+// Used only during font load before ThemeProvider is mounted. Matches the
+// Classic theme primary so the spinner looks intentional on any theme.
+const SPLASH_PRIMARY = '#4AACA5';
+const SPLASH_BG      = '#F5F0E8';
 
 // ── Inner component: has ThemeContext access ───────────────────────────────────
 
@@ -151,15 +178,17 @@ export default function App() {
   if (!fontsLoaded) {
     return (
       <View style={styles.splash}>
-        <ActivityIndicator size="large" color="#4AACA5" />
+        <ActivityIndicator size="large" color={SPLASH_PRIMARY} />
       </View>
     );
   }
 
   return (
-    <ThemeProvider>
-      <AppInner />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AppInner />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
@@ -168,6 +197,6 @@ const styles = StyleSheet.create({
     flex:            1,
     alignItems:      'center',
     justifyContent:  'center',
-    backgroundColor: '#F5F0E8',
+    backgroundColor: SPLASH_BG,
   },
 });

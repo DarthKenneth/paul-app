@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomerCard.js - Pressable card displaying a customer summary row
-// Version: 1.2.1
-// Last Updated: 2026-04-10
+// Version: 1.3
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.15)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        CustomerCard.js         (this file)
 //               CustomersScreen.js      (renders this in a FlatList)
 //               serviceAlerts.js        (getServiceStatus)
@@ -23,6 +23,11 @@
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
+// v1.2.2 2026-04-12  Claude  Removed sort hint label — name is always shown so the
+//                             highlighted sort-field subtitle was redundant
+// v1.3   2026-04-14  Claude  Differentiate missing name: renders "No name" in
+//                             theme.textMuted italic so it reads as placeholder,
+//                             not as an actual customer named "Unnamed"
 // v1.2.1 2026-04-10  Claude  Reverted column layout; schedule button moved to
 //                             CustomerDetailScreen footer instead
 // v1.2  2026-04-09  Claude  Accept intervalDays prop; pass to getServiceStatus
@@ -48,33 +53,11 @@ const LEVEL_COLORS = {
   ok:       'success',
 };
 
-function getSortValue(customer, sortMode) {
-  switch (sortMode) {
-    case 'zip':
-      return customer.zipCode || '';
-    case 'city':
-      return [customer.city, customer.state].filter(Boolean).join(', ') || '';
-    case 'firstName': {
-      // Show the rest of the name (last name) as a hint
-      const parts = (customer.name || '').trim().split(/\s+/);
-      return parts.length > 1 ? parts.slice(1).join(' ') : '';
-    }
-    case 'lastName': {
-      // Show the first name as a hint
-      const parts = (customer.name || '').trim().split(/\s+/);
-      return parts.length > 1 ? parts[0] : '';
-    }
-    default:
-      return '';
-  }
-}
-
-function CustomerCard({ customer, onPress, sortMode, intervalDays = 365 }) {
+function CustomerCard({ customer, onPress, intervalDays = 365 }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const status = getServiceStatus(customer, intervalDays);
   const badgeColor = theme[LEVEL_COLORS[status.level]] || theme.textMuted;
-  const sortValue = getSortValue(customer, sortMode);
 
   return (
     <Pressable
@@ -88,17 +71,15 @@ function CustomerCard({ customer, onPress, sortMode, intervalDays = 365 }) {
       </View>
 
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
-          {customer.name || 'Unnamed'}
+        <Text
+          style={[styles.name, !customer.name && styles.namePlaceholder]}
+          numberOfLines={1}
+        >
+          {customer.name || 'No name'}
         </Text>
         <Text style={styles.sub} numberOfLines={1}>
           {[customer.phone, [customer.city, customer.state].filter(Boolean).join(', ') || customer.zipCode].filter(Boolean).join(' · ')}
         </Text>
-        {!!sortValue && (
-          <Text style={styles.sortHint} numberOfLines={1}>
-            {sortValue}
-          </Text>
-        )}
       </View>
 
       <View style={styles.right}>
@@ -148,16 +129,15 @@ function makeStyles(theme) {
       color:        theme.text,
       marginBottom:  3,
     },
+    namePlaceholder: {
+      fontFamily:  theme.fontBody,
+      color:       theme.textMuted,
+      fontStyle:   'italic',
+    },
     sub: {
       fontFamily: theme.fontBody,
       fontSize:   FontSize.sm,
       color:      theme.textMuted,
-    },
-    sortHint: {
-      fontFamily: theme.fontUi,
-      fontSize:   FontSize.xs,
-      color:      theme.primary,
-      marginTop:   2,
     },
     right: {
       alignItems: 'flex-end',

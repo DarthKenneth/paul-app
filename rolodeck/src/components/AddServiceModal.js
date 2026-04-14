@@ -1,15 +1,16 @@
 // =============================================================================
 // AddServiceModal.js - Centered modal for logging a completed service entry
-// Version: 1.0
-// Last Updated: 2026-04-10
+// Version: 1.2
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.15)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        AddServiceModal.js       (this file)
 //               CustomerDetailScreen.js  (renders this modal)
 //               storage.js               (addServiceEntry, getCustomerById,
 //                                         getServiceIntervalMode,
 //                                         getServiceIntervalCustomDays)
 //               calendarSync.js          (syncCustomerDueDate)
+//               squarePlaceholder.js     (sendSquareInvoice)
 //               theme.js                 (useTheme)
 //               typography.js            (FontSize)
 //
@@ -20,11 +21,32 @@
 //   - Same MM/DD/YYYY split input + calendar picker as AddServiceScreen
 //   - maxDate enforced to today in calendar and handleSave validation
 //   - Loads interval mode on open; shows custom interval field when mode='custom'
-//   - onSave fires after persisting; parent reloads customer and closes modal
-//   - State resets on each open via useEffect on visible prop
+//   - Three phases: 'form' → 'success' → 'invoice'
+//     - 'form': date/notes entry; Save persists and transitions to 'success'
+//     - 'success': confirmation sheet; Done calls onSave(); Send Invoice →
+//       transitions to 'invoice'
+//     - 'invoice': amount entry; Send calls sendSquareInvoice then onSave();
+//       Back returns to 'success'
+//   - Backdrop/close: form phase → onClose(); invoice phase → confirmation Alert
+//     (entry is already saved, but user may be mid-invoice); success phase → onSave()
+//   - Calendar sync failure shows a non-blocking Alert (service entry is still saved)
+//   - State resets to 'form' on each open via useEffect on visible prop
 //
 // CHANGE LOG:
 // v1.0  2026-04-10  Claude  Initial implementation (extracted from AddServiceScreen)
+// v1.1  2026-04-12  Claude  Post-save invoice prompt (Option F)
+//         - Added phase state ('form' | 'success' | 'invoice') to drive 3-phase flow
+//         - handleSave now transitions to 'success' instead of calling onSave()
+//         - Success view: checkmark, "Service logged", date+name, Done + Send Invoice
+//         - Invoice view: inline amount entry wired to sendSquareInvoice
+//         - Backdrop/close in non-form phases calls onSave() (entry already saved)
+//         - Added sendSquareInvoice import from squarePlaceholder
+// v1.2  2026-04-14  Claude  Error surfacing + invoice-phase close confirmation
+//         - Calendar sync failure now shows a non-blocking Alert ("Service saved,
+//           but calendar sync failed") instead of silently swallowing the error
+//         - Backdrop/X tap in invoice phase now prompts "Leave without sending
+//           invoice?" before closing — prevents accidental loss of the invoice flow
+//           [updated ARCHITECTURE]
 // =============================================================================
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
@@ -50,6 +72,7 @@ import {
   getServiceIntervalCustomDays,
 } from '../data/storage';
 import { syncCustomerDueDate } from '../utils/calendarSync';
+import { sendSquareInvoice } from '../utils/squarePlaceholder';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 
@@ -79,6 +102,12 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
   const [calVisible, setCalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Post-save invoice flow
+  const [phase, setPhase]                 = useState('form'); // 'form' | 'success' | 'invoice'
+  const [savedDateDisplay, setSavedDateDisplay] = useState('');
+  const [invoiceAmount, setInvoiceAmount] = useState('');
+  const [invoiceSending, setInvoiceSending] = useState(false);
+
   const mmRef   = useRef(null);
   const ddRef   = useRef(null);
   const yyyyRef = useRef(null);
@@ -96,6 +125,10 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
       setCustomDays('30');
       setSaving(false);
       setCalVisible(false);
+      setPhase('form');
+      setSavedDateDisplay('');
+      setInvoiceAmount('');
+      setInvoiceSending(false);
       Promise.all([getServiceIntervalMode(), getServiceIntervalCustomDays()])
         .then(([mode, days]) => {
           setIntervalMode(mode);
@@ -147,6 +180,27 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
     setDd(String(day.day).padStart(2, '0'));
     setYyyy(String(day.year));
     setCalVisible(false);
+  };
+
+  // Backdrop/X close — behaviour depends on current phase:
+  //   form:    onClose() (nothing saved yet)
+  //   success: onSave() (entry already saved, just dismiss)
+  //   invoice: confirm before dismissing (user may be mid-invoice)
+  const handleClose = () => {
+    if (phase === 'form') {
+      onClose();
+    } else if (phase === 'invoice') {
+      Alert.alert(
+        'Leave without sending invoice?',
+        'The service has been saved. You can send an invoice later from the customer's profile.',
+        [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: onSave },
+        ],
+      );
+    } else {
+      onSave();
+    }
   };
 
   const handleSave = async () => {
@@ -204,12 +258,42 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
 
       getCustomerById(customer.id)
         .then((c) => syncCustomerDueDate(c))
-        .catch(() => {});
+        .catch((e) => {
+          // Non-blocking: entry is saved; sync failure is recoverable.
+          Alert.alert(
+            'Service saved',
+            'The service was logged, but your calendar could not be updated. ' +
+            'Check Calendar Sync in Settings if this keeps happening.',
+          );
+        });
 
-      onSave();
+      setSavedDateDisplay(`${mm}/${dd}/${yyyy}`);
+      setPhase('success');
+      setSaving(false);
     } catch {
       Alert.alert('Error', 'Failed to save service entry.');
       setSaving(false);
+    }
+  };
+
+  const handleInvoiceSend = async () => {
+    const dollars = parseFloat(invoiceAmount);
+    if (isNaN(dollars) || dollars <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid dollar amount greater than $0.');
+      return;
+    }
+    setInvoiceSending(true);
+    try {
+      await sendSquareInvoice(customer, Math.round(dollars * 100));
+      onSave();
+      Alert.alert(
+        'Invoice Sent',
+        `Invoice for $${dollars.toFixed(2)} sent to ${customer.email}.`,
+      );
+    } catch (err) {
+      Alert.alert('Not Available', err.message);
+    } finally {
+      setInvoiceSending(false);
     }
   };
 
@@ -218,150 +302,223 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable style={styles.backdrop} onPress={onClose} />
+        <Pressable style={styles.backdrop} onPress={handleClose} />
 
-        <View style={styles.card}>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {/* ── Header ── */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <Ionicons name="add-circle" size={20} color={theme.primary} style={styles.headerIcon} />
-                <View>
-                  <Text style={styles.title}>Add a Service</Text>
-                  {customer && (
-                    <Text style={styles.subtitle} numberOfLines={1}>{customer.name}</Text>
-                  )}
-                </View>
-              </View>
-              <Pressable onPress={onClose} hitSlop={12}>
-                <Ionicons name="close" size={22} color={theme.textSecondary} />
-              </Pressable>
-            </View>
-
-            {/* ── Date ── */}
-            <Text style={styles.label}>Date</Text>
-            <View style={styles.dateRow}>
-              {/* Month */}
-              <View style={styles.dateSegmentWrap}>
-                <TextInput
-                  ref={mmRef}
-                  style={styles.dateBox}
-                  value={mm}
-                  onChangeText={(v) => {
-                    const clean = v.replace(/\D/g, '').slice(0, 2);
-                    setMm(clean);
-                    if (clean.length === 2) ddRef.current?.focus();
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  placeholder="MM"
-                  placeholderTextColor={theme.placeholder}
-                />
-                <Text style={styles.dateSegmentLabel}>Month</Text>
-              </View>
-
-              <Text style={styles.dateSep}>/</Text>
-
-              {/* Day */}
-              <View style={styles.dateSegmentWrap}>
-                <TextInput
-                  ref={ddRef}
-                  style={styles.dateBox}
-                  value={dd}
-                  onChangeText={(v) => {
-                    const clean = v.replace(/\D/g, '').slice(0, 2);
-                    setDd(clean);
-                    if (clean.length === 2) yyyyRef.current?.focus();
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                  placeholder="DD"
-                  placeholderTextColor={theme.placeholder}
-                />
-                <Text style={styles.dateSegmentLabel}>Day</Text>
-              </View>
-
-              <Text style={styles.dateSep}>/</Text>
-
-              {/* Year */}
-              <View style={[styles.dateSegmentWrap, styles.dateSegmentYear]}>
-                <TextInput
-                  ref={yyyyRef}
-                  style={[styles.dateBox, styles.dateBoxYear]}
-                  value={yyyy}
-                  onChangeText={(v) => setYyyy(v.replace(/\D/g, '').slice(0, 4))}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  placeholder="YYYY"
-                  placeholderTextColor={theme.placeholder}
-                />
-                <Text style={styles.dateSegmentLabel}>Year</Text>
-              </View>
-
-              {/* Calendar icon */}
-              <Pressable
-                style={styles.calIcon}
-                onPress={() => setCalVisible(true)}
-                accessibilityLabel="Open date picker"
-              >
-                <Ionicons name="calendar-outline" size={22} color={theme.primary} />
-              </Pressable>
-            </View>
-
-            {/* ── Notes ── */}
-            <Text style={styles.label}>Notes</Text>
-            <TextInput
-              style={styles.notesInput}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Optional notes…"
-              placeholderTextColor={theme.placeholder}
-              multiline
-              numberOfLines={3}
-              textAlignVertical="top"
-            />
-
-            {/* ── Custom interval ── */}
-            {isCustom && (
-              <>
-                <Text style={styles.label}>Custom Interval (days)</Text>
-                <TextInput
-                  style={[styles.dateBox, styles.customDaysInput]}
-                  value={customDays}
-                  onChangeText={(v) => setCustomDays(v.replace(/\D/g, ''))}
-                  keyboardType="number-pad"
-                  placeholder="e.g. 45"
-                  placeholderTextColor={theme.placeholder}
-                />
-              </>
-            )}
-
-            {/* ── Save button ── */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.saveBtn,
-                pressed && styles.saveBtnPressed,
-                saving  && styles.saveBtnDisabled,
-              ]}
-              onPress={handleSave}
-              disabled={saving}
+        {/* ── Form phase ── */}
+        {phase === 'form' && (
+          <View style={styles.card}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
             >
-              <Ionicons name="add-circle-outline" size={18} color="#fff" style={styles.saveBtnIcon} />
-              <Text style={styles.saveBtnText}>
-                {saving ? 'Saving…' : 'Add a Service'}
+              {/* Header */}
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <Ionicons name="add-circle" size={20} color={theme.primary} style={styles.headerIcon} />
+                  <View>
+                    <Text style={styles.title}>Add a Service</Text>
+                    {customer && (
+                      <Text style={styles.subtitle} numberOfLines={1}>{customer.name}</Text>
+                    )}
+                  </View>
+                </View>
+                <Pressable onPress={onClose} hitSlop={12}>
+                  <Ionicons name="close" size={22} color={theme.textSecondary} />
+                </Pressable>
+              </View>
+
+              {/* Date */}
+              <Text style={styles.label}>Date</Text>
+              <View style={styles.dateRow}>
+                <View style={styles.dateSegmentWrap}>
+                  <TextInput
+                    ref={mmRef}
+                    style={styles.dateBox}
+                    value={mm}
+                    onChangeText={(v) => {
+                      const clean = v.replace(/\D/g, '').slice(0, 2);
+                      setMm(clean);
+                      if (clean.length === 2) ddRef.current?.focus();
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    placeholder="MM"
+                    placeholderTextColor={theme.placeholder}
+                  />
+                  <Text style={styles.dateSegmentLabel}>Month</Text>
+                </View>
+
+                <Text style={styles.dateSep}>/</Text>
+
+                <View style={styles.dateSegmentWrap}>
+                  <TextInput
+                    ref={ddRef}
+                    style={styles.dateBox}
+                    value={dd}
+                    onChangeText={(v) => {
+                      const clean = v.replace(/\D/g, '').slice(0, 2);
+                      setDd(clean);
+                      if (clean.length === 2) yyyyRef.current?.focus();
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                    placeholder="DD"
+                    placeholderTextColor={theme.placeholder}
+                  />
+                  <Text style={styles.dateSegmentLabel}>Day</Text>
+                </View>
+
+                <Text style={styles.dateSep}>/</Text>
+
+                <View style={[styles.dateSegmentWrap, styles.dateSegmentYear]}>
+                  <TextInput
+                    ref={yyyyRef}
+                    style={[styles.dateBox, styles.dateBoxYear]}
+                    value={yyyy}
+                    onChangeText={(v) => setYyyy(v.replace(/\D/g, '').slice(0, 4))}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    placeholder="YYYY"
+                    placeholderTextColor={theme.placeholder}
+                  />
+                  <Text style={styles.dateSegmentLabel}>Year</Text>
+                </View>
+
+                <Pressable
+                  style={styles.calIcon}
+                  onPress={() => setCalVisible(true)}
+                  accessibilityLabel="Open date picker"
+                >
+                  <Ionicons name="calendar-outline" size={22} color={theme.primary} />
+                </Pressable>
+              </View>
+
+              {/* Notes */}
+              <Text style={styles.label}>Notes</Text>
+              <TextInput
+                style={styles.notesInput}
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Optional notes…"
+                placeholderTextColor={theme.placeholder}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              {/* Custom interval */}
+              {isCustom && (
+                <>
+                  <Text style={styles.label}>Custom Interval (days)</Text>
+                  <TextInput
+                    style={[styles.dateBox, styles.customDaysInput]}
+                    value={customDays}
+                    onChangeText={(v) => setCustomDays(v.replace(/\D/g, ''))}
+                    keyboardType="number-pad"
+                    placeholder="e.g. 45"
+                    placeholderTextColor={theme.placeholder}
+                  />
+                </>
+              )}
+
+              {/* Save button */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  pressed && styles.saveBtnPressed,
+                  saving  && styles.saveBtnDisabled,
+                ]}
+                onPress={handleSave}
+                disabled={saving}
+              >
+                <Ionicons name="add-circle-outline" size={18} color="#fff" style={styles.saveBtnIcon} />
+                <Text style={styles.saveBtnText}>
+                  {saving ? 'Saving…' : 'Add a Service'}
+                </Text>
+              </Pressable>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Success phase ── */}
+        {phase === 'success' && (
+          <View style={[styles.card, styles.cardCompact]}>
+            <View style={styles.successView}>
+              <View style={styles.checkRing}>
+                <Ionicons name="checkmark" size={28} color="#fff" />
+              </View>
+              <Text style={styles.successTitle}>Service logged</Text>
+              <Text style={styles.successSub}>
+                {savedDateDisplay}{customer ? ` · ${customer.name}` : ''}
               </Text>
-            </Pressable>
-          </ScrollView>
-        </View>
+
+              <View style={styles.btnStack}>
+                <Pressable
+                  style={({ pressed }) => [styles.outlineBtn, pressed && styles.outlineBtnPressed]}
+                  onPress={() => setPhase('invoice')}
+                >
+                  <Text style={styles.outlineBtnText}>Send Invoice →</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
+                  onPress={onSave}
+                >
+                  <Text style={styles.primaryBtnText}>Done</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ── Invoice phase ── */}
+        {phase === 'invoice' && (
+          <View style={[styles.card, styles.cardCompact]}>
+            <Text style={styles.invoiceTitle}>Send Invoice</Text>
+            <Text style={styles.invoiceSub}>
+              {customer?.email
+                ? `Invoice will be sent to ${customer.email}`
+                : 'No email on file — add one to this customer first'}
+            </Text>
+
+            <View style={styles.amountRow}>
+              <Text style={styles.dollarSign}>$</Text>
+              <TextInput
+                style={styles.amountInput}
+                placeholder="0.00"
+                placeholderTextColor={theme.placeholder}
+                keyboardType="decimal-pad"
+                value={invoiceAmount}
+                onChangeText={setInvoiceAmount}
+                autoFocus
+                selectTextOnFocus
+              />
+            </View>
+
+            <View style={styles.invoiceActions}>
+              <Pressable
+                style={[styles.invoiceBtn, styles.backBtn]}
+                onPress={() => setPhase('success')}
+              >
+                <Text style={styles.backBtnText}>Back</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.invoiceBtn, styles.sendBtn]}
+                onPress={handleInvoiceSend}
+                disabled={invoiceSending}
+              >
+                <Text style={styles.sendBtnText}>
+                  {invoiceSending ? 'Sending…' : 'Send'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
 
       {/* ── Calendar picker modal ── */}
@@ -420,7 +577,10 @@ function makeStyles(theme) {
       padding:         24,
       maxHeight:       '85%',
     },
-    // ── Header ──
+    cardCompact: {
+      maxHeight: undefined,
+    },
+    // ── Form: Header ──
     header: {
       flexDirection:  'row',
       justifyContent: 'space-between',
@@ -446,7 +606,7 @@ function makeStyles(theme) {
       color:      theme.textMuted,
       marginTop:   2,
     },
-    // ── Date row ──
+    // ── Form: Date row ──
     label: {
       fontFamily:    theme.fontUiBold,
       fontSize:      FontSize.xs,
@@ -505,7 +665,7 @@ function makeStyles(theme) {
       marginBottom: 20,
       paddingHorizontal: 12,
     },
-    // ── Notes ──
+    // ── Form: Notes ──
     notesInput: {
       borderWidth:       1.5,
       borderColor:       theme.inputBorder,
@@ -519,7 +679,7 @@ function makeStyles(theme) {
       minHeight:         72,
       marginBottom:      22,
     },
-    // ── Save button ──
+    // ── Form: Save button ──
     saveBtn: {
       flexDirection:     'row',
       alignItems:        'center',
@@ -539,6 +699,131 @@ function makeStyles(theme) {
       marginRight: 8,
     },
     saveBtnText: {
+      fontFamily: theme.fontBodyBold,
+      fontSize:   FontSize.base,
+      color:      '#ffffff',
+    },
+    // ── Success phase ──
+    successView: {
+      alignItems:     'center',
+      paddingVertical: 8,
+    },
+    checkRing: {
+      width:           56,
+      height:          56,
+      borderRadius:    28,
+      backgroundColor: theme.primary,
+      alignItems:      'center',
+      justifyContent:  'center',
+      marginBottom:    16,
+    },
+    successTitle: {
+      fontFamily:   theme.fontHeading,
+      fontSize:     FontSize.xl,
+      color:        theme.text,
+      marginBottom:  6,
+      textAlign:    'center',
+    },
+    successSub: {
+      fontFamily:   theme.fontBody,
+      fontSize:     FontSize.sm,
+      color:        theme.textMuted,
+      textAlign:    'center',
+      lineHeight:   FontSize.sm * 1.5,
+      marginBottom: 28,
+    },
+    btnStack: {
+      width: '100%',
+      gap:    10,
+    },
+    primaryBtn: {
+      backgroundColor: theme.primary,
+      borderRadius:    12,
+      paddingVertical: 14,
+      alignItems:      'center',
+    },
+    primaryBtnPressed: {
+      opacity: 0.85,
+    },
+    primaryBtnText: {
+      fontFamily: theme.fontBodyBold,
+      fontSize:   FontSize.base,
+      color:      '#ffffff',
+    },
+    outlineBtn: {
+      borderWidth:     1.5,
+      borderColor:     theme.primary,
+      borderRadius:    12,
+      paddingVertical: 14,
+      alignItems:      'center',
+    },
+    outlineBtnPressed: {
+      backgroundColor: theme.background,
+    },
+    outlineBtnText: {
+      fontFamily: theme.fontBodyBold,
+      fontSize:   FontSize.base,
+      color:      theme.primary,
+    },
+    // ── Invoice phase ──
+    invoiceTitle: {
+      fontFamily:   theme.fontHeading,
+      fontSize:     FontSize.xl,
+      color:        theme.text,
+      marginBottom:  6,
+    },
+    invoiceSub: {
+      fontFamily:   theme.fontBody,
+      fontSize:     FontSize.sm,
+      color:        theme.textMuted,
+      marginBottom: 20,
+      lineHeight:   FontSize.sm * 1.5,
+    },
+    amountRow: {
+      flexDirection:     'row',
+      alignItems:        'center',
+      backgroundColor:   theme.inputBg,
+      borderWidth:        1,
+      borderColor:       theme.inputBorder,
+      borderRadius:      12,
+      paddingHorizontal: 16,
+      marginBottom:      24,
+    },
+    dollarSign: {
+      fontFamily:  theme.fontBodyBold,
+      fontSize:    FontSize.xl,
+      color:       theme.text,
+      marginRight:  4,
+    },
+    amountInput: {
+      flex:            1,
+      fontFamily:      theme.fontBody,
+      fontSize:        FontSize.xl,
+      color:           theme.text,
+      paddingVertical: 16,
+    },
+    invoiceActions: {
+      flexDirection: 'row',
+      gap:            12,
+    },
+    invoiceBtn: {
+      flex:            1,
+      borderRadius:    12,
+      paddingVertical: 13,
+      alignItems:      'center',
+    },
+    backBtn: {
+      backgroundColor: theme.border,
+    },
+    sendBtn: {
+      backgroundColor: theme.primary,
+    },
+    backBtnText: {
+      fontFamily: theme.fontBodyBold,
+      fontSize:   FontSize.base,
+      color:      theme.textSecondary,
+    },
+    sendBtnText: {
       fontFamily: theme.fontBodyBold,
       fontSize:   FontSize.base,
       color:      '#ffffff',

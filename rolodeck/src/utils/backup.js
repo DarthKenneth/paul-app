@@ -1,12 +1,13 @@
 // =============================================================================
 // backup.js - Cloud backup and restore for customer data
-// Version: 1.1
-// Last Updated: 2026-04-10
+// Version: 1.2
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.18)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        backup.js             (this file — export/import logic)
 //               appVersion.js         (APP_VERSION — written into backup metadata)
-//               storage.js            (getAllCustomers, restoreCustomers)
+//               storage.js            (getAllCustomers, restoreCustomers,
+//                                      CURRENT_SCHEMA_VERSION)
 //               SettingsScreen.js     (Back Up / Restore buttons)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
@@ -22,14 +23,18 @@
 //     included in device iCloud Backup automatically (if the user has it enabled)
 //     — the explicit export is an additional on-demand safety option
 //   - No third-party cloud accounts or API keys required
+//   - importBackup() validates individual customer shapes and filters out any
+//     entries that are missing a valid id, so a corrupted record in one backup
+//     cannot block a full restore
 //
 // BACKUP FILE FORMAT:
 //   {
-//     "backupVersion": "1",         schema version for future migrations
-//     "appVersion":    "0.18",      app version that created the backup
-//     "exportedAt":    ISO-8601,    timestamp
-//     "platform":      "ios" | "android",
-//     "customers":     Customer[]
+//     "backupVersion":     "1",     schema version for future migrations
+//     "storageSchemaVersion": N,    storage.js CURRENT_SCHEMA_VERSION at export time
+//     "appVersion":        "0.22",  app version that created the backup
+//     "exportedAt":        ISO-8601,
+//     "platform":          "ios" | "android",
+//     "customers":         Customer[]
 //   }
 //
 // CHANGE LOG:
@@ -41,6 +46,12 @@
 // v1.1  2026-04-10  Claude  APP_VERSION now imported from shared src/appVersion.js
 //                            (was hardcoded '1.6' — stale by 10+ versions — which
 //                            meant backup files had lying metadata)
+// v1.2  2026-04-14  Claude  Schema version in export + per-record shape validation
+//       - exportBackup() now embeds storageSchemaVersion: CURRENT_SCHEMA_VERSION
+//         so restoring code can detect schema mismatches [updated BACKUP FILE FORMAT]
+//       - importBackup() filters customers to those with a valid string id before
+//         passing to restoreCustomers(); throws if zero valid records remain
+//         [updated ARCHITECTURE]
 // =============================================================================
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -48,7 +59,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
-import { getAllCustomers, restoreCustomers } from '../data/storage';
+import { getAllCustomers, restoreCustomers, CURRENT_SCHEMA_VERSION } from '../data/storage';
 import { APP_VERSION } from '../appVersion';
 
 const BACKUP_VERSION   = '1';
@@ -90,10 +101,11 @@ export async function exportBackup() {
   const customers = await getAllCustomers();
 
   const payload = {
-    backupVersion: BACKUP_VERSION,
-    appVersion:    APP_VERSION,
-    exportedAt:    new Date().toISOString(),
-    platform:      Platform.OS,
+    backupVersion:        BACKUP_VERSION,
+    storageSchemaVersion: CURRENT_SCHEMA_VERSION,
+    appVersion:           APP_VERSION,
+    exportedAt:           new Date().toISOString(),
+    platform:             Platform.OS,
     customers,
   };
 
@@ -171,10 +183,19 @@ export async function importBackup() {
     throw new Error('Backup file contains no customers.');
   }
 
-  await restoreCustomers(payload.customers);
+  // Filter out any records missing a valid id — a corrupt record shouldn't
+  // block restoring the rest of the backup.
+  const validCustomers = payload.customers.filter(
+    (c) => c && typeof c === 'object' && typeof c.id === 'string' && c.id.length > 0,
+  );
+  if (validCustomers.length === 0) {
+    throw new Error('Backup file contains no valid customer records (all entries are missing ids).');
+  }
+
+  await restoreCustomers(validCustomers);
 
   return {
     exportedAt:    payload.exportedAt  || null,
-    customerCount: payload.customers.length,
+    customerCount: validCustomers.length,
   };
 }

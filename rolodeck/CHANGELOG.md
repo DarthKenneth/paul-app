@@ -8,6 +8,70 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.22] - 2026-04-14
+
+### Added
+- **Square credentials via env vars** — `EXPO_PUBLIC_SQUARE_CLIENT_ID`, `EXPO_PUBLIC_SQUARE_LOCATION_ID`, and `EXPO_PUBLIC_SQUARE_ENVIRONMENT` are now read from `.env` at build time. No credentials in source. (`.env.example`, `squarePlaceholder.js`)
+- **Sentry crash reporting** — optional opt-in: set `EXPO_PUBLIC_SENTRY_DSN` in `.env` to enable. App initialises Sentry only when DSN is present so there's no extra overhead for builds without it. (`App.js`, `.env.example`)
+- **Error boundary** — top-level React error boundary wraps the whole app. Catches uncaught JS errors, reports to Sentry, and shows a "Something went wrong" screen with a Restart button instead of a blank crash. (`ErrorBoundary.js`, `App.js`)
+- **Square token expiry detection** — `isSquareConnected()` now checks the stored expiry timestamp. An expired token is cleared immediately and the user is treated as disconnected (prompting re-auth) rather than failing at the first API call. (`squarePlaceholder.js`)
+
+### Changed
+- **Square OAuth token moved to expo-secure-store** — token is now stored in the iOS Keychain / Android Keystore instead of plain AsyncStorage. (`squarePlaceholder.js`)
+- **Per-customer AsyncStorage keys** — storage migrated from a single `@rolodeck_customers` envelope to individual `@rolodeck_customer_{id}` keys with a `@rolodeck_customer_index`. Includes an in-memory cache and a write mutex for concurrency safety. Existing data migrates automatically on first launch. (`storage.js`)
+- **Customer IDs use `expo-crypto`** — replaced `Math.random()`-based ID generation with cryptographically random bytes for collision resistance. (`storage.js`)
+- **Sort default changed to `firstName`** — the default sort on the Customers screen now matches the available sort options (was `'name'` which didn't match any key). (`storage.js`, `CustomersScreen.js`)
+- **"Unnamed" label replaced with "No name"** — nameless customers render "No name" in muted italic instead of "Unnamed" so it reads as a placeholder, not a real name. (`CustomerCard.js`)
+- **`addServiceEntry` preserves `intervalDays`** — custom interval days set when logging a service are now correctly saved to the entry (was silently dropped). (`storage.js`)
+- **Android back button in onboarding** — tapping back during the onboarding walkthrough now prompts "Skip walkthrough?" instead of silently doing nothing. (`OnboardingModal.js`)
+- **Services tab badge accessibility** — badge now announces its count to screen readers via `tabBarAccessibilityLabel`. (`TabNavigator.js`)
+- **SyncStatusBanner accessibility** — tappable banner states carry an `accessibilityHint`; non-tappable "ok" state uses `role="text"`. (`SyncStatusBanner.js`)
+- **Sync merge step is now rollback-safe** — all merge computations happen in memory before any write so a mid-loop failure cannot leave the database in a partially-updated state. (`squareSync.js`)
+- **`resolveLowConf` / `resolveConflict` performance** — both now call `getCustomerById()` instead of loading the full customer list to find one record. (`squareSync.js`)
+- **`LowConfRoloSide` performance** — each pending-review row now loads only the one Rolodeck customer it needs (`getCustomerById`) instead of fetching the entire list. (`SquareSyncScreen.js`)
+- **Backup schema version embedded** — exported backup files now include `storageSchemaVersion` so future restore logic can detect and handle schema mismatches. (`backup.js`)
+- **Address autocomplete cancels stale requests** — the Geoapify fetch is now cancelled via `AbortController` when the user types another character before the previous request completes. (`AddCustomerScreen.js`)
+- **`zipLookedUp` Set cleared on navigation focus** — the zip-code dedup Set in `CustomerDetailScreen` resets on each screen focus so it doesn't grow across navigation cycles. (`CustomerDetailScreen.js`)
+- **Calendar sync error surfaced to user** — if calendar sync fails after logging a service, a non-blocking alert informs the user ("Service saved, but calendar could not be updated") instead of silently swallowing the error. (`AddServiceModal.js`)
+- **Invoice-phase close confirmation** — tapping the backdrop or × while in the invoice-entry phase now shows an "Leave without sending invoice?" confirmation so accidental dismissal doesn't silently skip the invoice flow. (`AddServiceModal.js`)
+- **Loading spinner on Customers screen** — a centered `ActivityIndicator` renders while customers load instead of showing a blank list. (`CustomersScreen.js`)
+- **Dev seed/dedup buttons removed** — removed development-only "Seed" and "De-dup" buttons that shipped in production builds. (`CustomersScreen.js`)
+
+### Fixed
+- **`CustomersScreen` crash** — `route` was missing from the component's props destructure but used on line 320 (`route.params?.onAlertsRefresh`), causing a crash when accessed from the Customers tab. (`CustomersScreen.js`)
+- **Backup import shape validation** — `importBackup()` now filters out any customer records missing a valid `id` before calling `restoreCustomers()`, so a corrupted record cannot block a full restore. (`backup.js`)
+
+### Security
+- Square access token moved from plain AsyncStorage to `expo-secure-store` (encrypted at rest via iOS Keychain / Android Keystore). (`squarePlaceholder.js`)
+
+---
+
+## [0.21] - 2026-04-12
+
+### Added
+- **Post-save invoice prompt** — after logging a service, a confirmation sheet appears instead of closing immediately. Shows a checkmark, the date and customer name, and two buttons: **Done** (primary teal, closes the modal) and **Send Invoice →** (outlined, transitions to an inline amount entry). The invoice amount view sends via Square and then closes. (`AddServiceModal.js`)
+
+---
+
+## [0.20] - 2026-04-12
+
+### Added
+- **Square Customer Sync** — full match-and-merge system linking Rolodeck customers to Square. Pulls all Square customers (paginated), classifies them by confidence (ID / email / phone match vs. name-only), and merges Square data into Rolodeck without overwriting existing values. (`squareSync.js`, `squareCustomers.js`, `mergeLogic.js`)
+- **7-step sync algorithm** in `squareSync.js`: Fetch → Match → Merge → Confirm (low-confidence) → Create new → Push (user-triggered) → Save metadata.
+- **Square Customers API wrapper** (`squareCustomers.js`) — paginated `GET /customers`, `POST /customers`, `PUT /customers/{id}`, `GET /customers/{id}`. 3-attempt retry on 429 rate limit and 15s timeouts.
+- **Match & merge logic** (`mergeLogic.js`) — pure functions: `matchCustomers()` (4-priority matching), `mergeSquareIntoRolodeck()` (fill-empty + conflict detection), `mapSquareToRolodeck()`, `mapRolodeckToSquare()`.
+- **SquareSyncScreen** — dedicated sync management screen with 5 sections: Sync Status (Sync Now button + last-synced time), Pending Review (LOW_CONF pairs with Link / Keep Separate), Conflicts (per-field Use Square / Use Rolodeck), Sync History log, Push to Square (individual + Push All with confirm).
+- **SyncStatusBanner** — lightweight banner on the Customers screen: green (synced), yellow (items need review), red (sync failed), hidden (not connected).
+- **Square section in Settings** — replaced "coming soon" placeholder with live rows: Square Account (connect/disconnect), Sync Customers Now, Manage Sync / Review Conflicts (→ SquareSyncScreen), Auto-Sync on Open toggle. (`SettingsScreen.js`)
+- **Customer schema additions** — `squareCustomerId`, `squareSyncedAt`, `squareSyncStatus`, `squareConflictData`, and `notes` fields added to every customer record. Existing records receive null/empty defaults automatically on load. (`storage.js`)
+- **Sync metadata storage** — `getSquareSyncMetadata()` / `saveSquareSyncMetadata()` store last-sync timestamp, per-sync summary log (last 50 entries), and pending low-confidence review queue. `getSquareAutoSync()` / `saveSquareAutoSync()` for the auto-sync toggle. (`storage.js`)
+
+### Changed
+- **Square OAuth scopes** now include `CUSTOMERS_WRITE` (was missing; required for pushing local customers to Square). (`squarePlaceholder.js`)
+- `SQUARE_API_BASE` is now an exported constant from `squarePlaceholder.js` so `squareCustomers.js` uses the same sandbox/production URL without duplicating the environment logic.
+
+---
+
 ## [0.19] - 2026-04-10
 
 ### Added

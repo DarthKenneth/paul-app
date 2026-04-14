@@ -1,15 +1,16 @@
 // =============================================================================
 // CustomersScreen.js - Customer list with search, sort filter, and add button
-// Version: 1.3
-// Last Updated: 2026-04-09
+// Version: 1.5
+// Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.15)
+// PROJECT:      Rolodeck (project v0.22)
 // FILES:        CustomersScreen.js      (this file)
 //               CustomerCard.js         (list item component)
 //               storage.js              (getAllCustomers, getSortPreference,
 //                                        saveSortPreference)
 //               theme.js                (useTheme)
 //               typography.js           (FontFamily, FontSize)
+//               SyncStatusBanner.js     (Square sync status banner)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
@@ -34,6 +35,16 @@
 // v1.2  2026-04-03  Claude  Optimize + harden
 //                           - Memoized filtered+sorted list with useMemo
 //                           - Added try/catch on storage calls in useFocusEffect
+// v1.4  2026-04-12  Claude  Added SyncStatusBanner below search bar; navigates
+//                           to Settings > SquareSync on tap
+// v1.5  2026-04-14  Claude  Bug fixes + hardening
+//       - Added route to component props (was undefined — ReferenceError crash
+//         when tapping any customer card)
+//       - Removed dev seed/dedup buttons and SEED_CUSTOMERS import
+//       - Fixed sort default: getSortPreference() now returns 'firstName' as
+//         default (was 'name' which matched no SORT_OPTIONS key)
+//       - Added loading state with ActivityIndicator while customers load
+//       - Sort chip accessibilityState selected added to each option
 // =============================================================================
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -46,26 +57,24 @@ import {
   Modal,
   StyleSheet,
   SafeAreaView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { Alert } from 'react-native';
 import CustomerCard from '../components/CustomerCard';
+import SyncStatusBanner from '../components/SyncStatusBanner';
 import {
   getAllCustomers,
   getSortPreference,
   saveSortPreference,
   getShowArchived,
-  addCustomer,
-  addServiceEntry,
-  deleteCustomer,
   getServiceIntervalMode,
   getServiceIntervalCustomDays,
   modeToIntervalDays,
 } from '../data/storage';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
-import { SEED_CUSTOMERS } from '../../scripts/seed-data';
 
 const SORT_OPTIONS = [
   { key: 'firstName', label: 'First Name' },
@@ -99,13 +108,14 @@ function sortCustomers(customers, mode) {
   });
 }
 
-export default function CustomersScreen({ navigation }) {
+export default function CustomersScreen({ navigation, route }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [customers, setCustomers]   = useState([]);
+  const [loading, setLoading]       = useState(true);
   const [query, setQuery]           = useState('');
-  const [sortMode, setSortMode]     = useState('name');
+  const [sortMode, setSortMode]     = useState('firstName');
   const [sortModal, setSortModal]   = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [intervalDays, setIntervalDays] = useState(365);
@@ -113,6 +123,7 @@ export default function CustomersScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      setLoading(true);
       (async () => {
         try {
           const [all, pref, archived, mode, customDays] = await Promise.all([
@@ -130,6 +141,8 @@ export default function CustomersScreen({ navigation }) {
           }
         } catch {
           // Storage read failed — keep stale data rather than crashing
+        } finally {
+          if (active) setLoading(false);
         }
       })();
       return () => { active = false; };
@@ -188,31 +201,6 @@ export default function CustomersScreen({ navigation }) {
 
   const activeSortLabel = SORT_OPTIONS.find((o) => o.key === sortMode)?.label ?? 'Name';
 
-  // ── DEV: Seed fake customers (remove before release) ──
-  const handleSeed = async () => {
-    try {
-      for (const s of SEED_CUSTOMERS) {
-        const c = await addCustomer({
-          name: s.name, email: s.email, phone: s.phone,
-          address: s.address, city: s.city, state: s.state, zipCode: s.zipCode,
-        });
-        if (s.serviceDaysAgo != null) {
-          const serviceDate = new Date(Date.now() - s.serviceDaysAgo * 86400000);
-          await addServiceEntry(c.id, {
-            date: serviceDate.toISOString(),
-            type: 'service',
-            notes: 'Routine annual service',
-          });
-        }
-      }
-      const all = await getAllCustomers();
-      setCustomers(all);
-      Alert.alert('Seeded', `${SEED_CUSTOMERS.length} test customers added.`);
-    } catch (e) {
-      Alert.alert('Seed Error', e.message);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
 
@@ -239,37 +227,6 @@ export default function CustomersScreen({ navigation }) {
           <Ionicons name="chevron-down" size={13} color={theme.primary} />
         </Pressable>
 
-        {/* DEV: Seed + Dedup buttons — remove before release */}
-        <Pressable
-          style={({ pressed }) => [styles.sortChip, pressed && styles.sortChipPressed]}
-          onPress={handleSeed}
-          accessibilityRole="button"
-          accessibilityLabel="Seed test data"
-        >
-          <Ionicons name="flask-outline" size={14} color={theme.primary} />
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.sortChip, pressed && styles.sortChipPressed]}
-          onPress={async () => {
-            const all = await getAllCustomers();
-            const seen = new Set();
-            let removed = 0;
-            for (const c of all) {
-              if (seen.has(c.name)) {
-                await deleteCustomer(c.id);
-                removed++;
-              } else {
-                seen.add(c.name);
-              }
-            }
-            setCustomers(await getAllCustomers());
-            Alert.alert('Deduped', `Removed ${removed} duplicates.`);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Remove duplicates"
-        >
-          <Ionicons name="cut-outline" size={14} color={theme.primary} />
-        </Pressable>
       </View>
 
       {/* ── Search bar ── */}
@@ -294,41 +251,51 @@ export default function CustomersScreen({ navigation }) {
         </View>
       </View>
 
-      {/* ── Customer list ── */}
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderSectionHeader={({ section }) => (
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionLabel}>{section.title}</Text>
-            <View style={styles.sectionLine} />
-          </View>
-        )}
-        renderItem={({ item }) => (
-          <CustomerCard
-            customer={item}
-            sortMode={sortMode}
-            intervalDays={intervalDays}
-            onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id, backLabel: 'Customers' })}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        stickySectionHeadersEnabled={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="people-outline" size={56} color={theme.border} />
-            <Text style={styles.emptyTitle}>
-              {query.trim() ? 'No results' : 'No customers yet'}
-            </Text>
-            <Text style={styles.emptyBody}>
-              {query.trim()
-                ? 'Try a different search term.'
-                : 'Tap Add Customer to get started.'}
-            </Text>
-          </View>
-        }
+      {/* ── Square sync status banner ── */}
+      <SyncStatusBanner
+        onPress={() => navigation.navigate('SettingsTab', { screen: 'SquareSync' })}
       />
+
+      {/* ── Customer list ── */}
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionLabel}>{section.title}</Text>
+              <View style={styles.sectionLine} />
+            </View>
+          )}
+          renderItem={({ item }) => (
+            <CustomerCard
+              customer={item}
+              intervalDays={intervalDays}
+              onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id, backLabel: 'Customers', onAlertsRefresh: route.params?.onAlertsRefresh })}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          stickySectionHeadersEnabled={false}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="people-outline" size={56} color={theme.border} />
+              <Text style={styles.emptyTitle}>
+                {query.trim() ? 'No results' : 'No customers yet'}
+              </Text>
+              <Text style={styles.emptyBody}>
+                {query.trim()
+                  ? 'Try a different search term.'
+                  : 'Tap Add Customer to get started.'}
+              </Text>
+            </View>
+          }
+        />
+      )}
 
       {/* ── Sort filter modal ── */}
       <Modal
@@ -349,8 +316,9 @@ export default function CustomersScreen({ navigation }) {
                   pressed && styles.modalOptionPressed,
                 ]}
                 onPress={() => handleSortSelect(key)}
-                accessibilityRole="button"
+                accessibilityRole="radio"
                 accessibilityLabel={`Sort by ${label}`}
+                accessibilityState={{ selected: sortMode === key }}
               >
                 <Text
                   style={[
@@ -453,6 +421,11 @@ function makeStyles(theme) {
       fontSize:        FontSize.base,
       color:           theme.text,
       paddingVertical: 12,
+    },
+    loadingWrap: {
+      flex:            1,
+      alignItems:      'center',
+      justifyContent:  'center',
     },
     listContent: {
       paddingTop:    4,
