@@ -2,7 +2,7 @@
 
 ---
 
-## Current State (as of v0.22, 2026-04-14)
+## Current State (as of v0.22.5, 2026-04-14)
 
 The app is feature-complete and builds cleanly. Pre-release hardening is done.
 No external accounts are set up yet. The steps below get you from here to live.
@@ -14,13 +14,24 @@ No external accounts are set up yet. The steps below get you from here to live.
 - App icons — light + dark mode variants
 - EAS build + submit pipeline with beta profiles
 - OTA updates wired (expo-updates)
-- Sentry error reporting wired (needs your DSN — Step 1)
-- Square PKCE OAuth built (needs your credentials — Step 3)
-- Error boundary + restart recovery
+- Sentry crash reporting fully wired ✅
+  - DSN set in `.env`, `Sentry.init` fires on launch
+  - `Sentry.wrap()` on root component for automatic session tracking
+  - Error boundary reports uncaught JS errors to Sentry + shows Restart screen
+- Square PKCE OAuth built (needs your credentials — Step 12)
+  - Token stored in Keychain/Keystore (expo-secure-store)
+  - Expiry detection — expired tokens auto-cleared, user prompted to re-auth
+  - Merge is rollback-safe (memory-first, write only after all computations succeed)
 - Offline detection
 - Storage v2 (per-customer keys, write mutex, in-memory cache)
+- Crypto-random customer IDs (expo-crypto)
 - 38-item app audit complete — schema migrations, timezone safety, backup hardening,
   performance fixes, calendar sync error surfacing, invoice confirmation prompt
+- `.env` / `.env.local` pattern — all credentials out of source (Square, Sentry, Geoapify)
+- Services tab badge count fixed — refreshes reliably on launch, not just on app foreground
+- `runtimeVersion: { policy: "appVersion" }` in app.json — Expo Go manifest crash fixed
+- `promise@8.3.0` direct dep — Sentry launch crash fixed
+- `patch-package` for expo-modules-core — `addListener` crash in Expo Go fixed
 
 ---
 

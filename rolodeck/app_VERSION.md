@@ -23,3 +23,5 @@
 | v1.8.2 | 2026-04-14 | Claude | Bumped expo.version to 0.22.2 to match `AddServiceModal.js` syntax-error patch |
 | v1.8.3 | 2026-04-14 | Claude | Bumped expo.version to 0.22.3 to match the `promise` dependency fix |
 | v1.8.4 | 2026-04-14 | Claude | Bumped expo.version to 0.22.4 to match the expo-modules-core `addListener` patch |
+| v1.8.5 | 2026-04-14 | Claude | Bumped expo.version to 0.22.5 — Services tab badge fix (refreshAlerts sequencing) |
+| v1.8.6 | 2026-04-14 | Claude | Bumped expo.version to 0.22.6 — removed Sentry test button |

@@ -8,6 +8,20 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.22.6] - 2026-04-14
+
+### Changed
+- Removed temporary Sentry test button — DSN is confirmed set, `Sentry.init` fires on launch, `Sentry.wrap` is on the root component. Sentry is fully wired. (`App.js`)
+
+---
+
+## [0.22.5] - 2026-04-14
+
+### Fixed
+- **Services tab badge count not showing** — `refreshAlerts()` was called concurrently with `initStorage()`. On the first launch after V1→V2 storage migration, `getAllCustomers()` read the customer index before the migration finished writing it, getting `[]` and locking `alertCount` at 0 until the next app background/foreground. Fixed by running `refreshAlerts` after `initStorage` completes. Also added `console.warn` logging to the catch block so future storage errors surface in Metro logs instead of silently keeping the badge at 0. (`App.js`)
+
+---
+
 ## [0.22.4] - 2026-04-14
 
 ### Fixed

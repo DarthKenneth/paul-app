@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.4.1
+// Version: 1.6
 // Last Updated: 2026-04-14
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.22.5)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -39,6 +39,13 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v1.6  2026-04-14  Claude  Remove Sentry test button (DSN confirmed, fully wired)
+// v1.5  2026-04-14  Claude  Fix badge count not showing on Services tab
+//       - Run refreshAlerts after initStorage completes (not concurrently) so
+//         V1→V2 migration writes the customer index before getAllCustomers reads
+//         it; fixes alertCount=0 on first launch after schema migration
+//       - Added console.warn logging to refreshAlerts catch block so storage
+//         errors surface in Metro instead of silently keeping badge at 0
 // v1.4.1 2026-04-14  Claude  Added temp Sentry test button (floating, remove after verify)
 // v1.4  2026-04-14  Claude  Error boundary, Sentry, hardcoded color fixes
 //       - Wrapped AppInner in ErrorBoundary (catches render crashes, shows restart)
@@ -51,7 +58,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, ActivityIndicator, AppState, StyleSheet, Button } from 'react-native';
+import { View, ActivityIndicator, AppState, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import * as Sentry from '@sentry/react-native';
@@ -123,8 +130,9 @@ function AppInner() {
       ]);
       const intervalDays = modeToIntervalDays(mode, customDays);
       setAlertCount(getAlertBadgeCount(customers.filter((c) => !c.archived), intervalDays));
-    } catch {
+    } catch (err) {
       // Storage read failed — keep stale badge count
+      console.warn('[refreshAlerts] storage error, badge count unchanged:', err);
     }
   }, []);
 
@@ -134,8 +142,12 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
-    initStorage().catch(() => {});
-    refreshAlerts();
+    // Run refreshAlerts AFTER initStorage so the V1→V2 migration (which writes
+    // the customer index) completes before getAllCustomers reads the index.
+    // initStorage is fast on existing V2 installs (~1 AsyncStorage read).
+    initStorage()
+      .catch(() => {})
+      .then(() => refreshAlerts());
     getOnboardingComplete().then((done) => {
       if (!done) setShowOnboarding(true);
     });
@@ -153,17 +165,11 @@ function AppInner() {
   const isDark = themeKey === 'midnight';
 
   return (
-    <>
-      <NavigationContainer>
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <TabNavigator alertCount={alertCount} onAlertsRefresh={refreshAlerts} />
-        <OnboardingModal visible={showOnboarding} onComplete={handleOnboardingComplete} />
-      </NavigationContainer>
-      {/* TEMP: Sentry test button — remove after confirming events appear in dashboard */}
-      <View style={styles.sentryTest}>
-        <Button title='Try!' onPress={() => { Sentry.captureException(new Error('First error')); }} />
-      </View>
-    </>
+    <NavigationContainer>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <TabNavigator alertCount={alertCount} onAlertsRefresh={refreshAlerts} />
+      <OnboardingModal visible={showOnboarding} onComplete={handleOnboardingComplete} />
+    </NavigationContainer>
   );
 }
 
@@ -205,10 +211,5 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     backgroundColor: SPLASH_BG,
-  },
-  sentryTest: {
-    position:   'absolute',
-    bottom:     60,
-    alignSelf:  'center',
   },
 });

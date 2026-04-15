@@ -24,3 +24,5 @@
 | v1.8.2 | 2026-04-14 | Claude | Bumped version to 0.22.2 to match `AddServiceModal.js` syntax-error patch |
 | v1.8.3 | 2026-04-14 | Claude | Added `promise@8.3.0` dependency (required by `@sentry/react-native`); bumped version to 0.22.3 |
 | v1.8.4 | 2026-04-14 | Claude | Added `patch-package` dev-dep + `postinstall` script; bumped version to 0.22.4 |
+| v1.8.5 | 2026-04-14 | Claude | Bumped version to 0.22.5 — Services tab badge fix |
+| v1.8.6 | 2026-04-14 | Claude | Bumped version to 0.22.6 — removed Sentry test button |
