@@ -2,10 +2,10 @@
 
 ---
 
-## Current State (as of v0.22.5, 2026-04-14)
+## Current State (as of v0.22.6, 2026-04-16)
 
 The app is feature-complete and builds cleanly. Pre-release hardening is done.
-No external accounts are set up yet. The steps below get you from here to live.
+iOS submitted to TestFlight. Android first build done, awaiting manual upload to Play internal track.
 
 ### What's done ✅
 - Core app — customer database, service log, service intervals, calendar sync
@@ -35,7 +35,7 @@ No external accounts are set up yet. The steps below get you from here to live.
 
 ---
 
-## Step 1 — Sentry (10 min)
+## Step 1 — Sentry ✅ (10 min)
 
 1. Create a free account at [sentry.io](https://sentry.io)
 2. New Project → React Native → name it "Rolodeck"
@@ -51,7 +51,7 @@ Sentry will start capturing crashes immediately after the first build with the D
 
 ---
 
-## Step 2 — One-time account setup
+## Step 2 — One-time account setup ✅
 
 - **Apple Developer Program** — [developer.apple.com](https://developer.apple.com) ($99/year)
 - **Google Play Developer account** — [play.google.com/console](https://play.google.com/console) ($25 one-time)
@@ -60,10 +60,10 @@ Sentry will start capturing crashes immediately after the first build with the D
 
 ---
 
-## Step 3 — Register with Expo
+## Step 3 — Register with Expo ✅
 
 ```bash
-cd rolodeck
+cd /Users/keithdujardin/Repos/paul-app/rolodeck
 eas login          # log in to your Expo account
 eas init           # links this project to expo.dev — accept the defaults
 ```
@@ -72,7 +72,7 @@ This adds `extra.eas.projectId` to `app.json`. Commit that change.
 
 ---
 
-## Step 4 — Create the App Store Connect listing
+## Step 4 — Create the App Store Connect listing ✅
 
 1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
 2. Click **+** → **New App**
@@ -82,7 +82,7 @@ This adds `extra.eas.projectId` to `app.json`. Commit that change.
 
 ---
 
-## Step 5 — Set up iOS credentials
+## Step 5 — Set up iOS credentials ✅
 
 ```bash
 eas credentials --platform ios
@@ -93,13 +93,15 @@ stores them in its cloud.
 
 ---
 
-## Step 6 — Set EAS secrets for iOS submission
+## Step 6 — Set EAS secrets for iOS submission ✅
 
 ```bash
-eas secret:create --scope project --name APPLE_ID      --value "your@apple.com"
-eas secret:create --scope project --name ASC_APP_ID    --value "1234567890"
-eas secret:create --scope project --name APPLE_TEAM_ID --value "XXXXXXXXXX"
+eas env:create --scope project --name APPLE_ID      --value "kdujardin1@outlook.com"
+eas env:create --scope project --name ASC_APP_ID    --value "6762417306"
+eas env:create --scope project --name APPLE_TEAM_ID --value "W6R4H966U8"
 ```
+
+> Note: `eas secret:create` is deprecated — use `eas env:create` going forward.
 
 Where to find each:
 - `APPLE_ID` — your Apple Developer account email
@@ -108,7 +110,7 @@ Where to find each:
 
 ---
 
-## Step 7 — Create the Google Play listing
+## Step 7 — Create the Google Play listing ✅
 
 1. Go to [play.google.com/console](https://play.google.com/console)
 2. **Create app** → Name: Rolodeck, Package: `com.ardingate.rolodeck`
@@ -117,7 +119,7 @@ Where to find each:
 
 ---
 
-## Step 8 — Set up Android credentials
+## Step 8 — Set up Android credentials ✅
 
 ```bash
 eas credentials --platform android
@@ -145,37 +147,50 @@ eas credentials --platform android
 
 ---
 
-## Step 10 — First builds
+## Step 10 — First builds ✅
 
 ```bash
-npm run build:ios
-npm run build:android
+npm run build:ios && npm run build:android
 ```
 
 Both build on EAS cloud — no local Xcode or Android Studio needed. Takes 15–30 min.
+
+**Note:** `app.json` now has `ITSAppUsesNonExemptEncryption: false` in `ios.infoPlist` —
+required by Apple. Already added.
 
 ---
 
 ## Step 11 — Beta testing (TestFlight + Play internal)
 
-Once builds are done:
+**iOS** — already submitted via `npm run submit:beta:ios` ✅
+Apple is processing — you'll get an email when it's ready in TestFlight (5–10 min).
 
-```bash
-npm run submit:beta:ios      # → TestFlight (beta reviewers see it within minutes)
-npm run submit:beta:android  # → Play internal track (instant, no review)
-```
+**Android** — first submission must be manual (Google requirement):
+1. Download the AAB from EAS: `https://expo.dev/artifacts/eas/wpoD2Z5aKc9X5ToZVQ1M2.aab`
+2. Play Console → Rolodeck → Testing → Internal testing → Create new release
+3. Upload the `.aab` file and roll out
 
-Add yourself and any testers in:
+**Screenshots** — required before the Play Store listing goes live:
+- Take screenshots on a real device or simulator after installing the beta build
+- Required sizes: Phone (16:9 or 9:16), at least 2 screenshots
+- Upload at: Play Console → Rolodeck → Store presence → Main store listing → Graphics
+
+**After both are live**, add yourself as a tester and install on real devices:
 - App Store Connect → your app → TestFlight → Internal Testing
 - Play Console → your app → Internal testing → Testers
 
-Install on real devices. Test the golden path:
+Test the golden path:
 - [ ] Add a customer
 - [ ] Log a service
 - [ ] Calendar sync works (check Calendar app)
 - [ ] Export backup → share file → re-import
 - [ ] Settings → theme changes apply
 - [ ] Kill and relaunch — data persists
+
+**Future Android submissions** (after first manual upload + Google Service Account set up):
+```bash
+npm run submit:beta:android
+```
 
 ---
 
@@ -214,44 +229,71 @@ Users get it automatically on next app launch. For native changes, rebuild and s
 
 ## Step 14 — Bump to v1.0 and production release
 
-When you're happy with beta:
+When you're happy with beta, use the GitHub Actions workflow (Step 15 — already set up):
 
-1. Bump `VERSION` to `1.0` (or `1.0.0` if you prefer three-part)
+1. Bump `VERSION` to `1.0`
 2. Update `package.json "version"` and `app.json "expo.version"` to match
 3. Add a `CHANGELOG.md` entry
-4. Rebuild:
+4. Commit, tag, and push:
    ```bash
-   npm run build:ios && npm run build:android
-   ```
-5. Submit to production:
-   ```bash
-   npm run submit
+   git add -p
+   git commit -m "feat: Rolodeck v1.0"
+   git tag v1.0
+   git push && git push --tags
    ```
 
+GitHub Actions takes it from there — builds both apps and submits to both stores automatically.
 App Store review takes 1–3 days. Google Play is usually hours to a day.
-Sentry will start showing real-world crashes immediately.
+
+> Note: Android auto-submit requires the Google Service Account (Step 9) to be set up
+> before this works. iOS submits automatically via the App Store Connect API key.
 
 ---
 
 ## After launch — how updates work
 
-For JS-only fixes (90% of updates):
+**JS-only fixes (90% of updates) — OTA, no store review:**
 ```bash
 eas update --branch production --message "what changed"
 ```
 Users get it on next app open. No store submission needed.
 
-For native changes or version bumps:
+**Native changes or new releases — tag push triggers full pipeline:**
 ```bash
-npm run build:ios && npm run build:android
-npm run submit
+git tag v1.1
+git push --tags
 ```
+GitHub Actions builds both apps and submits to both stores automatically.
+
+**TestFlight beta updates:**
+```bash
+npm run build:ios && npm run submit:beta:ios
+```
+
+**Known credentials (keep these safe):**
+- Apple ID: `kdujardin1@outlook.com`
+- ASC App ID: `6762417306`
+- Apple Team ID: `W6R4H966U8`
+- Expo project: `@ardingate-studios-llc/rolodeck` (ID: `117e475a-df12-4791-a8bf-5d761b4c526c`)
+- iOS dist cert serial: `5AF486400E5125FDD1ADB0E61C2A5F18` (expires Apr 16 2027)
+- iOS provisioning profile: `M2QQJ7H3UH` (expires Apr 16 2027)
+- Android keystore: `p8ESASctpl` — SHA256: `94:2E:8E:0C:9A:1D:A7:16:66:E9:5A:E0:F1:C2:8F:40:38:C2:00:30:69:45:67:DA:EB:FF:38:1E:1B:96:51:C8`
+- Support URL: `https://studios.ardingate.com/contact/`
+- Privacy policy: `https://ardingate.com/privacy-policy/`
 
 ---
 
-## Step 15 — GitHub Actions (optional)
+## Step 15 — GitHub Actions ✅
 
-The release workflow in `.github/workflows/` can automate builds on tag push.
+The release workflow at `.github/workflows/release.yml` fully automates the release
+pipeline on tag push:
+
+1. Runs tests — build is blocked if they fail
+2. Builds iOS + Android on EAS cloud in parallel
+3. Auto-submits both to App Store + Google Play immediately after build
+4. EAS manages build numbers automatically (`appVersionSource: remote`) — you never
+   manually bump them
+
 To enable it, add an `EXPO_TOKEN` to GitHub Secrets:
 
 1. [expo.dev](https://expo.dev) → your account → Settings → Access Tokens → Create token
@@ -260,9 +302,15 @@ To enable it, add an `EXPO_TOKEN` to GitHub Secrets:
 
 Then each release is just:
 ```bash
-git tag v1.0
+git tag v1.1
 git push --tags
 ```
+
+That's it — tests run, both apps build, both stores get the submission. App Store review
+takes 1–3 days; Google Play is usually hours. No manual steps needed.
+
+> Note: Android auto-submit requires the Google Service Account to be set up first
+> (Step 9). iOS auto-submit works immediately using the EAS secrets from Step 6.
 
 ---
 

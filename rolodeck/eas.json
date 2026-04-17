@@ -30,9 +30,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "$APPLE_ID",
-        "ascAppId": "$ASC_APP_ID",
-        "appleTeamId": "$APPLE_TEAM_ID"
+        "appleId": "kdujardin1@outlook.com",
+        "ascAppId": "6762417306",
+        "appleTeamId": "W6R4H966U8"
       },
       "android": {
         "track": "production",
@@ -41,9 +41,9 @@
     },
     "beta": {
       "ios": {
-        "appleId": "$APPLE_ID",
-        "ascAppId": "$ASC_APP_ID",
-        "appleTeamId": "$APPLE_TEAM_ID"
+        "appleId": "kdujardin1@outlook.com",
+        "ascAppId": "6762417306",
+        "appleTeamId": "W6R4H966U8"
       },
       "android": {
         "track": "internal"

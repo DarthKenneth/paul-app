@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">
+  <!-- Background -->
+  <rect width="1024" height="500" fill="#F5F0E8"/>
+
+  <!-- Subtle texture lines -->
+  <rect x="0" y="0" width="1024" height="500" fill="url(#grain)" opacity="0.04"/>
+
+  <!-- Decorative teal accent bar -->
+  <rect x="0" y="0" width="8" height="500" fill="#4AACA5"/>
+
+  <!-- Background card shapes (decorative, right side) -->
+  <rect x="620" y="60" width="340" height="200" rx="16" fill="#FFFDF9" opacity="0.7"/>
+  <rect x="640" y="100" width="300" height="140" rx="12" fill="#FFFDF9" opacity="0.5"/>
+
+  <!-- Card shape behind icon -->
+  <rect x="80" y="100" width="420" height="300" rx="20" fill="#FFFDF9" opacity="0.6"/>
+
+  <!-- App icon placeholder circle -->
+  <circle cx="180" cy="250" r="70" fill="#4AACA5"/>
+  <!-- Simple "R" lettermark on icon -->
+  <text x="180" y="268" font-family="Georgia, serif" font-size="72" font-weight="bold" fill="#FFFDF9" text-anchor="middle">R</text>
+
+  <!-- Main title -->
+  <text x="290" y="230" font-family="Georgia, 'Times New Roman', serif" font-size="72" font-weight="bold" fill="#1A1A1A" letter-spacing="-1">Rolodeck</text>
+
+  <!-- Tagline -->
+  <text x="290" y="278" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="24" fill="#444444" letter-spacing="0.5">Customer database for service professionals</text>
+
+  <!-- Feature pills -->
+  <rect x="290" y="310" width="160" height="36" rx="18" fill="#4AACA5" opacity="0.15"/>
+  <text x="370" y="333" font-family="-apple-system, Arial, sans-serif" font-size="15" fill="#2E8A84" text-anchor="middle" font-weight="600">Service Reminders</text>
+
+  <rect x="462" y="310" width="120" height="36" rx="18" fill="#4AACA5" opacity="0.15"/>
+  <text x="522" y="333" font-family="-apple-system, Arial, sans-serif" font-size="15" fill="#2E8A84" text-anchor="middle" font-weight="600">No Account</text>
+
+  <rect x="594" y="310" width="130" height="36" rx="18" fill="#4AACA5" opacity="0.15"/>
+  <text x="659" y="333" font-family="-apple-system, Arial, sans-serif" font-size="15" fill="#2E8A84" text-anchor="middle" font-weight="600">Works Offline</text>
+
+  <!-- Bottom credit -->
+  <text x="512" y="470" font-family="-apple-system, Arial, sans-serif" font-size="13" fill="#999999" text-anchor="middle" letter-spacing="1">ARDINGATE STUDIOS LLC</text>
+
+  <!-- Teal accent dot cluster (decorative) -->
+  <circle cx="820" cy="160" r="6" fill="#4AACA5" opacity="0.4"/>
+  <circle cx="840" cy="145" r="4" fill="#4AACA5" opacity="0.25"/>
+  <circle cx="856" cy="168" r="5" fill="#D4795A" opacity="0.3"/>
+  <circle cx="800" cy="178" r="3" fill="#4AACA5" opacity="0.2"/>
+  <circle cx="870" cy="150" r="3" fill="#D4795A" opacity="0.2"/>
+</svg>
