@@ -17,13 +17,21 @@ Drop this file in any repo root. Claude Code reads it automatically on session s
 **Tier definitions for this project:**
 
 - **MAJOR** ([X].0): Full rewrites, breaking changes to AsyncStorage schema (requires migration), major navigation restructure, engine/framework migrations
-- **MINOR** (X.[Y]): New screens, new features, new components, new integrations, new color themes, changes that add or alter user-facing behavior
-- **PATCH** (X.Y.[Z]): Bug fixes, text/label corrections, style tweaks, minor UX polish, performance improvements with no behavior change
+- **MINOR** (0.X.0 → 0.[X+1].0): New screens, new features, new components, new integrations, new color themes, changes that add or alter user-facing behavior
+- **PATCH** (0.X.Y → 0.X.[Y+1]): Bug fixes, text/label corrections, style tweaks, minor UX polish, performance improvements with no behavior change
+
+**Build number vs. version string:**
+- EAS auto-increments the build number (CFBundleVersion) on every `eas build` — this is handled automatically and does NOT replace a version bump
+- Every EAS build push MUST also carry a new version string in VERSION / app.json / package.json
+  - Feature build → bump MINOR (0.23 → 0.24)
+  - Fix-only build → bump PATCH (0.23 → 0.23.1, next fix build → 0.23.2)
+  - Multiple fix builds in one session that haven't shipped yet can share one version bump
+- The version string and build number are both visible in TestFlight; keeping them in sync is the only way to tell builds apart
+- CHANGELOG entries use the version string (e.g. `## [0.23.1]`), not the build number
 
 **Project-specific conventions:**
 - Square integration changes are always minor+ (they alter a user-facing surface)
 - Storage schema changes that require migration are always major
-- None yet beyond the above
 
 ---
 
@@ -63,7 +71,7 @@ work. If scope is unclear, default to minor: `v[next minor]  [date]  User  Manua
 - **When to bump:** every task with user-facing changes
 - **One project bump per task, max**
 - **Sequencing:** patch after v1.2.1 → v1.2.2; minor resets patch (v1.3, not v1.3.0); major resets both
-- **Pre-release:** use `0.x` versioning. Bump to `1.0` when user declares ready
+- **Pre-release format:** always 3 components — `0.MINOR.PATCH`. Never drop the patch (write `0.23.0`, not `0.23`). Bump to `1.0.0` when user declares ready.
 
 ---
 

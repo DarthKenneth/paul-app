@@ -2,10 +2,10 @@
 
 ---
 
-## Current State (as of v0.22.6, 2026-04-16)
+## Current State (as of v0.23.1, 2026-04-17)
 
 The app is feature-complete and builds cleanly. Pre-release hardening is done.
-iOS submitted to TestFlight. Android first build done, awaiting manual upload to Play internal track.
+iOS on TestFlight (build 11, v0.23.0 — v0.23.1 in flight). Android live on Play internal track (released Apr 16). Google Play service account set up — auto-submit ready after 24–36 hr permission propagation.
 
 ### What's done ✅
 - Core app — customer database, service log, service intervals, calendar sync
@@ -130,20 +130,91 @@ Google ties it to your app forever.
 
 ---
 
-## Step 9 — Set up Google Play service account (for automated submission)
+## Step 9 — Set up Google Play service account (for automated submission) ✅
 
-1. In Play Console → **Setup** → **API access**
-2. Link to a Google Cloud project
-3. Click **Create new service account** → follow the link to Google Cloud
-4. Create a service account, give it the **Service Account Token Creator** role
-5. Back in Play Console, grant the service account **Release Manager** permissions
-6. In Google Cloud Console → the service account → **Keys** → **Add Key** → JSON → download
+> **Note:** The old "Setup → API access" page in Play Console no longer exists —
+> Google removed it in 2023/2024. The new flow is split across Google Cloud Console
+> and Play Console's Users and permissions. Do not follow any docs that reference
+> "Setup → API access" — they are stale.
 
-Upload the key to EAS:
+### Part A — Google Cloud Console (create the service account)
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project — name it something like **"Play Store API"**
+3. **APIs & Services → Library** → search **"Google Play Android Developer API"** → **Enable**
+4. **IAM & Admin → Service Accounts → Create Service Account**
+   - Name: `eas-submit` (or anything descriptive)
+   - **Skip assigning a GCP role** — leave the role field blank, just click Done.
+     All real permissions are granted in Play Console, not here.
+5. Click the new service account in the list → **Keys tab → Add Key → Create new key → JSON**
+6. Download the JSON file. **Do not commit it to git.** Save it somewhere safe.
+
+The service account email will look like:
+`eas-submit@your-project-id.iam.gserviceaccount.com`
+
+### Part B — Google Play Console (invite the service account as a user)
+
+1. Go to [play.google.com/console](https://play.google.com/console)
+2. Left nav (account level, not inside the app) → **Users and permissions**
+3. Click **Invite new users**
+4. In the email field, paste the service account email from Part A
+5. On the **Account permissions** tab, check:
+   - ✅ View app information and download bulk reports
+   - ✅ Release apps to testing tracks
+   - ✅ Manage testing tracks and edit tester lists
+   - ✅ Release to production, exclude devices, and use Play App Signing
+6. Click **Invite user** — service accounts don't accept email invitations, it just activates immediately
+
+> ⚠️ **Wait 24–36 hours before testing.** Google's API takes time to propagate the new
+> permissions. You will get `403 The caller does not have permission` errors immediately
+> after adding the account even when everything is configured correctly. This is normal —
+> just wait a day.
+
+### Part C — Upload the credential to EAS
+
 ```bash
-eas credentials --platform android
-# Select: "Set up Google Service Account Key for submitting"
+eas credentials -p android
 ```
+
+Follow the prompts → **Google Service Account** → **Upload a Google Service Account Key**
+→ provide the path to the JSON file you downloaded in Part A.
+
+EAS stores it encrypted on expo.dev. **You do not need to add anything to `eas.json`** —
+EAS CLI pulls it automatically during `eas submit`.
+
+### Part D — Update `eas.json` submit config
+
+Add the Android submit profile so `--auto-submit` knows where to send the build:
+
+```json
+{
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "completed",
+        "changesNotSentForReview": true
+      }
+    }
+  }
+}
+```
+
+`track: "internal"` is the Android equivalent of TestFlight.
+`changesNotSentForReview: true` skips Google's review queue for internal track pushes.
+
+### Part E — Verify it works
+
+Once the 24–36 hour propagation window has passed:
+
+```bash
+eas build --platform android --auto-submit
+```
+
+> ⚠️ **Hard requirement from Google:** The API will reject the first submission if the
+> app has never had an AAB uploaded manually through the Play Console UI. Complete
+> Step 11 (manual first upload) before relying on auto-submit. After that first manual
+> upload, EAS Submit takes over permanently.
 
 ---
 
@@ -165,10 +236,10 @@ required by Apple. Already added.
 **iOS** — already submitted via `npm run submit:beta:ios` ✅
 Apple is processing — you'll get an email when it's ready in TestFlight (5–10 min).
 
-**Android** — first submission must be manual (Google requirement):
-1. Download the AAB from EAS: `https://expo.dev/artifacts/eas/wpoD2Z5aKc9X5ToZVQ1M2.aab`
-2. Play Console → Rolodeck → Testing → Internal testing → Create new release
-3. Upload the `.aab` file and roll out
+**Android** — first submission must be manual (Google requirement): ✅
+1. ~~Download the AAB from EAS: `https://expo.dev/artifacts/eas/wpoD2Z5aKc9X5ToZVQ1M2.aab`~~
+2. ~~Play Console → Rolodeck → Testing → Internal testing → Create new release~~
+3. ~~Upload the `.aab` file and roll out~~ — Done (Released Apr 16)
 
 **Screenshots** — required before the Play Store listing goes live:
 - Take screenshots on a real device or simulator after installing the beta build
@@ -245,8 +316,9 @@ When you're happy with beta, use the GitHub Actions workflow (Step 15 — alread
 GitHub Actions takes it from there — builds both apps and submits to both stores automatically.
 App Store review takes 1–3 days. Google Play is usually hours to a day.
 
-> Note: Android auto-submit requires the Google Service Account (Step 9) to be set up
-> before this works. iOS submits automatically via the App Store Connect API key.
+> Note: Android auto-submit requires the Google Play service account to be set up
+> (Step 9) and the first AAB manually uploaded (Step 11) before this works.
+> iOS submits automatically via the App Store Connect API key.
 
 ---
 
@@ -309,8 +381,9 @@ git push --tags
 That's it — tests run, both apps build, both stores get the submission. App Store review
 takes 1–3 days; Google Play is usually hours. No manual steps needed.
 
-> Note: Android auto-submit requires the Google Service Account to be set up first
-> (Step 9). iOS auto-submit works immediately using the EAS secrets from Step 6.
+> Note: Android auto-submit requires the Google Play service account (Step 9, Parts A–D)
+> and first manual AAB upload (Step 11) before it works.
+> iOS auto-submit works immediately using the EAS secrets from Step 6.
 
 ---
 

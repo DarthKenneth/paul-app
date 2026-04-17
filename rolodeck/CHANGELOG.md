@@ -8,21 +8,34 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.23] - 2026-04-17
+## [0.23.1] - 2026-04-17
+
+### Added
+- **Full calendar sync for all scheduled services** — enabling calendar sync (or tapping the retry banner) now pushes every existing scheduled appointment across all customers to the calendar, not just newly created ones. (`calendarSync.js`, `SettingsScreen.js`)
+
+### Fixed
+- **Services tab badge not clearing after logging a service** — `CustomersScreen` wasn't receiving `onAlertsRefresh` in its route params, so the callback it forwarded to `CustomerDetailScreen` was always `undefined`. Added `initialParams={{ onAlertsRefresh }}` to the Customers root screen in the stack. (`TabNavigator.js`)
+- **Tab bar icons not actually 30px** — `tabBarIconSize` is not a valid React Navigation v6 bottom-tabs option and was silently ignored. Replaced with hardcoded `size={30}` in the render function. (`TabNavigator.js`)
+- **Calendar sync status overwritten by batch loop** — individual `syncScheduledService` calls each wrote their own status record, so a mid-loop failure could be clobbered by a later success. Batch sync now suppresses per-entry writes and owns one accurate final status. (`calendarSync.js`)
+
+### Changed
+- **Scheduled service display (Services tab)** — list view and calendar day-panel now show appointment time (e.g. "10:00 AM") and type icon (wrench for Service, house for Install) for each scheduled entry. (`ServicesScreen.js`)
+- **Tab bar** — icons increased 25% (24→30px), bottom padding increased 20% (9→11px), bar height adjusted to match. (`TabNavigator.js`)
+
+---
+
+## [0.23.0] - 2026-04-17
 
 ### Added
 - **Scheduling engine** — appointments now have a type (Service = 30 min, Install = 2.5 hr), a specific time slot, and respect configurable work days (Mon–Fri) and work hours (8am–5pm). Time slots are generated in 30-min increments; booked slots are shown grayed out. (`scheduleSettings.js`, `ScheduleServiceModal.js`)
 - **Scheduling Settings screen** — new screen under Settings → Scheduling. Configures work days, work start/end hours, service and install durations, and travel time before/after. All settings auto-save; stepper buttons for all numeric values. (`SchedulingSettingsScreen.js`, `TabNavigator.js`, `SettingsScreen.js`)
 - **Timed calendar events for scheduled services** — scheduled service appointments now create timed calendar events (not all-day) with the correct start/end time, appointment type in the title, and travel buffer summary in the notes. (`calendarSync.js`)
-- **Full calendar sync for all scheduled services** — enabling calendar sync (or tapping the retry banner) now pushes every existing scheduled appointment across all customers to the calendar, not just newly created ones. (`calendarSync.js`, `SettingsScreen.js`)
 
 ### Fixed
-- **Services tab badge not clearing after logging a service** — `CustomersScreen` wasn't receiving `onAlertsRefresh` in its route params, so the callback it forwarded to `CustomerDetailScreen` was always `undefined`. Added `initialParams={{ onAlertsRefresh }}` to the Customers root screen in the stack. (`TabNavigator.js`)
-- **Address autofill not working on TestFlight** — `EXPO_PUBLIC_GEOAPIFY_API_KEY` was not reaching EAS builds because `.env` is gitignored. Key added as an EAS project secret so it's injected at build time. (`eas.json`, EAS secrets)
+- **Double-booking allowed** — conflict detection only blocked work time, not travel buffer windows. Fixed to block `[existStart - travelBefore, existEnd + travelAfter]`. (`scheduleSettings.js`)
 - **App icon always showing dark variant** — `ios.icon.any` key in `app.json` is not recognized; correct key is `light`. Renamed so iOS properly switches between light and dark icons based on system appearance. (`app.json`)
 
 ### Changed
-- **Scheduled service display (Services tab)** — list view and calendar day-panel now show appointment time (e.g. "10:00 AM") and type icon (wrench for Service, house for Install) for each scheduled entry. (`ServicesScreen.js`)
 - **Scheduled service display (Customer detail)** — entries show appointment time and type-specific icon. (`CustomerDetailScreen.js`)
 - **iOS icon** — added `tinted` variant pointing to dark icon for iOS 26 tinted mode. Added Android `monochromeImage` (white silhouette on transparent) for Material You themed icons. (`app.json`, `generate-icons.js`)
 
@@ -35,6 +48,7 @@ CREATED:      2026-04-03
 
 ### Fixed
 - **Address autofill still not working** — removed the Zippopotam.us zip code lookup entirely. It was interfering with Geoapify autocomplete even after the previous guard. Address autocomplete (Geoapify) is now the only autofill mechanism; selecting a suggestion fills address, city, state, and zip in one shot. (`AddCustomerScreen.js`)
+- **Address autofill not working on TestFlight** — `EXPO_PUBLIC_GEOAPIFY_API_KEY` was not reaching EAS builds because `.env` is gitignored. Key added as an EAS project secret so it's injected at build time. (EAS secrets, not a code change)
 
 ---
 
@@ -90,7 +104,7 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.22] - 2026-04-14
+## [0.22.0] - 2026-04-14
 
 ### Added
 - **Square credentials via env vars** — `EXPO_PUBLIC_SQUARE_CLIENT_ID`, `EXPO_PUBLIC_SQUARE_LOCATION_ID`, and `EXPO_PUBLIC_SQUARE_ENVIRONMENT` are now read from `.env` at build time. No credentials in source. (`.env.example`, `squarePlaceholder.js`)
@@ -128,14 +142,14 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.21] - 2026-04-12
+## [0.21.0] - 2026-04-12
 
 ### Added
 - **Post-save invoice prompt** — after logging a service, a confirmation sheet appears instead of closing immediately. Shows a checkmark, the date and customer name, and two buttons: **Done** (primary teal, closes the modal) and **Send Invoice →** (outlined, transitions to an inline amount entry). The invoice amount view sends via Square and then closes. (`AddServiceModal.js`)
 
 ---
 
-## [0.20] - 2026-04-12
+## [0.20.0] - 2026-04-12
 
 ### Added
 - **Square Customer Sync** — full match-and-merge system linking Rolodeck customers to Square. Pulls all Square customers (paginated), classifies them by confidence (ID / email / phone match vs. name-only), and merges Square data into Rolodeck without overwriting existing values. (`squareSync.js`, `squareCustomers.js`, `mergeLogic.js`)
@@ -154,7 +168,7 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.19] - 2026-04-10
+## [0.19.0] - 2026-04-10
 
 ### Added
 - **Stone theme** — neutral cool-grey palette with a slate-blue primary and warm amber accent. Good middle ground between the warm Classic and the colored themes. (colors.js)
@@ -162,7 +176,7 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.18] - 2026-04-10
+## [0.18.0] - 2026-04-10
 
 ### Added
 - **AsyncStorage envelope + migration runner.** Customer data is now stored in a `{ schemaVersion, customers: [] }` envelope so the version travels with the data. Legacy raw-array installs auto-migrate on next load. Future schema changes just need a new entry in `MIGRATIONS` and a bump to `CURRENT_SCHEMA_VERSION`. Downgrade-protection prevents older builds from clobbering newer data. (storage.js)
@@ -184,7 +198,7 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.17] - 2026-04-10
+## [0.17.0] - 2026-04-10
 
 ### Changed
 - Calendar day panel now distinguishes scheduled services from due-date matches. Scheduled customers render with the blue "Scheduled" styling (matching the list view's Scheduled section) plus their notes; due-date customers keep urgency-colored styling. When a customer is both scheduled and due on the same day, the scheduled entry takes priority. (ServicesScreen.js)
@@ -193,7 +207,7 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.16] - 2026-04-10
+## [0.16.0] - 2026-04-10
 
 ### Added
 - Smooth tab swap animation — each tab's content fades in and slides from the right over 220ms when switched, so tab changes feel like the stack push animation instead of an instant swap. (TabNavigator.js)
@@ -212,7 +226,7 @@ CREATED:      2026-04-03
 
 ---
 
-## [0.15] - 2026-04-10
+## [0.15.0] - 2026-04-10
 
 ### Added
 - Schedule Service button on every customer card — opens a bottom-sheet modal with the same MM/DD/YYYY date picker and calendar picker as Add Service, restricted to tomorrow and forward. Uses blue throughout.
@@ -404,6 +418,13 @@ CREATED:      2026-04-03
 - `squarePlaceholder.js` updated: sandbox/production mode flag with dynamic base
   URL selection; `locationId` moved into `SQUARE_CONFIG` (no longer a function
   argument); `backendTokenUrl` now points to the Vercel endpoint pattern
+
+---
+
+## [1.3] - 2026-04-03
+
+### Infrastructure
+- CHANGELOG bootstrapped retroactively from git history. Version scheme normalized: `[1.0]`–`[1.2]` entries above describe work done under the initial `v1.3` git commit; `[1.4]` onward follows the standard versioning rules.
 
 ---
 
