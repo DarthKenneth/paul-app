@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.22.8] - 2026-04-17
+
+### Fixed
+- **Address autofill still not working** — removed the Zippopotam.us zip code lookup entirely. It was interfering with Geoapify autocomplete even after the previous guard. Address autocomplete (Geoapify) is now the only autofill mechanism; selecting a suggestion fills address, city, state, and zip in one shot. (`AddCustomerScreen.js`)
+
+---
+
 ## [0.22.7] - 2026-04-16
 
 ### Fixed

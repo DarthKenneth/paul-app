@@ -1,12 +1,11 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.6.1
-// Last Updated: 2026-04-16
+// Version: 1.7
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.22.7)
+// PROJECT:      Rolodeck (project v0.22.8)
 // FILES:        AddCustomerScreen.js  (this file)
 //               storage.js            (addCustomer)
-//               zipLookup.js          (lookupZip — city/state from zip code)
 //               placesConfig.js       (GEOAPIFY_API_KEY)
 //               theme.js              (useTheme)
 //               typography.js         (FontFamily, FontSize)
@@ -24,8 +23,6 @@
 //   - Suggestions render inline (not absolutely positioned) to avoid z-index
 //     issues inside ScrollView — they push city/state/zip down while visible
 //   - Suggestions are debounced 350ms; cleared on blur or selection
-//   - Zip code fallback: when the user enters a 5-digit zip code and city/state
-//     are empty, lookupZip() fetches them from Zippopotam.us as a backup
 //   - City and State rendered side-by-side in a row
 //   - On save: calls addCustomer(), navigates back (list refreshes via
 //     useFocusEffect in CustomersScreen)
@@ -67,6 +64,10 @@
 //       - fetchSuggestions() now accepts a signal and passes it to fetch()
 // v1.6.1 2026-04-16  Claude  Skip zip lookup when Geoapify key is present —
 //                             autocomplete already fills city/state/zip
+// v1.7   2026-04-17  Claude  Nuke zip autofill entirely
+//        - Removed lookupZip import and all Zippopotam.us logic
+//        - handleZipChange is now a plain setField call
+//        - Removed lookupDone ref [updated ARCHITECTURE]
 // =============================================================================
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -85,7 +86,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { addCustomer } from '../data/storage';
-import { lookupZip } from '../utils/zipLookup';
 import { GEOAPIFY_API_KEY } from '../config/placesConfig';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
@@ -147,7 +147,6 @@ export default function AddCustomerScreen({ navigation }) {
   const [suggestions, setSuggestions]     = useState([]);
   const [suggestLoading, setSuggestLoading] = useState(false);
 
-  const lookupDone      = useRef(new Set());
   const debounceRef     = useRef(null);
   const abortRef        = useRef(null); // AbortController for in-flight autocomplete
   const addressInputRef = useRef(null);
@@ -202,24 +201,7 @@ export default function AddCustomerScreen({ navigation }) {
     setTimeout(() => setSuggestions([]), 150);
   };
 
-  // ── Zip fallback (only when Geoapify is unavailable) ─────────────────────────
-
-  const handleZipChange = async (zip) => {
-    setField('zipCode', zip);
-    if (GEOAPIFY_API_KEY) return;
-    const clean = zip.replace(/\D/g, '');
-    if (clean.length === 5 && !lookupDone.current.has(clean)) {
-      lookupDone.current.add(clean);
-      const result = await lookupZip(clean);
-      if (result) {
-        setForm((f) => ({
-          ...f,
-          city:  f.city  || result.city,
-          state: f.state || result.stateAbbr,
-        }));
-      }
-    }
-  };
+  const handleZipChange = (zip) => setField('zipCode', zip);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
 
