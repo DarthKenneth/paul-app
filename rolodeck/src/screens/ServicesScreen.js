@@ -1,9 +1,9 @@
 // =============================================================================
 // ServicesScreen.js - Upcoming and overdue service list, grouped by due window
-// Version: 2.5
-// Last Updated: 2026-04-10
+// Version: 2.5.2
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.17)
+// PROJECT:      Rolodeck (project v0.23)
 // FILES:        ServicesScreen.js    (this file)
 //               storage.js           (getAllCustomers)
 //               serviceAlerts.js     (groupCustomersByDueWindow, getServiceStatus,
@@ -36,6 +36,15 @@
 //   - Section headers color-coded by urgency (list mode)
 //
 // CHANGE LOG:
+// v2.5.2 2026-04-17  Claude  Harden date parsing in scheduled row renderers
+//        - renderScheduledItem: guards item.scheduledDate with isNaN check;
+//          time row only renders when a valid date is present
+//        - renderCalendarRow (scheduled): same guard on scheduledEntry.date;
+//          optional-chain scheduledEntry.type reads
+// v2.5.1 2026-04-17  Claude  Time and type display for scheduled service rows
+//        - scheduledItems now includes type field (entry.type || 'service')
+//        - renderScheduledItem (list) shows time row + type icon/label
+//        - renderCalendarRow (scheduled kind) shows time row + type icon/label
 // v2.5  2026-04-10  Claude  Calendar view: scheduled distinction + visible arrows
 //       - Reworked customersOnSelectedDay → itemsOnSelectedDay, tagging each
 //         item with kind ('scheduled' | 'due') plus the matching scheduledEntry
@@ -184,6 +193,7 @@ export default function ServicesScreen({ navigation }) {
                   customerName:  c.name || 'Unnamed',
                   scheduledDate: entry.date,
                   notes:         entry.notes,
+                  type:          entry.type || 'service',
                 });
               }
             }
@@ -363,15 +373,22 @@ export default function ServicesScreen({ navigation }) {
 
   const renderScheduledItem = ({ item }) => {
     const blue = theme.scheduled;
-    const dateStr = new Date(item.scheduledDate).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric',
-    });
+    const d = item.scheduledDate ? new Date(item.scheduledDate) : null;
+    const validDate = d && !isNaN(d.getTime());
+    const dateStr = validDate
+      ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+      : 'Date unknown';
+    const timeStr = validDate
+      ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+      : '';
+    const typeLabel = item.type === 'install' ? 'Install' : 'Service';
+    const typeIcon  = item.type === 'install' ? 'home-outline' : 'construct-outline';
     return (
       <Pressable
         style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
         onPress={() => handleRowPress(item.customerId)}
         accessibilityRole="button"
-        accessibilityLabel={`${item.customerName}, scheduled ${dateStr}`}
+        accessibilityLabel={`${item.customerName}, scheduled ${typeLabel} ${dateStr} at ${timeStr}`}
       >
         <View style={[styles.rowAccent, { backgroundColor: blue }]} />
         <View style={styles.rowBody}>
@@ -380,7 +397,16 @@ export default function ServicesScreen({ navigation }) {
             <Ionicons name="calendar-outline" size={13} color={theme.textMuted} style={styles.metaIcon} />
             <Text style={styles.rowLastDate}>{dateStr}</Text>
           </View>
-          <Text style={[styles.rowStatus, { color: blue }]} numberOfLines={1}>Scheduled</Text>
+          {timeStr ? (
+            <View style={styles.rowMeta}>
+              <Ionicons name="time-outline" size={13} color={theme.textMuted} style={styles.metaIcon} />
+              <Text style={styles.rowLastDate}>{timeStr}</Text>
+            </View>
+          ) : null}
+          <View style={styles.rowMeta}>
+            <Ionicons name={typeIcon} size={13} color={blue} style={styles.metaIcon} />
+            <Text style={[styles.rowStatus, { color: blue }]}>{typeLabel}</Text>
+          </View>
         </View>
         <Ionicons name="chevron-forward" size={18} color={theme.border} />
       </Pressable>
@@ -430,26 +456,42 @@ export default function ServicesScreen({ navigation }) {
     // ── Scheduled row — blue accent + "Scheduled" label, matches list view ──
     if (kind === 'scheduled') {
       const blue = theme.scheduled;
-      const noteText = (scheduledEntry?.notes || '').trim();
+      const noteText  = (scheduledEntry?.notes || '').trim();
+      const d         = scheduledEntry?.date ? new Date(scheduledEntry.date) : null;
+      const validDate = d && !isNaN(d.getTime());
+      const timeStr   = validDate
+        ? d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+        : '';
+      const typeLabel = scheduledEntry?.type === 'install' ? 'Install' : 'Service';
+      const typeIcon  = scheduledEntry?.type === 'install' ? 'home-outline' : 'construct-outline';
       return (
         <Pressable
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           onPress={() => handleRowPress(customer.id)}
           accessibilityRole="button"
-          accessibilityLabel={`${customer.name || 'Customer'}, scheduled`}
+          accessibilityLabel={`${customer.name || 'Customer'}, scheduled ${typeLabel} at ${timeStr}`}
         >
           <View style={[styles.rowAccent, { backgroundColor: blue }]} />
           <View style={styles.rowBody}>
             <Text style={styles.rowName} numberOfLines={1}>
               {customer.name || 'Unnamed'}
             </Text>
+            {timeStr ? (
+              <View style={styles.rowMeta}>
+                <Ionicons name="time-outline" size={13} color={theme.textMuted} style={styles.metaIcon} />
+                <Text style={styles.rowLastDate}>{timeStr}</Text>
+              </View>
+            ) : null}
+            <View style={styles.rowMeta}>
+              <Ionicons name={typeIcon} size={13} color={blue} style={styles.metaIcon} />
+              <Text style={[styles.rowStatus, { color: blue }]}>{typeLabel}</Text>
+            </View>
             {noteText ? (
               <View style={styles.rowMeta}>
                 <Ionicons name="document-text-outline" size={13} color={theme.textMuted} style={styles.metaIcon} />
                 <Text style={styles.rowLastDate} numberOfLines={1}>{noteText}</Text>
               </View>
             ) : null}
-            <Text style={[styles.rowStatus, { color: blue }]} numberOfLines={1}>Scheduled</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={theme.border} />
         </Pressable>

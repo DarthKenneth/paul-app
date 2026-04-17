@@ -8,6 +8,29 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.23] - 2026-04-17
+
+### Added
+- **Scheduling engine** — appointments now have a type (Service = 30 min, Install = 2.5 hr), a specific time slot, and respect configurable work days (Mon–Fri) and work hours (8am–5pm). Time slots are generated in 30-min increments; booked slots are shown grayed out. (`scheduleSettings.js`, `ScheduleServiceModal.js`)
+- **Scheduling Settings screen** — new screen under Settings → Scheduling. Configures work days, work start/end hours, service and install durations, and travel time before/after. All settings auto-save; stepper buttons for all numeric values. (`SchedulingSettingsScreen.js`, `TabNavigator.js`, `SettingsScreen.js`)
+- **Timed calendar events for scheduled services** — scheduled service appointments now create timed calendar events (not all-day) with the correct start/end time, appointment type in the title, and travel buffer summary in the notes. (`calendarSync.js`)
+- **Full calendar sync for all scheduled services** — enabling calendar sync (or tapping the retry banner) now pushes every existing scheduled appointment across all customers to the calendar, not just newly created ones. (`calendarSync.js`, `SettingsScreen.js`)
+
+### Fixed
+- **Services tab badge not clearing after logging a service** — `CustomersScreen` wasn't receiving `onAlertsRefresh` in its route params, so the callback it forwarded to `CustomerDetailScreen` was always `undefined`. Added `initialParams={{ onAlertsRefresh }}` to the Customers root screen in the stack. (`TabNavigator.js`)
+- **Address autofill not working on TestFlight** — `EXPO_PUBLIC_GEOAPIFY_API_KEY` was not reaching EAS builds because `.env` is gitignored. Key added as an EAS project secret so it's injected at build time. (`eas.json`, EAS secrets)
+- **App icon always showing dark variant** — `ios.icon.any` key in `app.json` is not recognized; correct key is `light`. Renamed so iOS properly switches between light and dark icons based on system appearance. (`app.json`)
+
+### Changed
+- **Scheduled service display (Services tab)** — list view and calendar day-panel now show appointment time (e.g. "10:00 AM") and type icon (wrench for Service, house for Install) for each scheduled entry. (`ServicesScreen.js`)
+- **Scheduled service display (Customer detail)** — entries show appointment time and type-specific icon. (`CustomerDetailScreen.js`)
+- **iOS icon** — added `tinted` variant pointing to dark icon for iOS 26 tinted mode. Added Android `monochromeImage` (white silhouette on transparent) for Material You themed icons. (`app.json`, `generate-icons.js`)
+
+### Infrastructure
+- Expo upgraded from 55.0.13 → 55.0.15; `@react-native-community/netinfo` pinned to compatible version 11.5.2.
+
+---
+
 ## [0.22.8] - 2026-04-17
 
 ### Fixed

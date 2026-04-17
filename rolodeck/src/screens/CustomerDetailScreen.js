@@ -1,7 +1,7 @@
 // =============================================================================
 // CustomerDetailScreen.js - Customer info, divider, service log, add service
-// Version: 1.6.3
-// Last Updated: 2026-04-14
+// Version: 1.7
+// Last Updated: 2026-04-17
 //
 // PROJECT:      Rolodeck (project v0.22)
 // FILES:        CustomerDetailScreen.js  (this file)
@@ -30,6 +30,11 @@
 //   - All storage operations wrapped in try/catch
 //
 // CHANGE LOG:
+// v1.7   2026-04-17  Claude  Wire scheduled services to Apple Calendar
+//       - Imported syncScheduledService, removeScheduledServiceEvent from calendarSync
+//       - handleScheduleSave calls syncScheduledService(customer, entry) after save
+//       - handleDeleteScheduled calls removeScheduledServiceEvent(entryId) on cancel
+//       [updated ARCHITECTURE]
 // v1.6.3 2026-04-14  Claude  Clear zipLookedUp Set on each focus so it doesn't
 //                            grow unbounded across navigation cycles
 // v1.6.2 2026-04-12  Claude  Schedule refresh + badge propagation
@@ -105,6 +110,7 @@ import ServiceLogEntry from '../components/ServiceLogEntry';
 import ScheduleServiceModal from '../components/ScheduleServiceModal';
 import AddServiceModal from '../components/AddServiceModal';
 import { getCustomerById, updateCustomer, deleteCustomer, archiveCustomer, unarchiveCustomer, addScheduledService, deleteScheduledService } from '../data/storage';
+import { syncScheduledService, removeScheduledServiceEvent } from '../utils/calendarSync';
 import { lookupZip } from '../utils/zipLookup';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
@@ -250,6 +256,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
   const handleDeleteScheduled = async (entryId) => {
     try {
       await deleteScheduledService(customerId, entryId);
+      removeScheduledServiceEvent(entryId); // fire-and-forget
       const c = await getCustomerById(customerId);
       if (c) setCustomer(c);
     } catch {
@@ -268,9 +275,12 @@ export default function CustomerDetailScreen({ route, navigation }) {
 
   const handleScheduleSave = async (cId, data) => {
     try {
-      await addScheduledService(cId, data);
+      const entry = await addScheduledService(cId, data);
       const c = await getCustomerById(customerId);
-      if (c) setCustomer(c);
+      if (c) {
+        setCustomer(c);
+        syncScheduledService(c, entry); // fire-and-forget
+      }
     } catch {
       Alert.alert('Error', 'Could not save scheduled service.');
     }
@@ -499,22 +509,32 @@ export default function CustomerDetailScreen({ route, navigation }) {
                   .slice()
                   .sort((a, b) => new Date(a.date) - new Date(b.date))
                   .map((entry, idx, arr) => {
-                    const dateStr = new Date(entry.date).toLocaleDateString('en-US', {
+                    const apptDate = new Date(entry.date);
+                    const dateStr = apptDate.toLocaleDateString('en-US', {
                       year: 'numeric', month: 'short', day: 'numeric',
                     });
+                    const timeStr = apptDate.toLocaleTimeString('en-US', {
+                      hour: 'numeric', minute: '2-digit', hour12: true,
+                    });
+                    const typeLabel = entry.type === 'install' ? 'Install' : 'Service';
                     return (
                       <View
                         key={entry.id}
                         style={[styles.schedRow, idx === arr.length - 1 && styles.schedRowLast]}
                       >
                         <View style={styles.schedIconWrap}>
-                          <Ionicons name="calendar-outline" size={18} color={theme.scheduled} />
+                          <Ionicons
+                            name={entry.type === 'install' ? 'home-outline' : 'construct-outline'}
+                            size={18}
+                            color={theme.scheduled}
+                          />
                         </View>
                         <View style={styles.schedContent}>
                           <View style={styles.schedTopRow}>
-                            <Text style={styles.schedLabel}>Scheduled Service</Text>
+                            <Text style={styles.schedLabel}>Scheduled {typeLabel}</Text>
                             <Text style={styles.schedDate}>{dateStr}</Text>
                           </View>
+                          <Text style={styles.schedTime}>{timeStr}</Text>
                           {!!entry.notes && (
                             <Text style={styles.schedNotes}>{entry.notes}</Text>
                           )}
@@ -787,11 +807,18 @@ function makeStyles(theme) {
       fontSize:   FontSize.sm,
       color:      theme.textMuted,
     },
+    schedTime: {
+      fontFamily: theme.fontBodyMedium,
+      fontSize:   FontSize.sm,
+      color:      theme.textSecondary,
+      marginTop:   1,
+    },
     schedNotes: {
       fontFamily: theme.fontBody,
       fontSize:   FontSize.sm,
       color:      theme.textSecondary,
       lineHeight: FontSize.sm * 1.55,
+      marginTop:   2,
     },
     schedDelete: {
       paddingLeft: 8,

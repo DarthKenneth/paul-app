@@ -1,6 +1,6 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.7
+// Version: 1.7.1
 // Last Updated: 2026-04-17
 //
 // PROJECT:      Rolodeck (project v0.22.8)
@@ -65,6 +65,9 @@
 // v1.6.1 2026-04-16  Claude  Skip zip lookup when Geoapify key is present —
 //                             autocomplete already fills city/state/zip
 // v1.7   2026-04-17  Claude  Nuke zip autofill entirely
+// v1.7.1 2026-04-17  Claude  Surface Geoapify errors in console — check res.ok,
+//                             log HTTP status + body on failure, log features
+//                             count on success, warn when key is empty
 //        - Removed lookupZip import and all Zippopotam.us logic
 //        - handleZipChange is now a plain setField call
 //        - Removed lookupDone ref [updated ARCHITECTURE]
@@ -95,15 +98,24 @@ import { FontSize } from '../styles/typography';
 const GEOAPIFY_AUTOCOMPLETE_URL = 'https://api.geoapify.com/v1/geocode/autocomplete';
 
 async function fetchSuggestions(input, signal) {
-  if (!GEOAPIFY_API_KEY) return [];
+  if (!GEOAPIFY_API_KEY) {
+    console.warn('[Geoapify] GEOAPIFY_API_KEY is empty — autocomplete disabled');
+    return [];
+  }
   const params = new URLSearchParams({
     text:   input,
     filter: 'countrycode:us',
     limit:  '5',
     apiKey: GEOAPIFY_API_KEY,
   });
-  const res  = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params}`, { signal });
+  const res = await fetch(`${GEOAPIFY_AUTOCOMPLETE_URL}?${params}`, { signal });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[Geoapify] HTTP ${res.status}:`, body);
+    return [];
+  }
   const data = await res.json();
+  console.log('[Geoapify] features count:', data.features?.length ?? 'no features key', 'for input:', input);
   return Array.isArray(data.features) ? data.features : [];
 }
 
@@ -173,7 +185,7 @@ export default function AddCustomerScreen({ navigation }) {
         setSuggestions(preds);
       } catch (err) {
         if (err.name !== 'AbortError') {
-          // Autocomplete failed — manual entry still works fine
+          console.error('[Geoapify] fetch error:', err);
         }
       } finally {
         setSuggestLoading(false);

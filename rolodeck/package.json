@@ -1,6 +1,6 @@
 {
   "name": "rolodeck",
-  "version": "0.22.8",
+  "version": "0.23",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -39,12 +39,12 @@
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-community/netinfo": "^12.0.1",
+    "@react-native-community/netinfo": "11.5.2",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/stack": "^6.3.29",
     "@sentry/react-native": "~7.11.0",
-    "expo": "~55.0.13",
+    "expo": "~55.0.15",
     "expo-calendar": "~55.0.14",
     "expo-crypto": "~55.0.14",
     "expo-document-picker": "~55.0.13",

@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.0
-// Last Updated: 2026-04-12
+// Version: 2.0.2
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.21)
+// PROJECT:      Rolodeck (project v0.23)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -98,6 +98,9 @@
 //       - Tapping the banner calls handleCalSyncRetry which runs syncAllCustomers
 //         and refreshes the status
 //       - Toggling sync off clears the stale status [updated ARCHITECTURE]
+// v2.0.2 2026-04-17  Claude  handleCalSyncRetry: add catch block safety net + null-coalesce
+//                             on getCalendarSyncStatus result
+// v2.0.1 2026-04-17  Claude  Retry sync now calls syncAll (due dates + scheduled services)
 // v2.0  2026-04-12  Claude  Reverted Square to coming-soon placeholder
 //       - Removed live Square section (state, handlers, imports, JSX)
 //       - Replaced with coming-soon card matching Backup & Restore style
@@ -140,7 +143,7 @@ import {
   enableCalendarSync,
   disableCalendarSync,
   getCalendarSyncStatus,
-  syncAllCustomers,
+  syncAll,
 } from '../utils/calendarSync';
 import { APP_VERSION } from '../appVersion';
 
@@ -257,8 +260,12 @@ export default function SettingsScreen({ navigation }) {
     if (calSyncBusy) return;
     setCalSyncBusy(true);
     try {
-      await syncAllCustomers();
-      setCalSyncStatus(await getCalendarSyncStatus());
+      await syncAll();
+      const status = await getCalendarSyncStatus();
+      setCalSyncStatus(status ?? null);
+    } catch {
+      // syncAll has internal error handling; this catch is a safety net for
+      // unexpected throws so the busy spinner always clears
     } finally {
       setCalSyncBusy(false);
     }
@@ -327,6 +334,28 @@ export default function SettingsScreen({ navigation }) {
                 <Text style={styles.rowTitle}>Reminder Interval</Text>
                 <Text style={styles.rowDesc}>
                   {intervalLabel(intervalMode, intervalCustomDays)}
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </Pressable>
+        </View>
+
+        {/* ── Scheduling ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Scheduling</Text>
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={() => navigation.navigate('SchedulingSettings')}
+            accessibilityRole="button"
+            accessibilityLabel="Scheduling settings"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="calendar-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Work Days & Hours</Text>
+                <Text style={styles.rowDesc}>
+                  Work hours, appointment durations, travel time
                 </Text>
               </View>
             </View>

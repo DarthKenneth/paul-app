@@ -1,9 +1,9 @@
 // =============================================================================
 // TabNavigator.js - Root navigation: BottomTabNavigator + Stack navigators
-// Version: 1.4
-// Last Updated: 2026-04-14
+// Version: 1.5.3
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.23)
 // FILES:        TabNavigator.js           (this file — navigation structure)
 //               App.js                    (renders TabNavigator inside
 //                                          NavigationContainer + ThemeProvider)
@@ -48,6 +48,15 @@
 // v1.3.1  2026-04-12  Claude  Added SquareSyncScreen to Settings stack
 // v1.4    2026-04-14  Claude  Accessibility: Services badge announces count to
 //                             screen readers via tabBarAccessibilityLabel
+// v1.5.3  2026-04-17  Claude  Fix icon size: tabBarIconSize is not a valid RN v6 bottom-tabs
+//                             option (confirmed absent from installed package); replaced with
+//                             hardcoded size={30} directly in tabBarIcon render function
+// v1.5.2  2026-04-17  Claude  Tab bar: icon size 24→30 (+25%), paddingBottom 9→11 (+20%
+//                             rounded up), height 62→70 to match
+// v1.5.1  2026-04-17  Claude  Pass onAlertsRefresh as initialParams to Customers root
+//                             screen so CustomersScreen can forward it to CustomerDetail
+//                             — fixes badge not clearing after adding a service
+// v1.5    2026-04-17  Claude  Added SchedulingSettingsScreen to Settings stack
 // =============================================================================
 
 import React, { useRef, useCallback } from 'react';
@@ -65,7 +74,8 @@ import ServicesScreen       from '../screens/ServicesScreen';
 import SettingsScreen          from '../screens/SettingsScreen';
 import ThemeScreen             from '../screens/ThemeScreen';
 import ServiceIntervalScreen   from '../screens/ServiceIntervalScreen';
-import SquareSyncScreen        from '../screens/SquareSyncScreen';
+import SquareSyncScreen           from '../screens/SquareSyncScreen';
+import SchedulingSettingsScreen   from '../screens/SchedulingSettingsScreen';
 
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
@@ -146,6 +156,7 @@ function CustomersStackNavigator({ route }) {
         <CustStack.Screen
           name="Customers"
           component={CustomersScreen}
+          initialParams={{ onAlertsRefresh }}
           options={{ title: 'Customers', headerLeft: () => null }}
         />
         <CustStack.Screen
@@ -213,6 +224,11 @@ function SettingsStackNavigator() {
           component={SquareSyncScreen}
           options={{ title: 'Square Sync' }}
         />
+        <SettingsStack.Screen
+          name="SchedulingSettings"
+          component={SchedulingSettingsScreen}
+          options={{ title: 'Scheduling' }}
+        />
       </SettingsStack.Navigator>
     </AnimatedTabScreen>
   );
@@ -237,8 +253,8 @@ export default function TabNavigator({ alertCount, onAlertsRefresh }) {
           backgroundColor: theme.tabBar,
           borderTopColor:  theme.tabBarBorder,
           borderTopWidth:   1,
-          height:           62,
-          paddingBottom:     9,
+          height:           70,
+          paddingBottom:    11,
           paddingTop:        7,
         },
         tabBarActiveTintColor:   theme.tabIconActive,
@@ -247,10 +263,10 @@ export default function TabNavigator({ alertCount, onAlertsRefresh }) {
           fontFamily: theme.fontUiMedium,
           fontSize:   FontSize.xxs,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused, color }) => {
           const icons = TAB_ICONS[route.name];
           const iconName = focused ? icons.focused : icons.outline;
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName} size={30} color={color} />;
         },
       })}
     >

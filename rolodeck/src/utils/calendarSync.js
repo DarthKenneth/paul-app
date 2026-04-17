@@ -1,9 +1,9 @@
 // =============================================================================
-// calendarSync.js - One-way push of service due dates to the device calendar
-// Version: 1.3
-// Last Updated: 2026-04-10
+// calendarSync.js - Pushes service due dates and scheduled services to device calendar
+// Version: 1.7
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.18)
+// PROJECT:      Rolodeck (project v0.23)
 // FILES:        calendarSync.js         (this file — calendar sync engine)
 //               storage.js              (getAllCustomers, getCustomerById,
 //                                        getServiceIntervalMode,
@@ -12,6 +12,8 @@
 //               serviceAlerts.js        (getLastServiceDate,
 //                                        getEffectiveIntervalForCustomer)
 //               AddServiceScreen.js     (calls syncCustomerDueDate after save)
+//               CustomerDetailScreen.js (calls syncScheduledService after schedule,
+//                                        removeScheduledServiceEvent on cancel)
 //               SettingsScreen.js       (calls enableCalendarSync, disableCalendarSync,
 //                                        getCalendarSyncEnabled, syncAllCustomers)
 //
@@ -32,13 +34,20 @@
 //                (type 'com.google') so events sync to Google Calendar;
 //                falls back to any writable source if no Google account found;
 //                ownerAccount set to the source account's email
-//   - Event IDs persisted to @rolodeck_calendar_event_ids (JSON map of
-//     customerId → eventId) so events are upserted, not duplicated
-//   - Event content:
+//   - Due-date event IDs persisted to @rolodeck_calendar_event_ids
+//     (JSON map: customerId → eventId) so events are upserted, not duplicated
+//   - Scheduled service event IDs persisted to @rolodeck_calendar_scheduled_event_ids
+//     (JSON map: scheduledEntry.id → eventId)
+//   - Due-date event content:
 //       Title: "{customer name} — Service Due"
-//       All-day event on the computed due date (last service + 365 days)
+//       All-day event on the computed due date (last service + interval days)
 //       Notes: address, phone, email
 //       Alarm: 1 day before (where platform supports it)
+//   - Scheduled service event content:
+//       Title: "{customer name} — Scheduled Service"
+//       All-day event on the user-chosen date
+//       Notes: scheduled entry notes (if any) + address, phone, email
+//       Alarm: 1 day before
 //   - Customers with no service log entries are skipped (no pinnable due date)
 //   - Archived customers are excluded from syncAllCustomers
 //   - disableCalendarSync only persists the preference — it does NOT delete
@@ -58,6 +67,33 @@
 //       - syncAllCustomers (full sync for initial enable or manual re-sync)
 //       - removeCustomerEvent (for future archive/delete integration)
 //       - buildEventNotes (formats customer contact info for event body)
+// v1.7  2026-04-17  Claude  Harden batch sync and status reporting
+//       - syncScheduledService gains optional { writeStatus } param (default true);
+//         when false, errors re-throw instead of being swallowed into a per-entry
+//         status record so batch callers can own the final status write
+//       - syncAllScheduledServices now calls syncScheduledService with
+//         writeStatus: false and tracks per-entry failures; writes one accurate
+//         final status for the whole batch instead of being overwritten by the
+//         last individual entry
+// v1.6  2026-04-17  Claude  Full sync for all scheduled services
+//       - Added syncAllScheduledServices() — loops all active customers and calls
+//         syncScheduledService for each existing scheduledServices entry
+//       - Added syncAll() — calls syncAllCustomers then syncAllScheduledServices
+//       - enableCalendarSync now calls syncAll() instead of syncAllCustomers()
+//         so toggling sync on immediately pushes every scheduled appointment
+// v1.5  2026-04-17  Claude  Timed calendar events for scheduled services
+//       - syncScheduledService now creates timed events (allDay: false) using
+//         appointment start time + duration from scheduleSettings
+//       - Event title includes type: "— Scheduled Service" / "— Scheduled Install"
+//       - Event notes include duration, travel buffer summary, and contact info
+//       - Imported getScheduleSettings, getAppointmentDuration, formatDuration
+// v1.4  2026-04-17  Claude  Scheduled service calendar sync
+//       - Added SCHEDULED_EVENT_IDS_KEY + getScheduledEventIds/saveScheduledEventIds
+//       - Added syncScheduledService(customer, scheduledEntry) — upserts a calendar
+//         event on the user-chosen scheduled date; notes include any entry notes
+//         followed by customer contact info [updated ARCHITECTURE]
+//       - Added removeScheduledServiceEvent(entryId) — removes calendar event when
+//         a scheduled service is cancelled
 // v1.3  2026-04-10  Claude  Surface sync errors to user
 //       - Added LAST_SYNC_STATUS_KEY with { status, message, at } record
 //       - setSyncStatus() helper writes on every success/failure
@@ -85,6 +121,7 @@
 import * as Calendar from 'expo-calendar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { getScheduleSettings, getAppointmentDuration, formatDuration } from './scheduleSettings';
 import {
   getAllCustomers,
   getServiceIntervalMode,
@@ -94,10 +131,11 @@ import {
 import { getLastServiceDate, getEffectiveIntervalForCustomer } from './serviceAlerts';
 import { addDaysLocal } from './dateUtils';
 
-const SYNC_ENABLED_KEY   = '@rolodeck_calendar_sync_enabled';
-const CALENDAR_ID_KEY    = '@rolodeck_calendar_id';
-const EVENT_IDS_KEY      = '@rolodeck_calendar_event_ids';
-const LAST_SYNC_STATUS_KEY = '@rolodeck_calendar_last_sync_status';
+const SYNC_ENABLED_KEY            = '@rolodeck_calendar_sync_enabled';
+const CALENDAR_ID_KEY             = '@rolodeck_calendar_id';
+const EVENT_IDS_KEY               = '@rolodeck_calendar_event_ids';
+const SCHEDULED_EVENT_IDS_KEY     = '@rolodeck_calendar_scheduled_event_ids';
+const LAST_SYNC_STATUS_KEY        = '@rolodeck_calendar_last_sync_status';
 
 const CALENDAR_COLOR = '#4AACA5'; // Rolodeck teal
 
@@ -173,7 +211,7 @@ export async function enableCalendarSync() {
     return false;
   }
   await AsyncStorage.setItem(SYNC_ENABLED_KEY, 'true');
-  await syncAllCustomers();
+  await syncAll();
   return true;
 }
 
@@ -253,6 +291,15 @@ async function getEventIds() {
 
 async function saveEventIds(map) {
   await AsyncStorage.setItem(EVENT_IDS_KEY, JSON.stringify(map));
+}
+
+async function getScheduledEventIds() {
+  const raw = await AsyncStorage.getItem(SCHEDULED_EVENT_IDS_KEY);
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function saveScheduledEventIds(map) {
+  await AsyncStorage.setItem(SCHEDULED_EVENT_IDS_KEY, JSON.stringify(map));
 }
 
 // ── Event content ─────────────────────────────────────────────────────────────
@@ -366,6 +413,49 @@ export async function syncAllCustomers() {
 }
 
 /**
+ * Sync calendar events for every scheduled service across all active customers.
+ * Intended for initial enable and manual re-sync; fire-and-forget safe.
+ */
+export async function syncAllScheduledServices() {
+  try {
+    const enabled = await getCalendarSyncEnabled();
+    if (!enabled) return;
+
+    const granted = await requestCalendarPermission();
+    if (!granted) {
+      await setSyncStatus('permission-denied', 'Calendar access was revoked.');
+      return;
+    }
+
+    const all = await getAllCustomers();
+    let syncErrorMsg = null;
+    for (const customer of all.filter((c) => !c.archived)) {
+      for (const entry of (customer.scheduledServices || [])) {
+        try {
+          // writeStatus: false — suppress per-entry status writes so this
+          // function can write one accurate final status for the whole batch
+          await syncScheduledService(customer, entry, { writeStatus: false });
+        } catch (err) {
+          syncErrorMsg = err?.message || 'A scheduled service failed to sync.';
+        }
+      }
+    }
+    await setSyncStatus(
+      syncErrorMsg ? 'error' : 'ok',
+      syncErrorMsg || '',
+    );
+  } catch (err) {
+    await setSyncStatus('error', err?.message || 'Calendar sync failed.');
+  }
+}
+
+/** Full sync: due-date events for all customers + all scheduled service events. */
+export async function syncAll() {
+  await syncAllCustomers();
+  await syncAllScheduledServices();
+}
+
+/**
  * Remove a customer's calendar event. Call when a customer is deleted
  * or archived. Silently no-ops if no event exists for this customer.
  */
@@ -385,5 +475,103 @@ export async function removeCustomerEvent(customerId) {
     await saveEventIds(eventIds);
   } catch (err) {
     await setSyncStatus('error', err?.message || 'Failed to remove calendar event.');
+  }
+}
+
+/**
+ * Create or update a calendar event for a user-scheduled service appointment.
+ * The event lands on the exact date the user chose, not the computed due date.
+ * Call after addScheduledService() returns the saved entry.
+ *
+ * @param {boolean} [opts.writeStatus=true] - Set false when called from a batch
+ *   loop so the caller can own the final status write; errors are re-thrown
+ *   instead of being silently swallowed into a per-entry status record.
+ */
+export async function syncScheduledService(customer, scheduledEntry, { writeStatus = true } = {}) {
+  try {
+    const enabled = await getCalendarSyncEnabled();
+    if (!enabled) return;
+
+    const granted = await requestCalendarPermission();
+    if (!granted) {
+      if (writeStatus) await setSyncStatus('permission-denied', 'Calendar access was revoked.');
+      return;
+    }
+
+    const calendarId        = await getRoledeckCalendar();
+    const scheduledEventIds = await getScheduledEventIds();
+    const schedSettings     = await getScheduleSettings();
+
+    const startDate    = new Date(scheduledEntry.date);
+    const durationMins = getAppointmentDuration(scheduledEntry.type || 'service', schedSettings);
+    const endDate      = new Date(startDate.getTime() + durationMins * 60000);
+
+    const typeLabel = scheduledEntry.type === 'install' ? 'Install' : 'Service';
+    const travelNote = [
+      schedSettings.travelBefore > 0 ? `${schedSettings.travelBefore} min travel before` : '',
+      schedSettings.travelAfter  > 0 ? `${schedSettings.travelAfter} min travel after`  : '',
+    ].filter(Boolean).join(', ');
+
+    const notesParts = [
+      `${typeLabel} · ${formatDuration(durationMins)}${travelNote ? ` · ${travelNote}` : ''}`,
+      scheduledEntry.notes,
+      buildEventNotes(customer),
+    ].filter(Boolean);
+    const notes = notesParts.join('\n\n');
+
+    const eventDetails = {
+      title:     `${customer.name || 'Customer'} — Scheduled ${typeLabel}`,
+      startDate,
+      endDate,
+      allDay:    false,
+      calendarId,
+      notes,
+      alarms:    [{ relativeOffset: -1440 }], // 1 day before
+    };
+
+    const existingId = scheduledEventIds[scheduledEntry.id];
+    if (existingId) {
+      try {
+        await Calendar.updateEventAsync(existingId, eventDetails);
+      } catch {
+        const newId = await Calendar.createEventAsync(calendarId, eventDetails);
+        scheduledEventIds[scheduledEntry.id] = newId;
+        await saveScheduledEventIds(scheduledEventIds);
+      }
+    } else {
+      const eventId = await Calendar.createEventAsync(calendarId, eventDetails);
+      scheduledEventIds[scheduledEntry.id] = eventId;
+      await saveScheduledEventIds(scheduledEventIds);
+    }
+    if (writeStatus) await setSyncStatus('ok');
+  } catch (err) {
+    if (writeStatus) {
+      await setSyncStatus('error', err?.message || 'Calendar sync failed.');
+    } else {
+      throw err; // re-throw so the batch caller can track failures
+    }
+  }
+}
+
+/**
+ * Remove the calendar event for a scheduled service. Call when the user
+ * cancels a scheduled service. Silently no-ops if no event exists.
+ */
+export async function removeScheduledServiceEvent(entryId) {
+  try {
+    const scheduledEventIds = await getScheduledEventIds();
+    const eventId           = scheduledEventIds[entryId];
+    if (!eventId) return;
+
+    try {
+      await Calendar.deleteEventAsync(eventId);
+    } catch {
+      // Already deleted externally — fine
+    }
+
+    delete scheduledEventIds[entryId];
+    await saveScheduledEventIds(scheduledEventIds);
+  } catch (err) {
+    await setSyncStatus('error', err?.message || 'Failed to remove scheduled calendar event.');
   }
 }
