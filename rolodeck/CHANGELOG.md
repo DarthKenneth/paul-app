@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.22.7] - 2026-04-16
+
+### Fixed
+- **Zip code was overwriting address autocomplete results** — when Geoapify fills city/state/zip after the user picks a suggestion, the zip field changing used to trigger a Zippopotam.us lookup that could race and overwrite the Geoapify-provided city and state. The zip lookup now only runs when Geoapify is unavailable (no API key). (`AddCustomerScreen.js`)
+
+---
+
 ## [0.22.6] - 2026-04-14
 
 ### Changed

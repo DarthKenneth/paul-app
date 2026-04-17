@@ -1,9 +1,9 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.6
-// Last Updated: 2026-04-14
+// Version: 1.6.1
+// Last Updated: 2026-04-16
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.22.7)
 // FILES:        AddCustomerScreen.js  (this file)
 //               storage.js            (addCustomer)
 //               zipLookup.js          (lookupZip — city/state from zip code)
@@ -65,6 +65,8 @@
 //       - abortRef cancels the in-flight Geoapify request when a new keystroke
 //         fires; prevents stale responses from overwriting fresh suggestions
 //       - fetchSuggestions() now accepts a signal and passes it to fetch()
+// v1.6.1 2026-04-16  Claude  Skip zip lookup when Geoapify key is present —
+//                             autocomplete already fills city/state/zip
 // =============================================================================
 
 import React, { useState, useRef, useMemo } from 'react';
@@ -200,10 +202,11 @@ export default function AddCustomerScreen({ navigation }) {
     setTimeout(() => setSuggestions([]), 150);
   };
 
-  // ── Zip fallback ─────────────────────────────────────────────────────────────
+  // ── Zip fallback (only when Geoapify is unavailable) ─────────────────────────
 
   const handleZipChange = async (zip) => {
     setField('zipCode', zip);
+    if (GEOAPIFY_API_KEY) return;
     const clean = zip.replace(/\D/g, '');
     if (clean.length === 5 && !lookupDone.current.has(clean)) {
       lookupDone.current.add(clean);

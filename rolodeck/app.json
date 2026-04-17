@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.22.6",
+    "version": "0.22.7",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -41,6 +41,9 @@
       "icon": {
         "any": "./store-assets/icons/icon.png",
         "dark": "./store-assets/icons/icon-dark.png"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -51,11 +54,19 @@
       "package": "com.ardingate.rolodeck",
       "permissions": [
         "READ_CALENDAR",
-        "WRITE_CALENDAR"
+        "WRITE_CALENDAR",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
       ]
     },
     "web": {
       "favicon": "./store-assets/icons/icon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "117e475a-df12-4791-a8bf-5d761b4c526c"
+      }
+    },
+    "owner": "ardingate-studios-llc"
   }
 }
