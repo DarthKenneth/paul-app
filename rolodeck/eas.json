@@ -16,12 +16,13 @@
       }
     },
     "preview": {
-      "distribution": "internal",
       "autoIncrement": true,
       "ios": {
+        "distribution": "store",
         "credentialsSource": "remote"
       },
       "android": {
+        "distribution": "internal",
         "buildType": "apk",
         "credentialsSource": "remote"
       }

@@ -1,9 +1,9 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 2.0
-// Last Updated: 2026-04-14
+// Version: 2.0.1
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.24.0)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
@@ -69,7 +69,8 @@
 //               squareSyncStatus ('synced'|'local-only'|'conflict'|null),
 //               squareConflictData (object|null) }
 //   ServiceEntry:   { id, date (ISO string), type ('service'|'install'), notes,
-//                     intervalDays? (number, custom-interval entries only) }
+//                     intervalDays? (number, custom-interval entries only),
+//                     photos?: string[] (local file URIs) }
 //   ScheduledEntry: { id, date (ISO string), notes, createdAt (ISO string) }
 //   SquareSyncMeta: { lastSyncAt (ISO|null), syncLog: [SyncLogEntry],
 //                     pendingLowConf: [{ squareCustomer, rolodeckCustomerId }] }
@@ -119,6 +120,8 @@
 //       - Added getSquareSyncMetadata(), saveSquareSyncMetadata()
 //       - Added getSquareAutoSync(), saveSquareAutoSync()
 //         [updated ARCHITECTURE, SCHEMA]
+// v2.0.1  2026-04-17  Claude  Updated ServiceEntry schema comment to document
+//                             optional photos field (string[] of local file URIs)
 // v2.0  2026-04-14  Claude  Per-customer keys + cache + write mutex + hardening
 //       - BREAKING: migrated from single @rolodeck_customers envelope key to
 //         per-customer @rolodeck_customer_{id} keys with @rolodeck_customer_index

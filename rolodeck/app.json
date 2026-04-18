@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.23.1",
+    "version": "0.24.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -27,6 +27,13 @@
         "expo-calendar",
         {
           "calendarPermission": "Rolodeck uses your calendar to sync service due dates for your customers."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Rolodeck uses your photo library to attach photos to service notes.",
+          "cameraPermission": "Rolodeck uses your camera to take photos for service notes."
         }
       ],
       "expo-font",
@@ -58,7 +65,9 @@
         "READ_CALENDAR",
         "WRITE_CALENDAR",
         "android.permission.READ_CALENDAR",
-        "android.permission.WRITE_CALENDAR"
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.CAMERA"
       ]
     },
     "web": {

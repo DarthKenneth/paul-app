@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.24.0] - 2026-04-17
+
+### Added
+- **Photos on service notes** — when logging a service (modal and full-screen form) you can attach photos by taking one with the camera or choosing from the photo library. Multiple selection supported (up to 5 at a time). Photos are stored locally on device and displayed as a thumbnail strip on each service log entry; tap any thumbnail to view it full-screen. (`AddServiceModal.js`, `AddServiceScreen.js`, `ServiceLogEntry.js`, `photoUtils.js`)
+
+---
+
 ## [0.23.1] - 2026-04-17
 
 ### Added

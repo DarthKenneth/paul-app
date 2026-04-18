@@ -1,15 +1,16 @@
 // =============================================================================
 // AddServiceScreen.js - Add a service entry: date stamp + notes
-// Version: 1.5.2
-// Last Updated: 2026-04-10
+// Version: 1.6
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.16)
+// PROJECT:      Rolodeck (project v0.24.0)
 // FILES:        AddServiceScreen.js  (this file)
 //               storage.js           (addServiceEntry, getCustomerById,
 //                                     getServiceIntervalMode,
 //                                     getServiceIntervalCustomDays,
 //                                     modeToIntervalDays)
 //               calendarSync.js      (syncCustomerDueDate)
+//               photoUtils.js        (savePhotoLocally)
 //               theme.js             (useTheme)
 //               typography.js        (FontFamily, FontSize)
 //
@@ -22,6 +23,8 @@
 //     selecting a day populates the three boxes and closes the modal
 //   - No type toggle — type is stored as 'service' for all entries
 //   - Notes field is optional multiline text
+//   - Photos: camera or library picker (expo-image-picker); URIs copied to
+//     documentDirectory via photoUtils before being stored on the entry
 //   - Custom interval: when the global interval mode is 'custom', an additional
 //     "Custom interval" field appears; the entered days are stored as intervalDays
 //     on the service entry; this value persists for that customer's due date
@@ -64,6 +67,11 @@
 //         tapping a day fills the boxes and closes the modal
 //       - Removed DATE_REGEX / todayString helpers; replaced with todayParts()
 //       [updated ARCHITECTURE]
+// v1.6  2026-04-17  Claude  Photo attachments on service entries
+//       - Added camera + library photo pickers (expo-image-picker) to the form
+//       - Photos copied to permanent local storage via savePhotoLocally (photoUtils.js)
+//       - Thumbnail strip with per-photo remove button; up to 5 from library at once
+//       - photos array stored on service entry (omitted when empty) [updated ARCHITECTURE]
 // =============================================================================
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -79,10 +87,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { todayLocalKey } from '../utils/dateUtils';
+import { savePhotoLocally } from '../utils/photoUtils';
 import {
   addServiceEntry,
   getCustomerById,
@@ -117,6 +128,7 @@ export default function AddServiceScreen({ route, navigation }) {
   const [saving, setSaving]     = useState(false);
   const [intervalMode, setIntervalMode]   = useState('365');
   const [customDays, setCustomDays]       = useState('30');
+  const [photos, setPhotos]               = useState([]);
 
   const ddRef   = useRef(null);
   const yyyyRef = useRef(null);
@@ -201,6 +213,47 @@ export default function AddServiceScreen({ route, navigation }) {
     textDayHeaderFontSize:      FontSize.xs,
   }), [theme]);
 
+  // ── Photo handlers ──────────────────────────────────────────────────────────
+
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+    if (!result.canceled) {
+      try {
+        const saved = await savePhotoLocally(result.assets[0].uri);
+        setPhotos(prev => [...prev, saved]);
+      } catch {
+        Alert.alert('Error', 'Could not save photo.');
+      }
+    }
+  };
+
+  const handleChoosePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Photo library access is needed to choose photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+    });
+    if (!result.canceled) {
+      try {
+        const saved = await Promise.all(result.assets.map(a => savePhotoLocally(a.uri)));
+        setPhotos(prev => [...prev, ...saved]);
+      } catch {
+        Alert.alert('Error', 'Could not save photos.');
+      }
+    }
+  };
+
   // ── Save ────────────────────────────────────────────────────────────────────
 
   const handleSave = async () => {
@@ -251,6 +304,7 @@ export default function AddServiceScreen({ route, navigation }) {
         date:  dateObj.toISOString(),
         type:  'service',
         notes: notes.trim(),
+        ...(photos.length > 0 && { photos }),
       };
 
       if (isCustom) {
@@ -395,6 +449,40 @@ export default function AddServiceScreen({ route, navigation }) {
             textAlignVertical="top"
             returnKeyType="default"
           />
+
+          {/* ── Photos ── */}
+          <Text style={[styles.label, styles.labelTop]}>Photos</Text>
+          <View style={styles.photoButtons}>
+            <Pressable style={styles.photoBtn} onPress={handleTakePhoto}>
+              <Ionicons name="camera-outline" size={18} color={theme.primary} />
+              <Text style={styles.photoBtnText}>Take Photo</Text>
+            </Pressable>
+            <Pressable style={styles.photoBtn} onPress={handleChoosePhoto}>
+              <Ionicons name="image-outline" size={18} color={theme.primary} />
+              <Text style={styles.photoBtnText}>Choose Photo</Text>
+            </Pressable>
+          </View>
+          {photos.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.photoStrip}
+              contentContainerStyle={styles.photoStripContent}
+            >
+              {photos.map((uri, idx) => (
+                <View key={uri + idx} style={styles.thumbWrap}>
+                  <Image source={{ uri }} style={styles.thumb} />
+                  <Pressable
+                    style={styles.thumbRemove}
+                    onPress={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+                    hitSlop={6}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#fff" />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )}
 
           <Pressable
             style={({ pressed }) => [styles.saveBtn, (pressed || saving) && styles.saveBtnPressed]}
@@ -553,6 +641,48 @@ function makeStyles(theme) {
     },
     notesInput: {
       height: 150,
+    },
+    // ── Photos ──
+    photoButtons: {
+      flexDirection: 'row',
+      gap:            10,
+      marginBottom:   10,
+    },
+    photoBtn: {
+      flex:            1,
+      flexDirection:   'row',
+      alignItems:      'center',
+      justifyContent:  'center',
+      gap:              6,
+      borderWidth:      1,
+      borderColor:     theme.inputBorder,
+      borderRadius:    12,
+      paddingVertical: 12,
+      backgroundColor: theme.inputBg,
+    },
+    photoBtnText: {
+      fontFamily: theme.fontBodyMedium,
+      fontSize:   FontSize.sm,
+      color:      theme.primary,
+    },
+    photoStrip: {
+      marginBottom: 4,
+    },
+    photoStripContent: {
+      gap: 8,
+    },
+    thumbWrap: {
+      position: 'relative',
+    },
+    thumb: {
+      width:        88,
+      height:       88,
+      borderRadius:  10,
+    },
+    thumbRemove: {
+      position: 'absolute',
+      top:      -6,
+      right:    -6,
     },
     // ── Save button ──
     saveBtn: {

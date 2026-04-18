@@ -1,9 +1,9 @@
 // =============================================================================
 // AddServiceModal.js - Centered modal for logging a completed service entry
-// Version: 1.2.1
-// Last Updated: 2026-04-14
+// Version: 1.3
+// Last Updated: 2026-04-17
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.24.0)
 // FILES:        AddServiceModal.js       (this file)
 //               CustomerDetailScreen.js  (renders this modal)
 //               storage.js               (addServiceEntry, getCustomerById,
@@ -11,6 +11,7 @@
 //                                         getServiceIntervalCustomDays)
 //               calendarSync.js          (syncCustomerDueDate)
 //               squarePlaceholder.js     (sendSquareInvoice)
+//               photoUtils.js            (savePhotoLocally)
 //               theme.js                 (useTheme)
 //               typography.js            (FontSize)
 //
@@ -21,8 +22,10 @@
 //   - Same MM/DD/YYYY split input + calendar picker as AddServiceScreen
 //   - maxDate enforced to today in calendar and handleSave validation
 //   - Loads interval mode on open; shows custom interval field when mode='custom'
+//   - Photos: camera or library picker (expo-image-picker); URIs copied to
+//     documentDirectory via photoUtils before being stored on the entry
 //   - Three phases: 'form' → 'success' → 'invoice'
-//     - 'form': date/notes entry; Save persists and transitions to 'success'
+//     - 'form': date/notes/photo entry; Save persists and transitions to 'success'
 //     - 'success': confirmation sheet; Done calls onSave(); Send Invoice →
 //       transitions to 'invoice'
 //     - 'invoice': amount entry; Send calls sendSquareInvoice then onSave();
@@ -50,6 +53,11 @@
 // v1.2.1 2026-04-14  Claude  Fixed syntax error from unescaped apostrophe in the
 //                            invoice-leave Alert message (customer's profile); swapped
 //                            string delimiters from single to double quotes
+// v1.3  2026-04-17  Claude  Photo attachments on service entries
+//       - Added camera + library photo pickers (expo-image-picker) to the form phase
+//       - Photos copied to permanent local storage via savePhotoLocally (photoUtils.js)
+//       - Thumbnail strip with per-photo remove button; up to 5 from library at once
+//       - photos array stored on service entry (omitted when empty) [updated ARCHITECTURE]
 // =============================================================================
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
@@ -64,10 +72,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { todayLocalKey } from '../utils/dateUtils';
+import { savePhotoLocally } from '../utils/photoUtils';
 import {
   addServiceEntry,
   getCustomerById,
@@ -104,6 +115,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
   const [intervalMode, setIntervalMode] = useState('365');
   const [calVisible, setCalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [photos, setPhotos] = useState([]);
 
   // Post-save invoice flow
   const [phase, setPhase]                 = useState('form'); // 'form' | 'success' | 'invoice'
@@ -132,6 +144,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
       setSavedDateDisplay('');
       setInvoiceAmount('');
       setInvoiceSending(false);
+      setPhotos([]);
       Promise.all([getServiceIntervalMode(), getServiceIntervalCustomDays()])
         .then(([mode, days]) => {
           setIntervalMode(mode);
@@ -252,6 +265,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
         date:  dateObj.toISOString(),
         type:  'service',
         notes: notes.trim(),
+        ...(photos.length > 0 && { photos }),
       };
       if (isCustom) {
         entryData.intervalDays = Math.max(1, parseInt(customDays, 10));
@@ -297,6 +311,45 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
       Alert.alert('Not Available', err.message);
     } finally {
       setInvoiceSending(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+    if (!result.canceled) {
+      try {
+        const saved = await savePhotoLocally(result.assets[0].uri);
+        setPhotos(prev => [...prev, saved]);
+      } catch {
+        Alert.alert('Error', 'Could not save photo.');
+      }
+    }
+  };
+
+  const handleChoosePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Photo library access is needed to choose photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.7,
+      allowsMultipleSelection: true,
+      selectionLimit: 5,
+    });
+    if (!result.canceled) {
+      try {
+        const saved = await Promise.all(result.assets.map(a => savePhotoLocally(a.uri)));
+        setPhotos(prev => [...prev, ...saved]);
+      } catch {
+        Alert.alert('Error', 'Could not save photos.');
+      }
     }
   };
 
@@ -414,6 +467,40 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
                 numberOfLines={3}
                 textAlignVertical="top"
               />
+
+              {/* Photos */}
+              <Text style={styles.label}>Photos</Text>
+              <View style={styles.photoButtons}>
+                <Pressable style={styles.photoBtn} onPress={handleTakePhoto}>
+                  <Ionicons name="camera-outline" size={17} color={theme.primary} />
+                  <Text style={styles.photoBtnText}>Take Photo</Text>
+                </Pressable>
+                <Pressable style={styles.photoBtn} onPress={handleChoosePhoto}>
+                  <Ionicons name="image-outline" size={17} color={theme.primary} />
+                  <Text style={styles.photoBtnText}>Choose Photo</Text>
+                </Pressable>
+              </View>
+              {photos.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.photoStrip}
+                  contentContainerStyle={styles.photoStripContent}
+                >
+                  {photos.map((uri, idx) => (
+                    <View key={uri + idx} style={styles.thumbWrap}>
+                      <Image source={{ uri }} style={styles.thumb} />
+                      <Pressable
+                        style={styles.thumbRemove}
+                        onPress={() => setPhotos(prev => prev.filter((_, i) => i !== idx))}
+                        hitSlop={6}
+                      >
+                        <Ionicons name="close-circle" size={20} color="#fff" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
 
               {/* Custom interval */}
               {isCustom && (
@@ -680,7 +767,49 @@ function makeStyles(theme) {
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       minHeight:         72,
-      marginBottom:      22,
+      marginBottom:      12,
+    },
+    // ── Form: Photos ──
+    photoButtons: {
+      flexDirection: 'row',
+      gap:            10,
+      marginBottom:   10,
+    },
+    photoBtn: {
+      flex:            1,
+      flexDirection:   'row',
+      alignItems:      'center',
+      justifyContent:  'center',
+      gap:              6,
+      borderWidth:      1.5,
+      borderColor:     theme.inputBorder,
+      borderRadius:    10,
+      paddingVertical: 10,
+      backgroundColor: theme.inputBg,
+    },
+    photoBtnText: {
+      fontFamily: theme.fontBodyMedium,
+      fontSize:   FontSize.sm,
+      color:      theme.primary,
+    },
+    photoStrip: {
+      marginBottom: 20,
+    },
+    photoStripContent: {
+      gap: 6,
+    },
+    thumbWrap: {
+      position: 'relative',
+    },
+    thumb: {
+      width:        80,
+      height:       80,
+      borderRadius:  8,
+    },
+    thumbRemove: {
+      position: 'absolute',
+      top:      -6,
+      right:    -6,
     },
     // ── Form: Save button ──
     saveBtn: {
