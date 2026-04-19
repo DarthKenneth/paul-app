@@ -1,9 +1,9 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 2.0.1
-// Last Updated: 2026-04-17
+// Version: 2.0.2
+// Last Updated: 2026-04-18
 //
-// PROJECT:      Rolodeck (project v0.24.0)
+// PROJECT:      Rolodeck (project v0.24.1)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
@@ -71,7 +71,7 @@
 //   ServiceEntry:   { id, date (ISO string), type ('service'|'install'), notes,
 //                     intervalDays? (number, custom-interval entries only),
 //                     photos?: string[] (local file URIs) }
-//   ScheduledEntry: { id, date (ISO string), notes, createdAt (ISO string) }
+//   ScheduledEntry: { id, date (ISO string), type ('service'|'install'), notes, createdAt (ISO string) }
 //   SquareSyncMeta: { lastSyncAt (ISO|null), syncLog: [SyncLogEntry],
 //                     pendingLowConf: [{ squareCustomer, rolodeckCustomerId }] }
 //   SyncLogEntry:   { at, merged, created, lowConf, conflicts, errors }
@@ -120,6 +120,8 @@
 //       - Added getSquareSyncMetadata(), saveSquareSyncMetadata()
 //       - Added getSquareAutoSync(), saveSquareAutoSync()
 //         [updated ARCHITECTURE, SCHEMA]
+// v2.0.2  2026-04-18  Claude  Persist type field in addScheduledService so conflict
+//                             detection uses correct duration (install vs service)
 // v2.0.1  2026-04-17  Claude  Updated ServiceEntry schema comment to document
 //                             optional photos field (string[] of local file URIs)
 // v2.0  2026-04-14  Claude  Per-customer keys + cache + write mutex + hardening
@@ -503,6 +505,7 @@ export async function addScheduledService(customerId, data) {
     const entry = {
       id:        await generateId(),
       date:      data.date  || new Date().toISOString(),
+      type:      data.type  || 'service',
       notes:     data.notes || '',
       createdAt: new Date().toISOString(),
     };

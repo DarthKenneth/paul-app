@@ -1,9 +1,9 @@
 // =============================================================================
 // calendarSync.js - Pushes service due dates and scheduled services to device calendar
-// Version: 1.7
-// Last Updated: 2026-04-17
+// Version: 1.7.1
+// Last Updated: 2026-04-18
 //
-// PROJECT:      Rolodeck (project v0.23)
+// PROJECT:      Rolodeck (project v0.24.2)
 // FILES:        calendarSync.js         (this file — calendar sync engine)
 //               storage.js              (getAllCustomers, getCustomerById,
 //                                        getServiceIntervalMode,
@@ -60,6 +60,10 @@
 //     when status !== 'ok' and sync is enabled
 //
 // CHANGE LOG:
+// v1.7.1 2026-04-18  Claude  Harden event-ID map reads — getEventIds and
+//                            getScheduledEventIds now catch JSON.parse errors
+//                            and return an empty map so one corrupt AsyncStorage
+//                            write doesn't permanently break calendar sync
 // v1.0  2026-04-06  Claude  Initial scaffold
 //       - requestCalendarPermission, getRoledeckCalendar
 //       - getCalendarSyncEnabled, enableCalendarSync, disableCalendarSync
@@ -286,7 +290,14 @@ async function getRoledeckCalendar() {
 
 async function getEventIds() {
   const raw = await AsyncStorage.getItem(EVENT_IDS_KEY);
-  return raw ? JSON.parse(raw) : {};
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    // Corrupted map — reset rather than kill sync forever
+    return {};
+  }
 }
 
 async function saveEventIds(map) {
@@ -295,7 +306,13 @@ async function saveEventIds(map) {
 
 async function getScheduledEventIds() {
   const raw = await AsyncStorage.getItem(SCHEDULED_EVENT_IDS_KEY);
-  return raw ? JSON.parse(raw) : {};
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 async function saveScheduledEventIds(map) {

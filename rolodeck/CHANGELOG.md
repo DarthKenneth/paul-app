@@ -8,6 +8,28 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.24.2] - 2026-04-18
+
+### Fixed
+- **Schedule modal silently showed "no slots" on storage failure** — `refreshSlots` had `try/finally` but no `catch`, so if `getAllCustomers()` threw during slot refresh the error became an unhandled promise rejection and the user just saw an empty slot list. Now catches and alerts the user to retry. (`ScheduleServiceModal.js`)
+- **Schedule save crashed if customer prop was missing** — `handleSave` dereferenced `customer.id` with no guard, so a stale or null customer prop would throw instead of alerting the user. (`ScheduleServiceModal.js`)
+- **Calendar `minDate` could drift off by a day during fall-back DST** — the millisecond arithmetic `Date.now() + 86400000` advances by exactly 24h in real time, which is only 23h of wall-clock time on the night DST ends; between midnight and 1 AM the "tomorrow or later" floor would resolve to today. Now uses `addDaysLocal(new Date(), 1)`. (`ScheduleServiceModal.js`)
+- **`nextWorkDay` returned non-work-day when settings were corrupted** — an empty `workDays` array caused the loop to advance 14 days and hand back whatever day-of-week that landed on. Now returns `fromDate` unchanged in that case. (`scheduleSettings.js`)
+- **`isWorkDay` threw on corrupted settings** — called `.includes` on `undefined` if `workDays` was missing from storage. Now returns `false` defensively. (`scheduleSettings.js`)
+- **Service interval / last-service date could disagree** — `getLastServiceDate` scanned the log for the max-by-date entry, but `getEffectiveIntervalForCustomer` trusted `log[0]` was newest. Any log-order drift (Square import, manual edit, backup restore) made the two functions point at different entries. Unified both through a single `getLatestServiceEntry` helper. (`serviceAlerts.js`)
+- **"Overdue by 1 days" plural bug** in service status label. (`serviceAlerts.js`)
+- **Corrupt calendar event-ID map permanently broke sync** — `getEventIds` and `getScheduledEventIds` called `JSON.parse` with no catch, so one bad AsyncStorage write would throw on every subsequent sync attempt. Now returns an empty map on parse failure. (`calendarSync.js`)
+
+---
+
+## [0.24.1] - 2026-04-18
+
+### Fixed
+- **Double booking across customers** — conflict detection now checks all customers' scheduled services, not just the current customer's. Previously Paul Bonilla and Keith DuJardin could both be booked at 8:00 AM with no conflict shown. (`ScheduleServiceModal.js`)
+- **Install duration not blocking correct time** — the `type` field ('service'|'install') was collected in the schedule modal but never saved to storage, so all existing appointments fell back to the 30-min service duration when calculating conflicts. Installs now correctly block 2.5 hours. (`storage.js`)
+
+---
+
 ## [0.24.0] - 2026-04-17
 
 ### Added

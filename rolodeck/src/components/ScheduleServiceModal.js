@@ -1,9 +1,9 @@
 // =============================================================================
 // ScheduleServiceModal.js - Bottom-sheet modal for scheduling a future service
-// Version: 2.0
-// Last Updated: 2026-04-17
+// Version: 2.1
+// Last Updated: 2026-04-18
 //
-// PROJECT:      Rolodeck (project v0.22.8)
+// PROJECT:      Rolodeck (project v0.24.2)
 // FILES:        ScheduleServiceModal.js  (this file)
 //               CustomerDetailScreen.js  (renders this modal)
 //               storage.js               (addScheduledService)
@@ -31,6 +31,18 @@
 // CHANGE LOG:
 // v1.0  2026-04-10  Claude  Initial implementation
 // v1.1  2026-04-10  Claude  Centered overlay instead of bottom sheet
+// v2.1  2026-04-18  Claude  Harden error paths in schedule modal
+//       - refreshSlots now catches storage failures and alerts the user instead
+//         of silently leaving the slot list empty (was an unhandled rejection)
+//       - handleSave now guards against a missing customer prop so a stale or
+//         null customer can't call onSave(undefined, ...) and corrupt storage
+//       - calendar minDate uses addDaysLocal(new Date(), 1) instead of
+//         millisecond arithmetic so fall-back DST doesn't leave minDate on
+//         "today" for the hour after midnight
+// v2.0.1  2026-04-18  Claude  Fix conflict detection to be per-user, not per-customer
+//                             — refreshSlots now loads all customers and flattens
+//                             their scheduledServices so double-booking across
+//                             customers is prevented; also drops stale customer dep
 // v2.0  2026-04-17  Claude  Full scheduling engine integration
 //       - Added appointment type selector (Service / Install)
 //       - Added time slot picker driven by generateSlots()
@@ -58,6 +70,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
+import { getAllCustomers } from '../data/storage';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 import {
@@ -68,6 +81,7 @@ import {
   formatDuration,
   SCHEDULE_DEFAULTS,
 } from '../utils/scheduleSettings';
+import { addDaysLocal } from '../utils/dateUtils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -145,17 +159,26 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
     return null;
   }, [dd, mm, yyyy]);
 
-  const refreshSlots = useCallback(() => {
+  const refreshSlots = useCallback(async () => {
     if (!parsedDate) { setSlots([]); return; }
     if (!isWorkDay(parsedDate, schedSettings.workDays)) { setSlots([]); return; }
 
     setSlotsLoading(true);
-    const allScheduled = customer?.scheduledServices || [];
-    const generated = generateSlots(parsedDate, appointmentType, allScheduled, schedSettings);
-    setSlots(generated);
-    setSelectedSlot(null);
-    setSlotsLoading(false);
-  }, [parsedDate, appointmentType, schedSettings, customer]);
+    try {
+      const allCustomers = await getAllCustomers();
+      const allScheduled = allCustomers.flatMap((c) => c.scheduledServices || []);
+      const generated = generateSlots(parsedDate, appointmentType, allScheduled, schedSettings);
+      setSlots(generated);
+      setSelectedSlot(null);
+    } catch {
+      // Storage read failed — surface to user instead of silently showing "no slots"
+      setSlots([]);
+      setSelectedSlot(null);
+      Alert.alert('Error', 'Could not load scheduled appointments. Please try again.');
+    } finally {
+      setSlotsLoading(false);
+    }
+  }, [parsedDate, appointmentType, schedSettings]);
 
   useEffect(() => {
     refreshSlots();
@@ -203,6 +226,11 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
 
   const handleSave = () => {
     if (saving) return;
+
+    if (!customer?.id) {
+      Alert.alert('Error', 'No customer selected.');
+      return;
+    }
 
     if (!parsedDate) {
       Alert.alert('Invalid Date', 'Please enter a valid date.');
@@ -495,7 +523,7 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
             </View>
             <Calendar
               current={calSelectedDate || undefined}
-              minDate={toDateKey(new Date(Date.now() + 86400000))}
+              minDate={toDateKey(addDaysLocal(new Date(), 1))}
               markedDates={calMarked}
               onDayPress={handleDayPress}
               theme={calTheme}

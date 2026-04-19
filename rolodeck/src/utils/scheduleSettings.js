@@ -1,9 +1,9 @@
 // =============================================================================
 // scheduleSettings.js - Scheduling settings storage and time-slot generation
-// Version: 1.0.1
-// Last Updated: 2026-04-17
+// Version: 1.1
+// Last Updated: 2026-04-18
 //
-// PROJECT:      Rolodeck (project v0.22.8)
+// PROJECT:      Rolodeck (project v0.24.2)
 // FILES:        scheduleSettings.js          (this file — scheduling engine)
 //               SchedulingSettingsScreen.js  (reads/writes settings)
 //               ScheduleServiceModal.js      (uses generateSlots)
@@ -26,6 +26,11 @@
 //     so the UI can show both available (teal) and booked (gray) slots
 //
 // CHANGE LOG:
+// v1.1  2026-04-18  Claude  Harden work-day helpers against corrupted settings
+//       - isWorkDay returns false (instead of throwing) when workDays is
+//         undefined or not an array
+//       - nextWorkDay returns fromDate instead of silently advancing 14 days
+//         and returning a non-work-day when workDays is empty
 // v1.0.1 2026-04-17  Claude  Fix conflict detection to include travel buffers —
 //                            blocked zone is now [existStart-travelBefore,
 //                            existEnd+travelAfter] instead of work time only
@@ -107,16 +112,20 @@ export async function saveScheduleSettings(settings) {
 
 /** Returns true if the given Date falls on a configured work day. */
 export function isWorkDay(date, workDays) {
+  if (!Array.isArray(workDays) || workDays.length === 0) return false;
   return workDays.includes(date.getDay());
 }
 
 /**
  * Returns the next work day on or after fromDate.
  * If fromDate is already a work day, returns it unchanged.
+ * If workDays is empty or invalid, returns fromDate unchanged rather than
+ * silently advancing by 14 days and handing back a non-work-day.
  */
 export function nextWorkDay(fromDate, workDays) {
   const d = new Date(fromDate);
   d.setHours(0, 0, 0, 0);
+  if (!Array.isArray(workDays) || workDays.length === 0) return d;
   for (let i = 0; i < 14; i++) {
     if (workDays.includes(d.getDay())) return d;
     d.setDate(d.getDate() + 1);

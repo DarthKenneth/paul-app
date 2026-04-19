@@ -1,9 +1,9 @@
 // =============================================================================
 // serviceAlerts.js - Service due-date calculations and filter utilities
-// Version: 1.2
-// Last Updated: 2026-04-09
+// Version: 1.3
+// Last Updated: 2026-04-18
 //
-// PROJECT:      Rolodeck (project v0.14.1)
+// PROJECT:      Rolodeck (project v0.24.2)
 // FILES:        serviceAlerts.js     (this file — pure alert/filter logic)
 //               storage.js           (Customer data source)
 //               ServicesScreen.js    (groupCustomersByDueWindow, getServiceStatus)
@@ -36,6 +36,13 @@
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added groupCustomersByDueWindow() for ServicesScreen
 //                           section-based layout [updated ARCHITECTURE]
+// v1.3  2026-04-18  Claude  Unify "latest service entry" source of truth
+//       - Added getLatestServiceEntry() — reduces log by date, not position
+//       - getLastServiceDate and getEffectiveIntervalForCustomer both consume
+//         it so they can never disagree when log order drifts (Square import,
+//         manual edit, backup restore) — previously the interval lookup trusted
+//         log[0] while the date lookup scanned for max-by-date
+//       - Fix "Overdue by 1 days" plural bug in getServiceStatus
 // v1.2  2026-04-09  Claude  Configurable service interval
 //       - Removed hardcoded SERVICE_INTERVAL_DAYS = 365 constant
 //       - Added getEffectiveIntervalForCustomer() — checks most recent service
@@ -49,11 +56,27 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
+/**
+ * Returns the most recent service log entry (by date), or null.
+ * Single source of truth for "latest" — both getLastServiceDate and
+ * getEffectiveIntervalForCustomer consume this so they can never disagree
+ * about which entry is newest when log order drifts (e.g. Square import,
+ * manual edits, backup restore).
+ */
+export function getLatestServiceEntry(customer) {
+  if (!customer || !Array.isArray(customer.serviceLog) || customer.serviceLog.length === 0) {
+    return null;
+  }
+  return customer.serviceLog.reduce((latest, e) => {
+    if (!latest) return e;
+    return new Date(e.date) > new Date(latest.date) ? e : latest;
+  }, null);
+}
+
 /** Returns the Date of the most recent service log entry, or null. */
 export function getLastServiceDate(customer) {
-  if (!customer.serviceLog || customer.serviceLog.length === 0) return null;
-  const dates = customer.serviceLog.map((e) => new Date(e.date));
-  return dates.reduce((latest, d) => (d > latest ? d : latest), dates[0]);
+  const latest = getLatestServiceEntry(customer);
+  return latest ? new Date(latest.date) : null;
 }
 
 /**
@@ -62,12 +85,9 @@ export function getLastServiceDate(customer) {
  * precedence — it persists until a new entry is logged without one.
  */
 export function getEffectiveIntervalForCustomer(customer, globalIntervalDays) {
-  const log = customer.serviceLog;
-  if (Array.isArray(log) && log.length > 0) {
-    const latest = log[0]; // prepended on write, so index 0 = most recent
-    if (typeof latest.intervalDays === 'number' && latest.intervalDays > 0) {
-      return latest.intervalDays;
-    }
+  const latest = getLatestServiceEntry(customer);
+  if (latest && typeof latest.intervalDays === 'number' && latest.intervalDays > 0) {
+    return latest.intervalDays;
   }
   return globalIntervalDays;
 }
@@ -137,7 +157,10 @@ export function getServiceStatus(customer, intervalDays = 365) {
 
   const until = effective - days;
 
-  if (until < 0)   return { label: `Overdue by ${Math.abs(until)} days`, level: 'overdue' };
+  if (until < 0) {
+    const n = Math.abs(until);
+    return { label: `Overdue by ${n} day${n === 1 ? '' : 's'}`, level: 'overdue' };
+  }
   if (until === 0) return { label: 'Due today',                          level: 'overdue' };
   if (until <= 30) return { label: `Due in ${until} day${until === 1 ? '' : 's'}`,  level: 'warning' };
   if (until <= 90) return { label: `Due in ${until} days`,               level: 'upcoming' };
