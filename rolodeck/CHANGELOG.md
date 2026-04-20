@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.25.1] - 2026-04-20
+
+### Infrastructure
+- Version bump only — re-trigger the release pipeline after uploading the Google Play service account key to EAS's server-side credential store. The v0.25.0 builds started on EAS successfully but the auto-submit step aborted in non-interactive mode when it couldn't resolve Android submit credentials. No app code changes.
+
+---
+
 ## [0.25.0] - 2026-04-19
 
 ### Added

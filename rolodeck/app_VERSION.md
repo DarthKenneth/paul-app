@@ -26,3 +26,4 @@
 | v1.8.5 | 2026-04-14 | Claude | Bumped expo.version to 0.22.5 — Services tab badge fix (refreshAlerts sequencing) |
 | v1.8.6 | 2026-04-14 | Claude | Bumped expo.version to 0.22.6 — removed Sentry test button |
 | v1.9   | 2026-04-19 | Claude | Bumped expo.version to 0.25.0 — tap-to-edit service log entries + tablet/iPad responsive layout polish (max-width containers on primary screens) |
+| v1.9.1 | 2026-04-20 | Claude | Bumped expo.version to 0.25.1 — re-trigger release pipeline after uploading Google Play service account key to EAS (v0.25.0 builds started but auto-submit aborted on missing server-side Android creds) |
