@@ -11,3 +11,4 @@
 | Version | Date | Author | Description |
 |---------|------|--------|-------------|
 | v1.0 | 2026-04-09 | Claude | Initial EAS config — production (iOS Release + Android AAB, remote creds, autoIncrement) and preview (internal distribution) build profiles; production submit profile with env-var Apple IDs and Google Play track; appVersionSource: remote |
+| v1.0.1 | 2026-04-20 | Claude | Added `"releaseStatus": "draft"` to `submit.production.android` so the auto-submit step doesn't fail while the Google Play Console store listing metadata is still being filled out for the new app. |

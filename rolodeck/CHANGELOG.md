@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.25.2] - 2026-04-20
+
+### Infrastructure
+- Set `submit.production.android.releaseStatus` to `"draft"` in `eas.json`. Google Play rejected the v0.25.1 auto-submit because the new app is missing required store listing metadata (description, screenshots, privacy policy, content rating, data safety, etc.). Draft status lets the build upload to the Play Console without trying to actually publish to the production track; the release can be promoted from the console once the metadata is filled in. No app code changes. (`eas.json`)
+
+---
+
 ## [0.25.1] - 2026-04-20
 
 ### Infrastructure
