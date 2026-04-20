@@ -1,26 +1,30 @@
 // =============================================================================
 // ServiceLogEntry.js - Single row in a customer's service log list
-// Version: 1.2
-// Last Updated: 2026-04-17
+// Version: 1.3
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.24.0)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        ServiceLogEntry.js       (this file)
 //               CustomerDetailScreen.js  (renders these in a list)
+//               EditServiceModal.js      (opened when row is pressed)
 //               theme.js                 (useTheme)
 //               typography.js            (FontFamily, FontSize)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
-//   - Pure display component — receives a service entry object, renders it
+//   - Receives a service entry object, renders it
 //   - Icon: wrench (service) or construct (install), tinted with primaryPale bg
 //   - Date formatted as "Apr 3, 2026" (locale-aware via toLocaleDateString)
 //   - Notes text rendered only when non-empty
 //   - Photos rendered as a horizontal thumbnail strip when present; tapping a
-//     thumbnail opens a full-screen lightbox Modal
+//     thumbnail opens a full-screen lightbox Modal (swallows the row press)
 //   - Bottom border separates rows inside the log card
 //   - isInitial=true overrides the type label to "Initial Install/Service"
 //     (CustomerDetailScreen passes this for the oldest log entry)
+//   - Row is pressable when onPress prop is provided (v1.3) — opens the edit
+//     modal in the parent; tapping a thumbnail still opens the lightbox only
+//     (thumbnail Pressable's onPress stops propagation by not calling parent)
 //
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
@@ -31,6 +35,11 @@
 // v1.2  2026-04-17  Claude  Photo display — thumbnail strip + lightbox
 //       - Horizontal ScrollView thumbnail strip below notes for entries with photos
 //       - Tap any thumbnail to open a full-screen lightbox Modal
+//         [updated ARCHITECTURE]
+// v1.3  2026-04-19  Claude  Row is now pressable; opens edit modal in parent
+//       - Outer View swapped for Pressable; onPress prop wired through
+//       - Thumbnail press opens lightbox without bubbling to row press
+//       - Pressed state gets a subtle background highlight for affordance
 //         [updated ARCHITECTURE]
 // =============================================================================
 
@@ -45,7 +54,7 @@ const TYPE_CONFIG = {
   service: { icon: 'build-outline',     label: 'Service' },
 };
 
-function ServiceLogEntry({ entry, isInitial, isLast }) {
+function ServiceLogEntry({ entry, isInitial, isLast, onPress }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.service;
@@ -58,9 +67,19 @@ function ServiceLogEntry({ entry, isInitial, isLast }) {
     day:   'numeric',
   });
 
+  const RowContainer = onPress ? Pressable : View;
+  const rowProps = onPress
+    ? {
+        onPress,
+        accessibilityRole: 'button',
+        accessibilityLabel: `Edit ${label} from ${formattedDate}`,
+        style: ({ pressed }) => [styles.row, isLast && styles.rowLast, pressed && styles.rowPressed],
+      }
+    : { style: [styles.row, isLast && styles.rowLast] };
+
   return (
     <>
-      <View style={[styles.row, isLast && styles.rowLast]}>
+      <RowContainer {...rowProps}>
         <View style={styles.iconWrap}>
           <Ionicons name={config.icon} size={18} color={theme.primary} />
         </View>
@@ -87,7 +106,15 @@ function ServiceLogEntry({ entry, isInitial, isLast }) {
             </ScrollView>
           )}
         </View>
-      </View>
+        {onPress && (
+          <Ionicons
+            name="chevron-forward"
+            size={16}
+            color={theme.textMuted}
+            style={styles.chevron}
+          />
+        )}
+      </RowContainer>
       {lightboxUri !== null && (
         <Modal
           visible
@@ -122,6 +149,14 @@ function makeStyles(theme) {
     },
     rowLast: {
       borderBottomWidth: 0,
+    },
+    rowPressed: {
+      backgroundColor: theme.primaryPale,
+    },
+    chevron: {
+      alignSelf:   'center',
+      marginLeft:   8,
+      opacity:      0.6,
     },
     iconWrap: {
       width:           38,

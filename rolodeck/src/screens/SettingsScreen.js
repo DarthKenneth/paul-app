@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.0.2
-// Last Updated: 2026-04-17
+// Version: 2.0.3
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.23)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -36,6 +36,7 @@
 //   - useEffect cleanup prevents state updates on unmounted component
 //
 // CHANGE LOG:
+// v2.0.3 2026-04-19  Claude  Tablet width cap on ScrollView content
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Debug + harden
 //       - Fixed APP_VERSION constant: was '1.0.0', now '1.2' to match VERSION
@@ -128,6 +129,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
 import { Themes, ThemeNames } from '../styles/colors';
 import { FontPresetNames, FontSize } from '../styles/typography';
+import { useContentContainerStyle } from '../utils/responsive';
 import {
   getSortPreference,
   saveSortPreference,
@@ -171,6 +173,7 @@ const SORT_OPTIONS = [
 export default function SettingsScreen({ navigation }) {
   const { theme, themeKey, fontKey } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const widthCap = useContentContainerStyle();
 
   const [sortPref, setSortPref]               = useState('name');
   const [showArchived, setShowArchived]       = useState(false);
@@ -289,7 +292,7 @@ export default function SettingsScreen({ navigation }) {
   });
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, widthCap]}>
 
         {/* ── Default Sort Order ── */}
         <View style={styles.section}>

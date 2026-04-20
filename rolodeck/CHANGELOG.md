@@ -8,6 +8,20 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.25.0] - 2026-04-19
+
+### Added
+- **Tap service log entries to view or edit** — every row in a customer's service history is now pressable. Same-day entries open directly in edit mode (for quick fix-ups while still on-site). Older entries open read-only with a pencil icon in the header; tap the pencil to intentionally enter edit mode. Prevents accidentally modifying months-old history while scrolling. From edit mode you can add notes, attach/remove photos, or delete a mistake entry. (`EditServiceModal.js`, `ServiceLogEntry.js`, `CustomerDetailScreen.js`)
+- **Tablet / iPad responsive polish** — primary screens (Customers, Customer Detail, Add Customer, Add Service, Services, Settings) now cap their content at 760pt wide and center when running on an iPad or tablet. List items, forms, and the sticky footer no longer stretch edge-to-edge on a 1024pt screen. Phone layouts are unchanged. (`responsive.js` and all primary screens)
+
+### Changed
+- `ServiceLogEntry` now accepts an optional `onPress` prop; when provided the row highlights on press and shows a chevron affordance.
+
+### Infrastructure
+- New `src/utils/responsive.js` utility: `useIsTablet()` and `useContentContainerStyle()` hooks, `TABLET_BREAKPOINT` and `CONTENT_MAX_WIDTH` constants.
+
+---
+
 ## [0.24.2] - 2026-04-18
 
 ### Fixed

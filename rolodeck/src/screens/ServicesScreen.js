@@ -1,9 +1,9 @@
 // =============================================================================
 // ServicesScreen.js - Upcoming and overdue service list, grouped by due window
-// Version: 2.5.2
-// Last Updated: 2026-04-17
+// Version: 2.5.3
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.23)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        ServicesScreen.js    (this file)
 //               storage.js           (getAllCustomers)
 //               serviceAlerts.js     (groupCustomersByDueWindow, getServiceStatus,
@@ -62,6 +62,7 @@
 //         34×34 primaryPale-filled circle (renderArrow prop) so they're
 //         clearly visible against the surface background — the default tiny
 //         arrows were easy to miss [updated ARCHITECTURE]
+// v2.5.3  2026-04-19  Claude  Tablet width cap on SectionList content
 // v1.0    2026-04-03  Claude  Initial scaffold — flat FlatList with filter chips
 // v2.0    2026-04-03  Claude  Full rewrite as section-based SectionList
 //         - Replaced filter chips with automatic due-window sections
@@ -128,6 +129,7 @@ import {
 import { toLocalDateKey, localDateKeyFromISO, addDaysLocal } from '../utils/dateUtils';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
+import { useContentContainerStyle } from '../utils/responsive';
 
 // Color key per section — maps to theme properties
 const SECTION_COLOR_KEY = {
@@ -162,6 +164,7 @@ function dueDateString(customer, globalIntervalDays) {
 export default function ServicesScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const widthCap = useContentContainerStyle();
 
   const [viewMode, setViewMode]           = React.useState('list');
   const [sections, setSections]           = React.useState([]);
@@ -617,7 +620,7 @@ export default function ServicesScreen({ navigation }) {
         keyExtractor={(item) => item.id}
         renderSectionHeader={renderSectionHeader}
         renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, widthCap]}
         stickySectionHeadersEnabled={false}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListHeaderComponent={renderToggle}

@@ -47,7 +47,9 @@
         "appleTeamId": "W6R4H966U8"
       },
       "android": {
-        "track": "internal"
+        "track": "internal",
+        "releaseStatus": "draft",
+        "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       }
     }
   }

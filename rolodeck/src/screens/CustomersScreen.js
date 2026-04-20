@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomersScreen.js - Customer list with search, sort filter, and add button
-// Version: 1.5
-// Last Updated: 2026-04-14
+// Version: 1.6
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        CustomersScreen.js      (this file)
 //               CustomerCard.js         (list item component)
 //               storage.js              (getAllCustomers, getSortPreference,
@@ -26,6 +26,9 @@
 //   - Storage errors caught with try/catch
 //
 // CHANGE LOG:
+// v1.6  2026-04-19  Claude  Tablet width cap — action row, search bar, and
+//                           SectionList content are wrapped in useContentContainerStyle
+//                           so the list centers at 760pt on iPad instead of stretching
 // v1.0  2026-04-03  Claude  Initial scaffold — name/zip sort, FAB add button
 // v1.1  2026-04-03  Claude  Replaced FAB with top Add Customer button; replaced
 //                           two-option sort with 4-way sort filter modal
@@ -75,6 +78,7 @@ import {
 } from '../data/storage';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
+import { useContentContainerStyle } from '../utils/responsive';
 
 const SORT_OPTIONS = [
   { key: 'firstName', label: 'First Name' },
@@ -111,6 +115,7 @@ function sortCustomers(customers, mode) {
 export default function CustomersScreen({ navigation, route }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const widthCap = useContentContainerStyle();
 
   const [customers, setCustomers]   = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -205,7 +210,7 @@ export default function CustomersScreen({ navigation, route }) {
     <SafeAreaView style={styles.safe}>
 
       {/* ── Top action row: Add Customer + Sort ── */}
-      <View style={styles.actionRow}>
+      <View style={[styles.actionRow, widthCap]}>
         <Pressable
           style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
           onPress={() => navigation.navigate('AddCustomer')}
@@ -230,7 +235,7 @@ export default function CustomersScreen({ navigation, route }) {
       </View>
 
       {/* ── Search bar ── */}
-      <View style={styles.searchRow}>
+      <View style={[styles.searchRow, widthCap]}>
         <View style={styles.searchWrap}>
           <Ionicons
             name="search-outline"
@@ -278,7 +283,7 @@ export default function CustomersScreen({ navigation, route }) {
               onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id, backLabel: 'Customers', onAlertsRefresh: route.params?.onAlertsRefresh })}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, widthCap]}
           keyboardShouldPersistTaps="handled"
           stickySectionHeadersEnabled={false}
           ListEmptyComponent={

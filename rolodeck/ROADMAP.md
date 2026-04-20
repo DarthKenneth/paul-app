@@ -2,190 +2,537 @@
 
 ---
 
-## Current State (as of v0.23.1, 2026-04-17)
+## Current State (as of v0.25.0, 2026-04-19)
 
 The app is feature-complete and builds cleanly. Pre-release hardening is done.
-iOS on TestFlight (build 11, v0.23.0 — v0.23.1 in flight). Android live on Play internal track (released Apr 16). Google Play service account set up — auto-submit ready after 24–36 hr permission propagation.
 
-### What's done ✅
-- Core app — customer database, service log, service intervals, calendar sync
-- Five color themes (Classic, Ocean Blue, Forest Green, Midnight, Stone, Ember)
-- Backup / restore (manual export + import)
-- App icons — light + dark mode variants
-- EAS build + submit pipeline with beta profiles
-- OTA updates wired (expo-updates)
-- Sentry crash reporting fully wired ✅
-  - DSN set in `.env`, `Sentry.init` fires on launch
-  - `Sentry.wrap()` on root component for automatic session tracking
-  - Error boundary reports uncaught JS errors to Sentry + shows Restart screen
-- Square PKCE OAuth built (needs your credentials — Step 12)
-  - Token stored in Keychain/Keystore (expo-secure-store)
-  - Expiry detection — expired tokens auto-cleared, user prompted to re-auth
-  - Merge is rollback-safe (memory-first, write only after all computations succeed)
-- Offline detection
-- Storage v2 (per-customer keys, write mutex, in-memory cache)
-- Crypto-random customer IDs (expo-crypto)
-- 38-item app audit complete — schema migrations, timezone safety, backup hardening,
-  performance fixes, calendar sync error surfacing, invoice confirmation prompt
-- `.env` / `.env.local` pattern — all credentials out of source (Square, Sentry, Geoapify)
-- Services tab badge count fixed — refreshes reliably on launch, not just on app foreground
-- `runtimeVersion: { policy: "appVersion" }` in app.json — Expo Go manifest crash fixed
-- `promise@8.3.0` direct dep — Sentry launch crash fixed
-- `patch-package` for expo-modules-core — `addListener` crash in Expo Go fixed
+- **iOS** — TestFlight build 11 (v0.23.0 shipped); v0.24.x + v0.25.0 builds in flight
+- **Android** — Live on Play internal track (released Apr 16)
+- **Auto-submit** — GitHub Actions pipeline fully wired; `git tag vX.Y && git push --tags` builds + submits to both stores
 
 ---
 
-## Step 1 — Sentry ✅ (10 min)
+## Completed ✅
 
-1. Create a free account at [sentry.io](https://sentry.io)
-2. New Project → React Native → name it "Rolodeck"
-3. Copy the DSN (looks like `https://abc123@o123456.ingest.sentry.io/789`)
-4. In `rolodeck/.env`:
+### Release infrastructure
+- Sentry crash reporting (DSN in `.env`, root `Sentry.wrap()`, error boundary → Restart screen)
+- Apple Developer, Google Play, Expo, EAS CLI — all accounts set up
+- `eas init` → Expo project linked; projectId in `app.json`
+- App Store Connect listing created (Bundle ID `com.ardingate.rolodeck`, Apple ID `6762417306`)
+- Google Play listing created (package `com.ardingate.rolodeck`, content rating complete)
+- iOS distribution cert + provisioning profile (managed by EAS, expire Apr 16 2027)
+- Android upload keystore (managed by EAS — `p8ESASctpl`)
+- EAS env vars: `APPLE_ID`, `ASC_APP_ID`, `APPLE_TEAM_ID`
+- Google Play Service Account fully configured (GCP project + Play Console invite + JSON uploaded to EAS)
+- Auto-submit `eas.json` config for Android (track: internal)
+- First iOS + Android builds shipped; first Android AAB manually uploaded (Google requirement for first-ever submission)
+- GitHub Actions release workflow at `.github/workflows/release.yml` — tests → parallel iOS + Android builds → auto-submit both stores, triggered on tag push
+- `EXPO_TOKEN` in GitHub Secrets
+
+### Core app features shipped
+- Customer database (CRUD, search, sort, archive)
+- Service log per customer (date, type, notes)
+- Service interval tracking with global preset + per-entry custom interval
+- Device calendar sync (due dates + scheduled services)
+- Scheduling engine with configurable work days, hours, durations, travel time
+- Per-customer + cross-customer conflict detection (v0.24.1)
+- Six color themes (Classic, Ocean Blue, Forest Green, Midnight, Stone, Ember)
+- Backup / restore via JSON file share/import
+- App icons (light + dark mode)
+- OTA updates wired (`expo-updates`, `runtimeVersion: appVersion`)
+- Square PKCE OAuth flow built (needs live credentials to activate — see Step 2)
+- Offline detection
+- Storage v2 (per-customer keys, write mutex, in-memory cache)
+- Crypto-random customer IDs (`expo-crypto`)
+- 38-item release audit (schema migrations, timezone safety, backup hardening, performance)
+- `.env` pattern — all credentials out of source
+- Services tab badge count (reliable refresh on launch)
+- **Service note photo attachments** (v0.24.0) — camera + library picker via `expo-image-picker`; up to 5 photos per entry; URIs stored locally via `photoUtils.savePhotoLocally` in `documentDirectory`
+- **In-app camera** (v0.24.0) — same path; captures job-site photos during a service visit
+- **Tap-to-edit service log entries** (v0.25.0) — past service/install entries are selectable; edit notes, add/remove photos, or delete a mistake entry directly from the customer detail screen
+- **Tablet / iPad responsive polish** (v0.25.0) — primary screens cap content at 760pt and center on tablets (iPad mini through Pro) so forms and lists don't stretch edge-to-edge; phone layouts untouched
+
+### Release pipeline fixes
+- `runtimeVersion: { policy: "appVersion" }` — Expo Go manifest crash
+- `promise@8.3.0` direct dep — Sentry launch crash
+- `patch-package` for `expo-modules-core` — `addListener` crash in Expo Go
+
+---
+
+## Remaining Steps to v1.0
+
+### Step 1 — Finish beta testing
+
+**Google Play screenshots** (required before the store listing goes live):
+- Take screenshots on a real device or simulator
+- Required sizes: Phone (16:9 or 9:16), minimum 2
+- Upload: Play Console → Rolodeck → Store presence → Main store listing → Graphics
+
+**Golden-path tester checklist** (run on both platforms):
+- [ ] Add a customer
+- [ ] Log a service
+- [ ] Calendar sync populates due dates + appointments
+- [ ] Export backup → share file → import on another device
+- [ ] Settings → theme changes apply live
+- [ ] Kill and relaunch — data persists
+- [ ] Add photos to a service entry from camera + library
+- [ ] Schedule a service → conflict detection catches overlaps
+
+### Step 2 — Square activation (optional, can ship without)
+
+The PKCE OAuth flow is already built. To activate:
+
+1. Create a Square Developer account at [developer.squareup.com](https://developer.squareup.com)
+2. Create a new application → copy **Application ID** + a **Location ID**
+3. Add to `.env`:
+   ```
+   EXPO_PUBLIC_SQUARE_CLIENT_ID=your-application-id
+   EXPO_PUBLIC_SQUARE_LOCATION_ID=your-location-id
+   EXPO_PUBLIC_SQUARE_ENVIRONMENT=production
+   ```
+4. Square Developer Dashboard → OAuth settings → add redirect URI: `rolodeck://square-callback`
+
+Can ship v1 without it and enable in a v1.x OTA push.
+
+### Step 3 — Bug fixes from beta
+
+For JS-only fixes, OTA push:
+```bash
+eas update --branch production --message "fix: describe the fix"
+```
+
+For native changes, rebuild and submit.
+
+### Step 4 — Tablet / iPad buildout (optional for v1, required for iPad marketing)
+
+`supportsTablet: true` is already on in `app.json`. v0.25.0 shipped the first pass of tablet polish: every primary screen (Customers, Customer Detail, Add Customer, Add Service, Services, Settings) now caps content at 760pt on tablets via `src/utils/responsive.js` (`useIsTablet`, `useContentContainerStyle`). That's enough to make the app *feel* native on iPad in portrait.
+
+Below is the remaining work to make Rolodeck a genuinely iPad-first app. Treat these as minor-version bumps (0.26.x, 0.27.x, …) landing before v1.0, or defer past v1.0 and ship as v1.x polish.
+
+**Phase A — Orientation + landscape (minor bump, ~1 day):**
+- [ ] Change `app.json` `orientation` from `"portrait"` to `"default"` so iPad can rotate. This also unlocks phone landscape; either accept that or install `expo-screen-orientation` and lock phone runtime-only via `ScreenOrientation.lockAsync(PORTRAIT_UP)` when `!useIsTablet()` on app mount.
+- [ ] Test every screen in landscape: `CustomersScreen`, `CustomerDetailScreen`, `AddCustomerScreen`, `AddServiceScreen`, `ServicesScreen`, `SettingsScreen`, `ThemeScreen`, `ServiceIntervalScreen`, `SquareSyncScreen`, `SchedulingSettingsScreen`, plus modals (`AddServiceModal`, `EditServiceModal`, `ScheduleServiceModal`, `OnboardingModal`).
+- [ ] Fix any landscape regressions — most likely candidates: `KeyboardAvoidingView` offsets, modal max-height clipping, photo lightbox aspect ratio.
+
+**Phase B — Master-detail split views (minor bump, ~3-5 days):**
+
+Biggest UX win on iPad. Replace the "list → push detail → back" pattern with a persistent split view on tablet landscape. Keep phone behavior untouched.
+
+- [ ] `CustomersScreen` → split view: list on left (320pt fixed), `CustomerDetailScreen` on right (flex). Tapping a row swaps the right pane without a navigation push. Use `useIsTablet() && width > height` to gate.
+- [ ] `ServicesScreen` → same pattern: due/overdue list on left, selected customer's history + upcoming on right.
+- [ ] `SettingsScreen` → list of categories on left, selected subscreen on right (ThemeScreen, ServiceIntervalScreen, SquareSyncScreen, SchedulingSettingsScreen).
+- [ ] Refactor: `CustomerDetailScreen`, `ThemeScreen`, etc. need to work both as pushed screens (phone) and embedded panes (tablet). Extract the visual body into a `CustomerDetailPane` component that the screen wrapper uses for navigation, and the split view mounts directly.
+- [ ] Update `TabNavigator` so the Customers and Settings tabs conditionally render a split-view container instead of a pushed Stack on tablet landscape.
+
+**Phase C — Sidebar navigation (minor bump, ~2 days):**
+
+Replace the bottom tab bar with a persistent left sidebar on tablet. iPad HIG expects this; bottom tabs on a 1024pt screen waste vertical space and feel phone-ish.
+
+- [ ] Add `createDrawerNavigator` from `@react-navigation/drawer` (already likely in deps — if not, install).
+- [ ] On tablet: render Drawer (permanently open, 240pt wide) instead of BottomTabNavigator. Nav items: Customers, Services, Settings, plus quick-access rows for Theme + Scheduling.
+- [ ] Customer count, service alert badge, and Square sync status move to sidebar footer.
+- [ ] Phone: unchanged — BottomTabNavigator as today.
+
+**Phase D — Touch-target + typography tuning on tablet (patch bump):**
+
+Fine-tune for the larger screen without going overboard. iPads don't need bigger everything — just the right things bigger.
+
+- [ ] Bump `FontSize.base` by ~1-2pt on tablet (via `useIsTablet()` in `typography.js`).
+- [ ] Increase card padding and row heights ~15-20% on tablet so the list doesn't feel cramped next to the detail pane.
+- [ ] Audit every `TouchableOpacity`/`Pressable` that's <44pt tall — raise to 48pt on tablet.
+- [ ] Calendar modal (`react-native-calendars`): widen `width: '90%'` → capped 520pt on tablet.
+
+**Phase E — Tablet-specific polish (patch bump):**
+
+- [ ] Photo lightbox: use aspect-ratio-preserving layout that fits iPad landscape (current 80% height is fine portrait, wastes space landscape).
+- [ ] iPad-specific splash screen asset at `store-assets/icons/` (2048×2732 for 12.9" Pro).
+- [ ] App Store listing: add iPad screenshots, update description to mention tablet support.
+- [ ] Google Play: tablet-optimized listing (Play Console → Store presence → Tablet section).
+
+**Phase F — Keyboard + pointer support (nice-to-have, post v1):**
+
+iPad with Magic Keyboard / trackpad is real. Not required for v1, but worth tracking:
+- Hover states on cards and buttons (`Pressable onHoverIn/onHoverOut`)
+- Command-key shortcuts (⌘F search, ⌘N new customer) via `react-native-keyevent` or RN's `useKeyboardEventListener`
+- Pointer cursor on interactive elements
+
+---
+
+### Step 5 — Bump to v1.0 and production release
+
+1. Bump `VERSION` to `1.0.0`
+2. Sync `package.json "version"` + `app.json "expo.version"`
+3. Add `CHANGELOG.md` entry
+4. Commit, tag, push:
+   ```bash
+   git add -p
+   git commit -m "feat: Rolodeck v1.0"
+   git tag v1.0
+   git push && git push --tags
+   ```
+
+GitHub Actions takes it from there. App Store review: 1–3 days. Google Play: usually hours.
+
+---
+
+## Multi-Profession Upgrade (v2.0)
+
+> **Status:** Design complete. Mockup at `/tmp/rolodeck-mockup/index.html` (can be regenerated — see "Mockup" section below). Not implemented. Expected to ship after v1.x has had time to stabilize in production.
+
+### Vision
+
+Rolodeck's core engine — customer DB + service log + due dates + scheduling + calendar sync + photos + Square — is already **100% trade-agnostic**. The current app is water-treatment-flavored only at the cosmetic layer (service types, default interval, default durations). v2.0 generalizes this with **profession presets** so any solo service pro can pick their trade and get sensible defaults.
+
+**Target user (unchanged):** solo LLC owners and freelancers running a customer-visit business. Not multi-tech companies. Not regulated enterprise operations. See memory: *project: Rolodeck target user*.
+
+### The 12 profession presets to ship
+
+All of these fit the solo-operator mold. Data shape is identical across all twelve (see "Data model" below).
+
+| # | Profession | Default Interval | Has "install" type |
+|---|---|---|---|
+| 1 | 💧 Water Treatment | 12 months | Yes (equipment install) |
+| 2 | ❄️ HVAC | 6 months (seasonal) | Yes (system install) |
+| 3 | 🪲 Pest Control | 90 days (quarterly) | Yes (initial service) |
+| 4 | 🌱 Lawn Care | 7 days (weekly in-season) | Yes (install / hardscape) |
+| 5 | 🏊 Pool & Spa | 7 days (weekly in-season) | Yes (pool opening) |
+| 6 | ⚡ Electrician | On-demand | Yes (new install) |
+| 7 | 🧹 Cleaning Service | 14 days (bi-weekly) | Yes (move-in/out) |
+| 8 | 🔥 Chimney Sweep | 12 months (annual) | Yes (insert install) |
+| 9 | 🔧 Appliance Repair | On-demand | Yes (install / haul-away) |
+| 10 | 🏠 Gutter & Window | 6 months (spring + fall) | Yes (guard install) |
+| 11 | 🔑 Locksmith | On-demand | Yes (lock install) |
+| 12 | 🚪 Garage Door | 12 months (annual tune-up) | Yes (full door install) |
+
+**Plus a "Custom" option** — blank slate, fully user-defined. This is the long-term answer for trades not in the preset list (mobile detailer, piano tuner, pet sitter, etc.).
+
+**Explicitly rejected / deferred:**
+- **Fire Extinguisher / Life Safety** — too enterprise, too regulated (AHJ, inspection tags, multi-tech crews). Doesn't fit solo-operator target.
+- **Septic service** — borderline. Full pumping requires a $100k vac truck + often a second set of hands. True solo septic pumpers are rare. Could ship later as "Septic Inspection" only (inspection side is solo-friendly).
+
+### Three scheduling archetypes
+
+Every trade falls into one of these, and the UI should emphasize/de-emphasize the due-date system accordingly:
+
+1. **Recurring cadence** — water, HVAC, pest, lawn, pool, septic, chimney, gutter, garage door. Due-date tracking is the whole value prop.
+2. **On-demand / reactive** — electrician, appliance repair, locksmith. Customer DB + service log matters; due dates barely used. Show "no recurring" as a valid interval option.
+3. **Seasonal burst** — chimney (Sep–Dec), pool open/close (Mar + Oct), HVAC tune-ups (Mar + Sep), gutter (Apr + Oct). Two hits a year with sharp spikes.
+
+### Data model
+
+All changes are **additive**. Existing AsyncStorage keys stay untouched.
+
+**New AsyncStorage keys:**
+
+```
+@rolodeck_profession            # string: 'water' | 'hvac' | 'pest' | ... | 'custom'
+@rolodeck_profession_custom     # object: user overrides (durations, labels)
+@rolodeck_lists_<profession>    # object: per-profession custom list contents
+@rolodeck_schema_version        # number: bumped 1 → 2 on first v2 launch
+```
+
+**Profession preset config shape** (ships in source, not AsyncStorage):
+
+```js
+{
+  id: 'pest',
+  name: 'Pest Control',
+  emoji: '🪲',
+  tagline: 'Quarterly routes, termite, mosquito',
+
+  serviceTypes: [
+    { id: 'treat',   label: 'Routine Treatment', icon: 'shield-checkmark-outline', dur: '30 min' },
+    { id: 'initial', label: 'Initial Service',   icon: 'flash-outline',            dur: '90 min', install: true },
+    { id: 'inspect', label: 'Inspection',        icon: 'search-outline',           dur: '45 min' },
+    { id: 'follow',  label: 'Follow-Up',         icon: 'repeat-outline',           dur: '20 min' },
+    { id: 'wdi',     label: 'WDI / Termite',     icon: 'document-text-outline',    dur: '60 min' },
+  ],
+
+  customLists: [
+    { key: 'pests',    label: 'Target Pests',         items: ['Ants', 'Roaches', 'Termites', ...] },
+    { key: 'products', label: 'Products / Chemicals', items: ['Temprid FX', 'Termidor SC', ...] },
+    { key: 'methods',  label: 'Treatment Methods',    items: ['Liquid perimeter', ...] },
+    { key: 'areas',    label: 'Areas Treated',        items: ['Interior', 'Exterior perimeter', ...] },
+  ],
+
+  entryFields: [
+    { label: 'Target Pests',  source: 'pests',    multi: true },
+    { label: 'Products Used', source: 'products', multi: true },
+    { label: 'Areas Treated', source: 'areas',    multi: true },
+  ],
+
+  defaultIntervalDays: 90,
+
+  checklist: [
+    { label: 'Product: Temprid FX (0.075%)', type: 'check' },
+    { label: 'Activity level',               type: 'measure' },
+    // ...
+  ],
+
+  equipmentFields: [
+    { key: 'targetPests', label: 'Target Pests', kind: 'dropdown', source: 'pests' },
+    { key: 'sqft',        label: 'Sq Footage',   kind: 'number' },
+    { key: 'pets',        label: 'Pets',         kind: 'text' },
+    { key: 'baitStations',label: 'Bait Stations',kind: 'number' },
+  ],
+}
+```
+
+Full preset data for all 12 professions is already built out in the mockup HTML — port it when implementing.
+
+### Screens to add / modify
+
+**New screens** (under Settings → Profession):
+- `ProfessionSettingsScreen.js` — profession picker + live preview + drill-down rows
+- `ServiceTypesEditorScreen.js` — list of service types with duration steppers, add/remove/reorder, "Reset to profession defaults"
+- `CustomListsEditorScreen.js` — each custom list shown as removable chips + "+ Add" button (e.g., add regional pests like palmetto bugs, boxelder bugs, scorpions)
+- `ChecklistEditorScreen.js` — reorderable list of check-vs-measure items, add/remove, type toggle
+- `EquipmentFieldsEditorScreen.js` — per-customer field editor; each field has a type (text/number/date/dropdown); dropdowns pick which custom list they pull from
+- `DefaultIntervalScreen.js` — preset grid (7d, 14d, 30d, 60d, 90d, 6mo, 12mo, 2yr, custom) + toggles ("apply to new customers only", "allow per-customer override")
+
+**Modified screens:**
+- `CustomerCard.js` — subtitle content varies by profession (equipment summary instead of city/phone for some trades)
+- `CustomerDetailScreen.js` — new "Equipment / Site Info" block between info and service log; field set comes from active profession's `equipmentFields`
+- `AddCustomerScreen.js` — render profession-specific fields on customer-create form
+- `AddServiceScreen.js` — 
+  - Service type picker at top (replaces hardcoded single type — grid of 2-6 types per profession)
+  - New "Details" section between Date and Checklist: renders each `entryField` as a dropdown pulling from the corresponding custom list (single-select or multi-select based on `multi: true`)
+  - Checklist section still pulls from profession's checklist (currently hardcoded, now dynamic)
+- `ScheduleServiceModal.js` — duration lookup now keyed on service type ID rather than the `service`/`install` binary
+- `scheduleSettings.js` — `SCHEDULE_DEFAULTS` generalizes from hardcoded `service: 30min, install: 150min` to a lookup keyed on active profession's service types
+
+**Modified scheduling logic:**
+- Current: `type: 'service' | 'install'` with hardcoded 30min / 150min durations
+- v2: `type` is any profession service type ID. Durations come from `profession.serviceTypes[typeId].dur`, user-overrideable via ServiceTypesEditorScreen.
+
+### "Add Install" rethink
+
+Currently there's no dedicated Add Install screen — AddServiceScreen.js v1.1 removed the `service|install` toggle and saves everything as `type: 'service'`. CustomerDetailScreen still renders entries with `type: 'install'` specially (rust-colored initial-install tag).
+
+**v2 approach:** Each profession flags one of its service types with `install: true`. That type:
+- Gets rust-colored save button
+- Shows an "Equipment / Job Details" section instead of a checklist
+- Typically has a longer default duration
+- Is what new customers' onboarding entry maps to
+
+Professions without a real "install" concept (some cleaning use-cases) can still have the onboarding flagged entry — just labeled differently (e.g., "Onboarding" or "First Service").
+
+### Migration strategy
+
+**Existing user data is 100% safe.** All changes are additive — no renames, no removals.
+
+**Migration function** (runs once on first v2 launch):
+
+```js
+// On app boot, check @rolodeck_schema_version
+if (schemaVersion < 2) {
+  // 1. Set default profession = 'water' (preserves Paul-style experience)
+  await AsyncStorage.setItem('@rolodeck_profession', 'water');
+
+  // 2. Seed the water profession's custom lists with defaults
+  await AsyncStorage.setItem('@rolodeck_lists_water', JSON.stringify(WATER_DEFAULTS));
+
+  // 3. Existing service entries have type: 'service' | 'install' — these map 1:1
+  //    to the water profession's service types. No entry modification needed; the
+  //    profession's serviceTypes array must include IDs 'service' and 'install'.
+
+  // 4. Bump schema version
+  await AsyncStorage.setItem('@rolodeck_schema_version', '2');
+}
+```
+
+**What existing users see after upgrade:**
+- Every customer, phone, address, service log entry, photo, scheduled service — all untouched
+- They stay on the water treatment preset by default (no UX regression)
+- New optional fields (equipment brand, serial, etc.) are empty; user fills over time
+- Settings gains new "Profession" row; no onboarding modal for upgrades
+
+**What fresh installs see:**
+- First-run onboarding modal asks which profession they run
+- Choice seeds the default interval, service types, and custom lists for that trade
+- They can always change later in Settings → Profession
+
+**Profession switch semantics (existing user changes profession mid-stream):**
+- Old service log entries **keep their original type labels** (history is history — do not retroactively rewrite)
+- New entries use the new profession's service types
+- Custom list additions stay attached to the profession they were added to (switching away hides them; switching back shows them)
+- Equipment field values on customers: old values preserved under their original keys even if the new profession has different `equipmentFields` (they just don't render on the form)
+
+**Per `CLAUDE.md` rule:** *"Storage schema changes that require migration are always major"* → this is a **v1.x → v2.0** bump. No exceptions.
+
+### UX principles
+
+- **Defaults should Just Work.** 95% of users should never need to touch the customize screens. Ship solid presets.
+- **Customization is power-user territory** — discoverable but not required.
+- **Never force data entry** — new optional fields stay empty on old customers until the user decides to fill them.
+- **History is sacred** — profession switches, field edits, preset updates never rewrite past entries.
+- **One-person scope only** — no multi-tech dispatch, no role-based permissions, no crew assignment. See target-user memory.
+- **Respect the on-demand trades** — electrician, locksmith, appliance repair: do NOT push due-date badges on customers when interval is "none/on-demand". These users want the DB and service log, not nagging.
+
+### Scope guards (what NOT to build)
+
+- No technician assignment / dispatch (violates solo-target)
+- No role-based permissions (violates solo-target)
+- No compliance / inspection-tag tracking (too enterprise, rejected fire safety for this reason)
+- No multi-seat billing
+- No Septic full-service preset (defer until inspection-only scope is confirmed as useful)
+- No retroactive history rewriting on profession switch
+
+### Implementation sequencing
+
+Rough phase order. Each phase should be shippable-if-forced.
+
+1. **Phase 1 — Infra** — profession config registry (one file per profession in `src/data/professions/`), AsyncStorage key handlers, migration function, schema version check on boot
+2. **Phase 2 — Core reads** — wire CustomerCard + CustomerDetail + AddService + AddCustomer to read from active profession. Water treatment behavior stays identical.
+3. **Phase 3 — Entry field dropdowns** — custom lists + dropdown UI in AddServiceScreen. User can add items to lists inline.
+4. **Phase 4 — Customize screens** — all 5 Settings drill-downs (Service Types, Custom Lists, Checklist, Equipment Fields, Default Interval)
+5. **Phase 5 — Onboarding** — first-run profession picker modal for fresh installs
+6. **Phase 6 — Testing** — seed and validate each of the 12 professions end-to-end; test migration on real v1 backup files
+7. **Phase 7 — Release** — tag `v2.0.0`, migration tested on real v1 AsyncStorage dumps before shipping
+
+### Mockup
+
+A full HTML mockup of v2 is buildable at `/tmp/rolodeck-mockup/index.html`. Serve with `python3 -m http.server 8765` and open `http://localhost:8765`. Not checked into the repo — regenerate when needed. The mockup shows:
+
+- 10 phone frames side by side per profession (all 12 professions in the header dropdown):
+  - Main flows: Customer List, Customer Detail, Add Service, Add Install
+  - Settings drill-downs: Profession Picker, Service Types & Durations, Custom Lists, Visit Checklist, Equipment Fields, Default Interval
+- Real Rolodeck color palette (teal primary, cream bg, rust install accent, blue scheduled)
+- Real Ionicons via CDN
+
+The mockup data is the authoritative source for the preset contents — port it verbatim when building.
+
+### Open design questions (not yet decided)
+
+- **Onboarding for upgrading users** — do we show the profession picker on first v2 launch to existing users, or silently default to water and let them discover Settings → Profession? Current plan: silent default. Consider a one-time "New in v2: profession presets" banner.
+- **Per-customer profession override** — could a user have one Rolodeck app handling two trades (e.g., solo HVAC guy who also does appliance repair)? Out of scope for v2; revisit if requested.
+- **Profession-switch UX on existing data** — current plan: no remap UI, history stays as-is. Revisit if beta testers find it confusing.
+- **Migration rollback** — if v2 migration fails mid-flight, can we safely revert to v1 behavior? Current plan: the schema bump is the last step, so a failed migration leaves the app in "still v1" state. Worth testing.
+
+---
+
+## Future Feature Backlog (post v1.0, not tied to v2)
+
+### Near-term
+- Square OAuth activation (creds swap — see Step 2 above)
+- Service note templates — save common notes to reuse
+- CSV import — bulk-import customers from a spreadsheet
+
+### Longer-term
+- Push notifications — reminders when customers are coming due
+- iCloud / Google Drive sync — automatic backup instead of manual export
+
+### Done ✅
+- **Customer photos** — shipped as service note photo attachments in v0.24.0
+- **In-app camera** — `expo-image-picker` camera + library integration in v0.24.0
+- **Service note photo attachments** — v0.24.0
+
+### Rejected / out of scope
+- **Technician assignment** — violates solo-LLC / freelancer target user
+- **Multi-seat billing / crew dispatch** — same reason
+- **Fire extinguisher / life safety preset** — too enterprise, too regulated
+
+---
+
+## Credentials reference
+
+**Keep these safe — needed for release operations.**
+
+- Apple ID: `kdujardin1@outlook.com`
+- ASC App ID: `6762417306`
+- Apple Team ID: `W6R4H966U8`
+- Expo project: `@ardingate-studios-llc/rolodeck` (ID: `117e475a-df12-4791-a8bf-5d761b4c526c`)
+- iOS dist cert serial: `5AF486400E5125FDD1ADB0E61C2A5F18` (expires Apr 16 2027)
+- iOS provisioning profile: `M2QQJ7H3UH` (expires Apr 16 2027)
+- Android keystore: `p8ESASctpl`
+- Android SHA256: `94:2E:8E:0C:9A:1D:A7:16:66:E9:5A:E0:F1:C2:8F:40:38:C2:00:30:69:45:67:DA:EB:FF:38:1E:1B:96:51:C8`
+- Support URL: `https://studios.ardingate.com/contact/`
+- Privacy policy: `https://ardingate.com/privacy-policy/`
+
+---
+
+## Archive: Completed Pipeline Steps (detail)
+
+> Preserved for reference in case any step needs to be re-run. All marked ✅ above.
+
+### Sentry setup
+
+1. Account at [sentry.io](https://sentry.io) → new project → React Native → "Rolodeck"
+2. Copy DSN into `rolodeck/.env`:
    ```
    EXPO_PUBLIC_SENTRY_DSN=https://your-dsn-here
    ```
-5. (Optional) Add to EAS environment in `eas.json` under `production.env` so it's
-   available in cloud builds without needing the local `.env` file.
+3. Optional: add to EAS environment in `eas.json` under `production.env`
 
-Sentry will start capturing crashes immediately after the first build with the DSN.
-
----
-
-## Step 2 — One-time account setup ✅
-
-- **Apple Developer Program** — [developer.apple.com](https://developer.apple.com) ($99/year)
-- **Google Play Developer account** — [play.google.com/console](https://play.google.com/console) ($25 one-time)
-- **Expo account** (free) — [expo.dev](https://expo.dev)
-- **EAS CLI** installed globally: `npm install -g eas-cli`
-
----
-
-## Step 3 — Register with Expo ✅
+### Expo registration
 
 ```bash
 cd /Users/keithdujardin/Repos/paul-app/rolodeck
-eas login          # log in to your Expo account
-eas init           # links this project to expo.dev — accept the defaults
+eas login
+eas init          # accept defaults — adds extra.eas.projectId to app.json
 ```
 
-This adds `extra.eas.projectId` to `app.json`. Commit that change.
+### App Store Connect listing
 
----
+- [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → + → New App
+- iOS, Name: Rolodeck, Bundle ID: `com.ardingate.rolodeck`
+- Store listing copy lives in `store-assets/`
 
-## Step 4 — Create the App Store Connect listing ✅
-
-1. Go to [appstoreconnect.apple.com](https://appstoreconnect.apple.com)
-2. Click **+** → **New App**
-3. Platform: iOS, Name: Rolodeck, Bundle ID: `com.ardingate.rolodeck`
-4. Open the new app → **App Information** → copy the **Apple ID** (numeric, ~10 digits)
-5. Fill in store listing using the copy in `store-assets/`
-
----
-
-## Step 5 — Set up iOS credentials ✅
+### iOS credentials + EAS secrets
 
 ```bash
 eas credentials --platform ios
-```
 
-EAS walks you through creating a distribution certificate and provisioning profile and
-stores them in its cloud.
-
----
-
-## Step 6 — Set EAS secrets for iOS submission ✅
-
-```bash
 eas env:create --scope project --name APPLE_ID      --value "kdujardin1@outlook.com"
 eas env:create --scope project --name ASC_APP_ID    --value "6762417306"
 eas env:create --scope project --name APPLE_TEAM_ID --value "W6R4H966U8"
 ```
 
-> Note: `eas secret:create` is deprecated — use `eas env:create` going forward.
+> `eas secret:create` is deprecated — use `eas env:create`.
 
-Where to find each:
-- `APPLE_ID` — your Apple Developer account email
-- `ASC_APP_ID` — App Store Connect → your app → App Information → **Apple ID** field
-- `APPLE_TEAM_ID` — [developer.apple.com/account](https://developer.apple.com/account) → Membership → **Team ID**
+### Google Play listing
 
----
+- [play.google.com/console](https://play.google.com/console) → Create app
+- Name: Rolodeck, Package: `com.ardingate.rolodeck`
+- Copy in `store-assets/android/`; content rating questionnaire in `Content_Rating_Questionnaire.md`
 
-## Step 7 — Create the Google Play listing ✅
-
-1. Go to [play.google.com/console](https://play.google.com/console)
-2. **Create app** → Name: Rolodeck, Package: `com.ardingate.rolodeck`
-3. Work through the store listing (copy in `store-assets/android/`)
-4. Complete the content rating questionnaire (`store-assets/android/Content_Rating_Questionnaire.md`)
-
----
-
-## Step 8 — Set up Android credentials ✅
+### Android credentials
 
 ```bash
 eas credentials --platform android
 ```
 
-EAS generates and securely stores your upload keystore. This keystore is permanent —
-Google ties it to your app forever.
+EAS generates and stores the upload keystore permanently.
 
----
+### Google Play Service Account
 
-## Step 9 — Set up Google Play service account (for automated submission) ✅
+> The old "Setup → API access" page is gone. The new flow is split across Google Cloud Console and Play Console.
 
-> **Note:** The old "Setup → API access" page in Play Console no longer exists —
-> Google removed it in 2023/2024. The new flow is split across Google Cloud Console
-> and Play Console's Users and permissions. Do not follow any docs that reference
-> "Setup → API access" — they are stale.
+**Part A — GCP Console:**
+1. [console.cloud.google.com](https://console.cloud.google.com) → new project ("Play Store API")
+2. APIs & Services → Library → enable **Google Play Android Developer API**
+3. IAM & Admin → Service Accounts → Create Service Account (name: `eas-submit`). **Skip the GCP role** — all real perms go in Play Console.
+4. Service account → Keys tab → Add Key → Create new key → JSON. Download, never commit.
 
-### Part A — Google Cloud Console (create the service account)
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com)
-2. Create a new project — name it something like **"Play Store API"**
-3. **APIs & Services → Library** → search **"Google Play Android Developer API"** → **Enable**
-4. **IAM & Admin → Service Accounts → Create Service Account**
-   - Name: `eas-submit` (or anything descriptive)
-   - **Skip assigning a GCP role** — leave the role field blank, just click Done.
-     All real permissions are granted in Play Console, not here.
-5. Click the new service account in the list → **Keys tab → Add Key → Create new key → JSON**
-6. Download the JSON file. **Do not commit it to git.** Save it somewhere safe.
-
-The service account email will look like:
-`eas-submit@your-project-id.iam.gserviceaccount.com`
-
-### Part B — Google Play Console (invite the service account as a user)
-
-1. Go to [play.google.com/console](https://play.google.com/console)
-2. Left nav (account level, not inside the app) → **Users and permissions**
-3. Click **Invite new users**
-4. In the email field, paste the service account email from Part A
-5. On the **Account permissions** tab, check:
+**Part B — Play Console:**
+1. Account-level Users and permissions
+2. Invite new users → paste the service account email
+3. Account permissions:
    - ✅ View app information and download bulk reports
    - ✅ Release apps to testing tracks
    - ✅ Manage testing tracks and edit tester lists
    - ✅ Release to production, exclude devices, and use Play App Signing
-6. Click **Invite user** — service accounts don't accept email invitations, it just activates immediately
+4. Invite user (activates immediately — no email accept)
 
-> ⚠️ **Wait 24–36 hours before testing.** Google's API takes time to propagate the new
-> permissions. You will get `403 The caller does not have permission` errors immediately
-> after adding the account even when everything is configured correctly. This is normal —
-> just wait a day.
+> ⚠️ **Wait 24–36 hours** for Google to propagate perms. `403 The caller does not have permission` errors during that window are normal.
 
-### Part C — Upload the credential to EAS
-
+**Part C — Upload to EAS:**
 ```bash
 eas credentials -p android
+# → Google Service Account → Upload a Google Service Account Key → path to JSON
 ```
 
-Follow the prompts → **Google Service Account** → **Upload a Google Service Account Key**
-→ provide the path to the JSON file you downloaded in Part A.
-
-EAS stores it encrypted on expo.dev. **You do not need to add anything to `eas.json`** —
-EAS CLI pulls it automatically during `eas submit`.
-
-### Part D — Update `eas.json` submit config
-
-Add the Android submit profile so `--auto-submit` knows where to send the build:
-
+**Part D — `eas.json`:**
 ```json
 {
   "submit": {
@@ -200,208 +547,71 @@ Add the Android submit profile so `--auto-submit` knows where to send the build:
 }
 ```
 
-`track: "internal"` is the Android equivalent of TestFlight.
-`changesNotSentForReview: true` skips Google's review queue for internal track pushes.
+> ⚠️ **Hard Google requirement:** The API will reject the first-ever submission unless an AAB has been manually uploaded through Play Console UI at least once. After that, EAS Submit takes over permanently.
 
-### Part E — Verify it works
-
-Once the 24–36 hour propagation window has passed:
-
-```bash
-eas build --platform android --auto-submit
-```
-
-> ⚠️ **Hard requirement from Google:** The API will reject the first submission if the
-> app has never had an AAB uploaded manually through the Play Console UI. Complete
-> Step 11 (manual first upload) before relying on auto-submit. After that first manual
-> upload, EAS Submit takes over permanently.
-
----
-
-## Step 10 — First builds ✅
+### First builds
 
 ```bash
 npm run build:ios && npm run build:android
 ```
 
-Both build on EAS cloud — no local Xcode or Android Studio needed. Takes 15–30 min.
+`app.json` has `ITSAppUsesNonExemptEncryption: false` in `ios.infoPlist` (Apple requirement).
 
-**Note:** `app.json` now has `ITSAppUsesNonExemptEncryption: false` in `ios.infoPlist` —
-required by Apple. Already added.
-
----
-
-## Step 11 — Beta testing (TestFlight + Play internal)
-
-**iOS** — already submitted via `npm run submit:beta:ios` ✅
-Apple is processing — you'll get an email when it's ready in TestFlight (5–10 min).
-
-**Android** — first submission must be manual (Google requirement): ✅
-1. ~~Download the AAB from EAS: `https://expo.dev/artifacts/eas/wpoD2Z5aKc9X5ToZVQ1M2.aab`~~
-2. ~~Play Console → Rolodeck → Testing → Internal testing → Create new release~~
-3. ~~Upload the `.aab` file and roll out~~ — Done (Released Apr 16)
-
-**Screenshots** — required before the Play Store listing goes live:
-- Take screenshots on a real device or simulator after installing the beta build
-- Required sizes: Phone (16:9 or 9:16), at least 2 screenshots
-- Upload at: Play Console → Rolodeck → Store presence → Main store listing → Graphics
-
-**After both are live**, add yourself as a tester and install on real devices:
-- App Store Connect → your app → TestFlight → Internal Testing
-- Play Console → your app → Internal testing → Testers
-
-Test the golden path:
-- [ ] Add a customer
-- [ ] Log a service
-- [ ] Calendar sync works (check Calendar app)
-- [ ] Export backup → share file → re-import
-- [ ] Settings → theme changes apply
-- [ ] Kill and relaunch — data persists
-
-**Future Android submissions** (after first manual upload + Google Service Account set up):
-```bash
-npm run submit:beta:android
-```
-
----
-
-## Step 12 — Square setup (optional, can ship without)
-
-The PKCE OAuth flow is already built. To activate it:
-
-1. Create a Square Developer account at [developer.squareup.com](https://developer.squareup.com)
-2. Create a new application → get the **Application ID** and a **Location ID**
-3. In `.env`:
-   ```
-   EXPO_PUBLIC_SQUARE_CLIENT_ID=your-application-id
-   EXPO_PUBLIC_SQUARE_LOCATION_ID=your-location-id
-   EXPO_PUBLIC_SQUARE_ENVIRONMENT=production
-   ```
-4. In Square Developer Dashboard → OAuth settings → add your redirect URI:
-   `rolodeck://square-callback`
-
-Square sync will go live as soon as those values are in the build. You can ship v1
-without it and enable it in a v1.1 OTA push.
-
----
-
-## Step 13 — Bug fixes
-
-Fix any issues found in beta testing. For JS-only fixes (no new native modules or
-config changes), you can push an OTA update without rebuilding:
+### iOS TestFlight
 
 ```bash
-eas update --branch production --message "fix: describe the fix"
+npm run submit:beta:ios
 ```
 
-Users get it automatically on next app launch. For native changes, rebuild and submit.
+Apple processes in 5–10 min; email notification when ready.
+
+### First Android AAB (manual)
+
+- Download AAB from EAS artifact URL
+- Play Console → Rolodeck → Testing → Internal testing → Create new release → upload AAB → roll out
+- Released Apr 16 — future Android submissions use `npm run submit:beta:android`
+
+### GitHub Actions release workflow
+
+File: `.github/workflows/release.yml`
+
+1. Runs tests (blocks on fail)
+2. Parallel iOS + Android builds on EAS cloud
+3. Auto-submits both to App Store + Google Play
+4. EAS manages build numbers automatically (`appVersionSource: remote`)
+
+**Enabling:**
+1. [expo.dev](https://expo.dev) → Settings → Access Tokens → Create
+2. GitHub repo → Settings → Secrets → Actions → New secret: `EXPO_TOKEN`
+
+**Trigger:**
+```bash
+git tag v1.1
+git push --tags
+```
+
+> Android auto-submit requires the Google Play Service Account + first manual AAB upload to already be in place. iOS auto-submit works immediately via EAS secrets.
 
 ---
 
-## Step 14 — Bump to v1.0 and production release
-
-When you're happy with beta, use the GitHub Actions workflow (Step 15 — already set up):
-
-1. Bump `VERSION` to `1.0`
-2. Update `package.json "version"` and `app.json "expo.version"` to match
-3. Add a `CHANGELOG.md` entry
-4. Commit, tag, and push:
-   ```bash
-   git add -p
-   git commit -m "feat: Rolodeck v1.0"
-   git tag v1.0
-   git push && git push --tags
-   ```
-
-GitHub Actions takes it from there — builds both apps and submits to both stores automatically.
-App Store review takes 1–3 days. Google Play is usually hours to a day.
-
-> Note: Android auto-submit requires the Google Play service account to be set up
-> (Step 9) and the first AAB manually uploaded (Step 11) before this works.
-> iOS submits automatically via the App Store Connect API key.
-
----
-
-## After launch — how updates work
+## After-launch operations
 
 **JS-only fixes (90% of updates) — OTA, no store review:**
 ```bash
 eas update --branch production --message "what changed"
 ```
-Users get it on next app open. No store submission needed.
+Users get it on next app open.
 
 **Native changes or new releases — tag push triggers full pipeline:**
 ```bash
 git tag v1.1
 git push --tags
 ```
-GitHub Actions builds both apps and submits to both stores automatically.
 
 **TestFlight beta updates:**
 ```bash
 npm run build:ios && npm run submit:beta:ios
 ```
-
-**Known credentials (keep these safe):**
-- Apple ID: `kdujardin1@outlook.com`
-- ASC App ID: `6762417306`
-- Apple Team ID: `W6R4H966U8`
-- Expo project: `@ardingate-studios-llc/rolodeck` (ID: `117e475a-df12-4791-a8bf-5d761b4c526c`)
-- iOS dist cert serial: `5AF486400E5125FDD1ADB0E61C2A5F18` (expires Apr 16 2027)
-- iOS provisioning profile: `M2QQJ7H3UH` (expires Apr 16 2027)
-- Android keystore: `p8ESASctpl` — SHA256: `94:2E:8E:0C:9A:1D:A7:16:66:E9:5A:E0:F1:C2:8F:40:38:C2:00:30:69:45:67:DA:EB:FF:38:1E:1B:96:51:C8`
-- Support URL: `https://studios.ardingate.com/contact/`
-- Privacy policy: `https://ardingate.com/privacy-policy/`
-
----
-
-## Step 15 — GitHub Actions ✅
-
-The release workflow at `.github/workflows/release.yml` fully automates the release
-pipeline on tag push:
-
-1. Runs tests — build is blocked if they fail
-2. Builds iOS + Android on EAS cloud in parallel
-3. Auto-submits both to App Store + Google Play immediately after build
-4. EAS manages build numbers automatically (`appVersionSource: remote`) — you never
-   manually bump them
-
-To enable it, add an `EXPO_TOKEN` to GitHub Secrets:
-
-1. [expo.dev](https://expo.dev) → your account → Settings → Access Tokens → Create token
-2. GitHub repo → Settings → Secrets → Actions → New secret
-3. Name: `EXPO_TOKEN`, Value: [token from step 1]
-
-Then each release is just:
-```bash
-git tag v1.1
-git push --tags
-```
-
-That's it — tests run, both apps build, both stores get the submission. App Store review
-takes 1–3 days; Google Play is usually hours. No manual steps needed.
-
-> Note: Android auto-submit requires the Google Play service account (Step 9, Parts A–D)
-> and first manual AAB upload (Step 11) before it works.
-> iOS auto-submit works immediately using the EAS secrets from Step 6.
-
----
-
-## Feature Backlog
-
-### Near-term
-
-- **Square OAuth** — ready to activate, just needs credentials (Step 12)
-- **Customer photos** — attach a photo to a customer record
-- **Service note templates** — save common notes to reuse
-- **CSV import** — bulk-import customers from a spreadsheet
-
-### Longer-term
-
-- **Push notifications** — remind you when customers are coming due
-- **iCloud / Google Drive sync** — automatic backup instead of manual export
-- **In-app camera** — capture job site photos during a service visit
-- **Technician assignment** — for shops with multiple techs
 
 ---
 

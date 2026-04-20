@@ -1,13 +1,15 @@
 // =============================================================================
 // CustomerDetailScreen.js - Customer info, divider, service log, add service
-// Version: 1.7
-// Last Updated: 2026-04-17
+// Version: 1.8.1
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        CustomerDetailScreen.js  (this file)
 //               ServiceLogEntry.js       (renders each log entry)
+//               EditServiceModal.js      (edit notes/photos on a past entry)
 //               storage.js               (getCustomerById, updateCustomer,
 //                                          deleteCustomer)
+//               responsive.js            (useIsTablet for max-width container)
 //               theme.js                 (useTheme)
 //               typography.js            (FontFamily, FontSize)
 //
@@ -20,6 +22,9 @@
 //   - Service log: sorted by date descending at render time (sortedLog useMemo);
 //     the last entry in the sorted list (oldest date) receives isInitial=true
 //     so ServiceLogEntry labels it "Initial Install/Service"
+//   - Each log row is tappable; tapping opens EditServiceModal so the user can
+//     add/update notes and photos after the fact, or delete a mistake entry
+//   - On tablets, the scrollable content is capped at 760px wide and centered
 //   - Edit mode: pencil icon in top-right toggles inline edit form
 //   - Delete: trash icon with Alert confirmation
 //   - useFocusEffect reloads on every focus so log updates appear immediately
@@ -30,6 +35,19 @@
 //   - All storage operations wrapped in try/catch
 //
 // CHANGE LOG:
+// v1.8.1 2026-04-19  Claude  Tap opens view mode on older entries; same-day entries
+//                            still open directly in edit (prevents accidental edits
+//                            to long-ago history — user taps pencil to edit)
+// v1.8   2026-04-19  Claude  Tap-to-edit service log entries + tablet width cap
+//       - ServiceLogEntry rows are now pressable and open EditServiceModal
+//         so notes and photos can be added/removed/updated after the fact
+//       - Delete button inside the edit modal handles mistake entries
+//       - Added editEntry + editIsInitial state; EditServiceModal wired above
+//         the closing KeyboardAvoidingView; save + delete refresh the customer
+//         and fire onAlertsRefresh so the Services tab badge stays correct
+//       - Content wrapped in a useIsTablet-driven max-width 760px container
+//         so long-form info + service log doesn't stretch across an iPad
+//         [updated ARCHITECTURE]
 // v1.7   2026-04-17  Claude  Wire scheduled services to Apple Calendar
 //       - Imported syncScheduledService, removeScheduledServiceEvent from calendarSync
 //       - handleScheduleSave calls syncScheduledService(customer, entry) after save
@@ -109,11 +127,14 @@ import { Ionicons } from '@expo/vector-icons';
 import ServiceLogEntry from '../components/ServiceLogEntry';
 import ScheduleServiceModal from '../components/ScheduleServiceModal';
 import AddServiceModal from '../components/AddServiceModal';
+import EditServiceModal from '../components/EditServiceModal';
 import { getCustomerById, updateCustomer, deleteCustomer, archiveCustomer, unarchiveCustomer, addScheduledService, deleteScheduledService } from '../data/storage';
 import { syncScheduledService, removeScheduledServiceEvent } from '../utils/calendarSync';
+import { isSameLocalDay } from '../utils/dateUtils';
 import { lookupZip } from '../utils/zipLookup';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
+import { useContentContainerStyle } from '../utils/responsive';
 
 const INFO_FIELDS = [
   { key: 'name',    label: 'Name',    icon: 'person-outline',   placeholder: 'Full name',         autoCapitalize: 'words' },
@@ -138,6 +159,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
   const { customerId } = route.params;
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const widthCap = useContentContainerStyle();
 
   const [customer, setCustomer]           = useState(null);
   const [editing, setEditing]             = useState(false);
@@ -145,6 +167,9 @@ export default function CustomerDetailScreen({ route, navigation }) {
   const [form, setForm]                   = useState({});
   const [scheduleModal, setScheduleModal] = useState(false);
   const [addModal, setAddModal]           = useState(false);
+  const [editEntry, setEditEntry]         = useState(null);
+  const [editIsInitial, setEditIsInitial] = useState(false);
+  const [editInitialMode, setEditInitialMode] = useState('view');
 
   // Safe back navigation that never throws GO_BACK errors. Handles three cases:
   //   1. backTab param set (cross-tab origin, e.g. from ServicesTab) → jump to tab
@@ -333,7 +358,7 @@ export default function CustomerDetailScreen({ route, navigation }) {
       >
         {/* ── Scrollable content ── */}
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, widthCap]}
           keyboardShouldPersistTaps="handled"
         >
 
@@ -567,14 +592,24 @@ export default function CustomerDetailScreen({ route, navigation }) {
               </View>
             ) : (
               <View style={styles.logCard}>
-                {sortedLog.map((entry, idx) => (
-                  <ServiceLogEntry
-                    key={entry.id}
-                    entry={entry}
-                    isInitial={idx === logCount - 1}
-                    isLast={idx === logCount - 1}
-                  />
-                ))}
+                {sortedLog.map((entry, idx) => {
+                  const isInitial = idx === logCount - 1;
+                  return (
+                    <ServiceLogEntry
+                      key={entry.id}
+                      entry={entry}
+                      isInitial={isInitial}
+                      isLast={idx === logCount - 1}
+                      onPress={() => {
+                        setEditIsInitial(isInitial);
+                        setEditInitialMode(
+                          isSameLocalDay(new Date(entry.date), new Date()) ? 'edit' : 'view',
+                        );
+                        setEditEntry(entry);
+                      }}
+                    />
+                  );
+                })}
               </View>
             )}
           </View>
@@ -583,24 +618,26 @@ export default function CustomerDetailScreen({ route, navigation }) {
 
         {/* ── Sticky footer ── */}
         <View style={styles.footer}>
-          <Pressable
-            style={({ pressed }) => [styles.footerBtn, styles.addServiceBtn, pressed && styles.footerBtnPressed]}
-            onPress={() => setAddModal(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Add a service"
-          >
-            <Ionicons name="add-circle-outline" size={18} color={theme.surface} style={styles.footerBtnIcon} />
-            <Text style={styles.footerBtnText}>Add a Service</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.footerBtn, styles.scheduleBtn, pressed && styles.footerBtnPressed]}
-            onPress={() => setScheduleModal(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Schedule service"
-          >
-            <Ionicons name="calendar-outline" size={18} color="#fff" style={styles.footerBtnIcon} />
-            <Text style={styles.footerBtnText}>Schedule</Text>
-          </Pressable>
+          <View style={[styles.footerInner, widthCap]}>
+            <Pressable
+              style={({ pressed }) => [styles.footerBtn, styles.addServiceBtn, pressed && styles.footerBtnPressed]}
+              onPress={() => setAddModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Add a service"
+            >
+              <Ionicons name="add-circle-outline" size={18} color={theme.surface} style={styles.footerBtnIcon} />
+              <Text style={styles.footerBtnText}>Add a Service</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.footerBtn, styles.scheduleBtn, pressed && styles.footerBtnPressed]}
+              onPress={() => setScheduleModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Schedule service"
+            >
+              <Ionicons name="calendar-outline" size={18} color="#fff" style={styles.footerBtnIcon} />
+              <Text style={styles.footerBtnText}>Schedule</Text>
+            </Pressable>
+          </View>
         </View>
 
         <AddServiceModal
@@ -615,6 +652,30 @@ export default function CustomerDetailScreen({ route, navigation }) {
           customer={customer}
           onSave={handleScheduleSave}
           onClose={() => setScheduleModal(false)}
+        />
+
+        <EditServiceModal
+          visible={editEntry !== null}
+          customerId={customerId}
+          entry={editEntry}
+          isInitial={editIsInitial}
+          initialMode={editInitialMode}
+          onSave={async () => {
+            setEditEntry(null);
+            try {
+              const c = await getCustomerById(customerId);
+              if (c) setCustomer(c);
+            } catch {}
+          }}
+          onDelete={async () => {
+            setEditEntry(null);
+            try {
+              const c = await getCustomerById(customerId);
+              if (c) setCustomer(c);
+            } catch {}
+            route.params?.onAlertsRefresh?.();
+          }}
+          onClose={() => setEditEntry(null)}
         />
 
       </KeyboardAvoidingView>
@@ -833,13 +894,15 @@ function makeStyles(theme) {
     },
     // ── Footer ──
     footer: {
+      borderTopWidth:     1,
+      borderTopColor:    theme.border,
+      backgroundColor:   theme.background,
+    },
+    footerInner: {
       flexDirection:     'row',
       gap:               10,
       paddingHorizontal: 20,
       paddingVertical:   14,
-      borderTopWidth:     1,
-      borderTopColor:    theme.border,
-      backgroundColor:   theme.background,
     },
     footerBtn: {
       flex:           1,

@@ -1,9 +1,9 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.7.1
-// Last Updated: 2026-04-17
+// Version: 1.8
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.22.8)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        AddCustomerScreen.js  (this file)
 //               storage.js            (addCustomer)
 //               placesConfig.js       (GEOAPIFY_API_KEY)
@@ -31,6 +31,8 @@
 //   - Storage errors caught and surfaced via Alert
 //
 // CHANGE LOG:
+// v1.8    2026-04-19  Claude  Tablet width cap on form scroll container so the
+//                              customer-create form doesn't stretch across iPad
 // v1.0    2026-04-03  Claude  Initial scaffold
 // v1.0.1  2026-04-03  Claude  Added double-tap protection (saving state),
 //                              input trimming on save, and try/catch around
@@ -91,6 +93,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { addCustomer } from '../data/storage';
 import { GEOAPIFY_API_KEY } from '../config/placesConfig';
 import { useTheme } from '../styles/theme';
+import { useContentContainerStyle } from '../utils/responsive';
 import { FontSize } from '../styles/typography';
 
 // ── Geoapify autocomplete helper ──────────────────────────────────────────────
@@ -153,6 +156,7 @@ const EMPTY_FORM = {
 export default function AddCustomerScreen({ navigation }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const widthCap = useContentContainerStyle();
 
   const [form, setForm]                   = useState(EMPTY_FORM);
   const [saving, setSaving]               = useState(false);
@@ -251,7 +255,7 @@ export default function AddCustomerScreen({ navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, widthCap]}
           keyboardShouldPersistTaps="handled"
         >
           {/* ── Name / Email / Phone ── */}

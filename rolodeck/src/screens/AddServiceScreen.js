@@ -1,9 +1,9 @@
 // =============================================================================
 // AddServiceScreen.js - Add a service entry: date stamp + notes
-// Version: 1.6
-// Last Updated: 2026-04-17
+// Version: 1.7
+// Last Updated: 2026-04-19
 //
-// PROJECT:      Rolodeck (project v0.24.0)
+// PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        AddServiceScreen.js  (this file)
 //               storage.js           (addServiceEntry, getCustomerById,
 //                                     getServiceIntervalMode,
@@ -37,6 +37,7 @@
 //   - Storage errors caught and surfaced via Alert
 //
 // CHANGE LOG:
+// v1.7  2026-04-19  Claude  Tablet width cap on form scroll container
 // v1.0  2026-04-03  Claude  Initial scaffold — included service/install toggle
 // v1.1  2026-04-03  Claude  Removed type toggle; simplified to date + notes
 //                           only per spec ("service date stamp + notes")
@@ -103,6 +104,7 @@ import {
 import { syncCustomerDueDate } from '../utils/calendarSync';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
+import { useContentContainerStyle } from '../utils/responsive';
 
 function todayParts() {
   const t = new Date();
@@ -117,6 +119,7 @@ export default function AddServiceScreen({ route, navigation }) {
   const { customerId, onAlertsRefresh } = route.params;
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const widthCap = useContentContainerStyle();
 
   const today = todayParts();
   const [dd, setDd]     = useState(today.dd);
@@ -342,7 +345,7 @@ export default function AddServiceScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, widthCap]}
           keyboardShouldPersistTaps="handled"
         >
           {/* ── Date ── */}

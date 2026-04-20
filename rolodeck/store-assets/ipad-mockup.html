@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rolodeck — iPad / Tablet Layout Mockup</title>
+<style>
+  :root {
+    --primary: #4AACA5;
+    --primaryDark: #2E8A84;
+    --primaryPale: #C6ECEA;
+    --accent: #D4795A;
+    --bg: #F5F0E8;
+    --surface: #FFFDF9;
+    --border: #DDD5C4;
+    --borderLight: #EEEEEE;
+    --text: #1A1A1A;
+    --text2: #444;
+    --muted: #999;
+    --red: #E53E3E;
+    --orange: #DD7700;
+    --green: #3DAA6A;
+    --blue: #2B7FF0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    background: #2a2a30;
+    color: var(--text);
+  }
+  .page {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+  h1 {
+    color: #fff;
+    font-weight: 600;
+    margin: 0 0 4px;
+    letter-spacing: -.5px;
+  }
+  .subtitle {
+    color: #bbb;
+    margin: 0 0 32px;
+    font-size: 14px;
+  }
+  .section-title {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 40px 0 12px;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .section-title .tag {
+    font-size: 11px;
+    font-weight: 500;
+    background: #444;
+    color: #ddd;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: .3px;
+  }
+  .section-note {
+    color: #999;
+    font-size: 13px;
+    margin: 0 0 20px;
+    max-width: 900px;
+    line-height: 1.5;
+  }
+
+  /* Device frames */
+  .row {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .device {
+    background: #111;
+    border-radius: 44px;
+    padding: 14px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 2px #333 inset;
+  }
+  .device.phone { width: 380px; }
+  .device.ipad  { width: 1100px; }
+  .device .screen {
+    background: var(--bg);
+    border-radius: 30px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .device.phone .screen { height: 780px; }
+  .device.ipad  .screen { height: 780px; flex-direction: row; }
+  .device-label {
+    text-align: center;
+    color: #999;
+    font-size: 12px;
+    margin-top: 10px;
+    letter-spacing: .5px;
+  }
+
+  /* Header bar (phone + iPad) */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .topbar h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .topbar .actions { display: flex; gap: 10px; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    background: var(--primaryPale);
+    color: var(--primaryDark);
+    display: grid; place-items: center;
+    font-size: 16px;
+  }
+
+  /* Tab bar (phone only) */
+  .tabbar {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 8px 0 20px;
+    flex-shrink: 0;
+  }
+  .tabbar .tab {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 4px 0;
+  }
+  .tabbar .tab.active { color: var(--primary); font-weight: 600; }
+  .tabbar .tab .ic {
+    font-size: 20px;
+    display: block;
+    margin-bottom: 2px;
+  }
+
+  /* Sidebar (iPad only) */
+  .sidebar {
+    width: 240px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .sidebar .brand {
+    padding: 20px 18px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--primaryDark);
+    border-bottom: 1px solid var(--border);
+    letter-spacing: -.3px;
+  }
+  .sidebar .nav { padding: 10px 10px; flex: 1; }
+  .sidebar .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--text2);
+    font-size: 14px;
+    margin-bottom: 2px;
+    cursor: pointer;
+  }
+  .sidebar .nav-item .ic { font-size: 18px; width: 20px; text-align: center; }
+  .sidebar .nav-item.active {
+    background: var(--primaryPale);
+    color: var(--primaryDark);
+    font-weight: 600;
+  }
+  .sidebar .nav-item .count {
+    margin-left: auto;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 10px;
+  }
+  .sidebar .foot {
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* Master column (list) */
+  .master {
+    width: 340px;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+  .search {
+    padding: 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .search input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: #fff;
+    font-size: 14px;
+  }
+  .list { overflow-y: auto; padding: 10px; flex: 1; }
+
+  /* Customer card */
+  .card {
+    background: var(--surface);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .card.selected {
+    border-color: var(--primary);
+    background: var(--primaryPale);
+  }
+  .card .name {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 2px;
+    color: var(--text);
+  }
+  .card .meta {
+    font-size: 12px;
+    color: var(--text2);
+  }
+  .card .row2 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+  }
+  .pill {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+  }
+  .pill.overdue  { background: #fde2e2; color: var(--red); }
+  .pill.sched    { background: #dbe9ff; color: var(--blue); }
+  .pill.ok       { background: #d8f0e2; color: var(--green); }
+  .pill.warn     { background: #fde9cd; color: var(--orange); }
+
+  /* Detail pane */
+  .detail {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px;
+  }
+  .detail h3 {
+    margin: 0 0 4px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .detail .sub { color: var(--text2); font-size: 13px; margin-bottom: 20px; }
+  .detail .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+  }
+  .panel h4 {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .kv { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; border-bottom: 1px solid var(--borderLight); }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: var(--text2); }
+  .kv .v { color: var(--text); font-weight: 500; }
+
+  .service-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--borderLight);
+    font-size: 14px;
+  }
+  .service-row:last-child { border-bottom: none; }
+  .service-row .name { flex: 1; font-weight: 500; }
+  .service-row .due  { color: var(--muted); font-size: 12px; }
+
+  /* Phone-only list page */
+  .phone-list { padding: 12px; overflow-y: auto; flex: 1; }
+  .fab {
+    position: absolute;
+    right: 22px; bottom: 110px;
+    width: 56px; height: 56px;
+    border-radius: 28px;
+    background: var(--accent);
+    color: #fff;
+    display: grid; place-items: center;
+    font-size: 28px;
+    box-shadow: 0 8px 20px rgba(212,121,90,.5);
+  }
+  .phone-wrap { position: relative; }
+
+  /* Phone detail example */
+  .phone-detail {
+    padding: 18px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .phone-detail h3 { margin: 0 0 4px; font-size: 20px; }
+  .phone-detail .sub { color: var(--text2); font-size: 13px; margin-bottom: 16px; }
+
+  .callout {
+    background: #1d2a35;
+    border-left: 3px solid var(--primary);
+    padding: 14px 18px;
+    border-radius: 6px;
+    color: #cde;
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 0 0 24px;
+    max-width: 900px;
+  }
+  .callout strong { color: #fff; }
+
+  .legend {
+    color: #888;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Rolodeck — Phone vs. iPad Layout Mockup</h1>
+<p class="subtitle">Side-by-side of current iPhone layout vs. proposed iPad-optimized layout. v0.24.2 baseline.</p>
+
+<div class="callout">
+  <strong>What changes on iPad:</strong> bottom tab bar is replaced with a persistent left <em>sidebar</em>;
+  the Customers list becomes a <em>master-detail split view</em> (list on the left, detail on the right, no drilling in/out);
+  forms and cards cap their width and use multi-column layouts instead of stretching edge-to-edge;
+  landscape orientation is unlocked.
+</div>
+
+<!-- ============================================================= -->
+<div class="section-title">Customers screen <span class="tag">PRIMARY DIFFERENCE</span></div>
+<p class="section-note">Phone: tap a customer → push to detail screen → back button to return. iPad: list and detail are always visible. Selection updates the right pane instantly.</p>
+
+<div class="row">
+
+  <!-- PHONE -->
+  <div>
+    <div class="device phone">
+      <div class="screen phone-wrap">
+        <div class="topbar">
+          <h2>Customers</h2>
+          <div class="actions">
+            <div class="icon-btn">⌕</div>
+            <div class="icon-btn">⋯</div>
+          </div>
+        </div>
+        <div class="phone-list">
+          <div class="card">
+            <div class="name">Alvarez, Maria</div>
+            <div class="meta">2847 Birchwood Ln</div>
+            <div class="row2"><span class="meta">3 services</span><span class="pill overdue">OVERDUE</span></div>
+          </div>
+          <div class="card selected">
+            <div class="name">Chen Family</div>
+            <div class="meta">14 Park Circle</div>
+            <div class="row2"><span class="meta">5 services</span><span class="pill sched">SCHEDULED</span></div>
+          </div>
+          <div class="card">
+            <div class="name">Delacroix, P.</div>
+            <div class="meta">882 Harbor Rd</div>
+            <div class="row2"><span class="meta">2 services</span><span class="pill ok">OK</span></div>
+          </div>
+          <div class="card">
+            <div class="name">Eastman, Jill</div>
+            <div class="meta">59 Maplewood Dr</div>
+            <div class="row2"><span class="meta">4 services</span><span class="pill warn">DUE SOON</span></div>
+          </div>
+          <div class="card">
+            <div class="name">Fisher, R.</div>
+            <div class="meta">1207 Oakview Ave</div>
+            <div class="row2"><span class="meta">1 service</span><span class="pill ok">OK</span></div>
+          </div>
+          <div class="card">
+            <div class="name">Grayson, T.</div>
+            <div class="meta">77 Cedar Hollow</div>
+            <div class="row2"><span class="meta">6 services</span><span class="pill overdue">OVERDUE</span></div>
+          </div>
+        </div>
+        <div class="fab">+</div>
+        <div class="tabbar">
+          <div class="tab active"><span class="ic">👥</span>Customers</div>
+          <div class="tab"><span class="ic">🧰</span>Services</div>
+          <div class="tab"><span class="ic">⚙</span>Settings</div>
+        </div>
+      </div>
+    </div>
+    <div class="device-label">iPhone — current</div>
+  </div>
+
+  <!-- IPAD -->
+  <div>
+    <div class="device ipad">
+      <div class="screen">
+        <!-- sidebar -->
+        <div class="sidebar">
+          <div class="brand">Rolodeck</div>
+          <div class="nav">
+            <div class="nav-item active"><span class="ic">👥</span>Customers <span class="count">47</span></div>
+            <div class="nav-item"><span class="ic">🧰</span>Services</div>
+            <div class="nav-item"><span class="ic">📅</span>Schedule</div>
+            <div class="nav-item"><span class="ic">💳</span>Square Sync</div>
+            <div class="nav-item"><span class="ic">🎨</span>Theme</div>
+            <div class="nav-item"><span class="ic">⚙</span>Settings</div>
+          </div>
+          <div class="foot">v0.24.2 · Signed in as Paul</div>
+        </div>
+
+        <!-- master list -->
+        <div class="master">
+          <div class="search"><input placeholder="Search customers…" value=""></div>
+          <div class="list">
+            <div class="card">
+              <div class="name">Alvarez, Maria</div>
+              <div class="meta">2847 Birchwood Ln</div>
+              <div class="row2"><span class="meta">3 services</span><span class="pill overdue">OVERDUE</span></div>
+            </div>
+            <div class="card selected">
+              <div class="name">Chen Family</div>
+              <div class="meta">14 Park Circle</div>
+              <div class="row2"><span class="meta">5 services</span><span class="pill sched">SCHEDULED</span></div>
+            </div>
+            <div class="card">
+              <div class="name">Delacroix, P.</div>
+              <div class="meta">882 Harbor Rd</div>
+              <div class="row2"><span class="meta">2 services</span><span class="pill ok">OK</span></div>
+            </div>
+            <div class="card">
+              <div class="name">Eastman, Jill</div>
+              <div class="meta">59 Maplewood Dr</div>
+              <div class="row2"><span class="meta">4 services</span><span class="pill warn">DUE SOON</span></div>
+            </div>
+            <div class="card">
+              <div class="name">Fisher, R.</div>
+              <div class="meta">1207 Oakview Ave</div>
+              <div class="row2"><span class="meta">1 service</span><span class="pill ok">OK</span></div>
+            </div>
+            <div class="card">
+              <div class="name">Grayson, T.</div>
+              <div class="meta">77 Cedar Hollow</div>
+              <div class="row2"><span class="meta">6 services</span><span class="pill overdue">OVERDUE</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- detail -->
+        <div class="detail">
+          <h3>Chen Family</h3>
+          <div class="sub">14 Park Circle · Customer since Aug 2024</div>
+
+          <div class="grid">
+            <div class="panel">
+              <h4>Contact</h4>
+              <div class="kv"><span class="k">Phone</span><span class="v">(555) 402-1188</span></div>
+              <div class="kv"><span class="k">Email</span><span class="v">chen.family@…</span></div>
+              <div class="kv"><span class="k">Preferred</span><span class="v">Text message</span></div>
+              <div class="kv"><span class="k">Gate code</span><span class="v">#4821</span></div>
+            </div>
+            <div class="panel">
+              <h4>Square Sync</h4>
+              <div class="kv"><span class="k">Status</span><span class="v" style="color:var(--green)">Linked</span></div>
+              <div class="kv"><span class="k">Last invoice</span><span class="v">$420 · Mar 12</span></div>
+              <div class="kv"><span class="k">Open balance</span><span class="v">$0.00</span></div>
+            </div>
+          </div>
+
+          <div class="panel" style="margin-bottom:20px">
+            <h4>Services</h4>
+            <div class="service-row"><span class="name">Lawn mow — biweekly</span><span class="due">Next: Apr 22</span><span class="pill sched">SCHEDULED</span></div>
+            <div class="service-row"><span class="name">Gutter clean</span><span class="due">Next: May 10</span><span class="pill ok">OK</span></div>
+            <div class="service-row"><span class="name">Hedge trim</span><span class="due">Next: Apr 24</span><span class="pill warn">DUE SOON</span></div>
+            <div class="service-row"><span class="name">Fertilizer (spring)</span><span class="due">Overdue by 6d</span><span class="pill overdue">OVERDUE</span></div>
+            <div class="service-row"><span class="name">Driveway power wash</span><span class="due">Next: Jun 1</span><span class="pill ok">OK</span></div>
+          </div>
+
+          <div class="panel">
+            <h4>Recent notes</h4>
+            <div class="kv"><span class="k">Apr 08</span><span class="v">Back gate sticking — bring WD-40 next visit</span></div>
+            <div class="kv"><span class="k">Mar 25</span><span class="v">Dog in yard after 4pm, call first</span></div>
+            <div class="kv"><span class="k">Mar 12</span><span class="v">Invoice paid on the spot, tipped $40</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="device-label">iPad — proposed (sidebar + master-detail split)</div>
+  </div>
+</div>
+
+<!-- ============================================================= -->
+<div class="section-title">Add Customer form <span class="tag">FORM SCALING</span></div>
+<p class="section-note">Phone: single column, inputs full-width. iPad: capped content width (~720px), paired fields go side-by-side instead of stacking, form stays centered in the detail pane instead of stretching across the whole screen.</p>
+
+<div class="row">
+
+  <!-- PHONE form -->
+  <div>
+    <div class="device phone">
+      <div class="screen">
+        <div class="topbar">
+          <div class="icon-btn">‹</div>
+          <h2 style="flex:1;text-align:center;margin-left:-34px">Add Customer</h2>
+        </div>
+        <div class="phone-detail">
+          <label style="font-size:12px;color:var(--text2);font-weight:600">NAME</label>
+          <input style="width:100%;padding:12px;margin:6px 0 14px;border:1px solid var(--border);border-radius:10px;background:#fff" value="Chen Family">
+          <label style="font-size:12px;color:var(--text2);font-weight:600">ADDRESS</label>
+          <input style="width:100%;padding:12px;margin:6px 0 14px;border:1px solid var(--border);border-radius:10px;background:#fff" value="14 Park Circle">
+          <label style="font-size:12px;color:var(--text2);font-weight:600">CITY</label>
+          <input style="width:100%;padding:12px;margin:6px 0 14px;border:1px solid var(--border);border-radius:10px;background:#fff" value="Arlington">
+          <label style="font-size:12px;color:var(--text2);font-weight:600">ZIP</label>
+          <input style="width:100%;padding:12px;margin:6px 0 14px;border:1px solid var(--border);border-radius:10px;background:#fff" value="02474">
+          <label style="font-size:12px;color:var(--text2);font-weight:600">PHONE</label>
+          <input style="width:100%;padding:12px;margin:6px 0 14px;border:1px solid var(--border);border-radius:10px;background:#fff" value="(555) 402-1188">
+          <label style="font-size:12px;color:var(--text2);font-weight:600">EMAIL</label>
+          <input style="width:100%;padding:12px;margin:6px 0 20px;border:1px solid var(--border);border-radius:10px;background:#fff" value="chen.family@…">
+          <div style="background:var(--primary);color:#fff;padding:13px;border-radius:10px;text-align:center;font-weight:600">Save Customer</div>
+        </div>
+        <div class="tabbar">
+          <div class="tab active"><span class="ic">👥</span>Customers</div>
+          <div class="tab"><span class="ic">🧰</span>Services</div>
+          <div class="tab"><span class="ic">⚙</span>Settings</div>
+        </div>
+      </div>
+    </div>
+    <div class="device-label">iPhone — stacked single column</div>
+  </div>
+
+  <!-- IPAD form -->
+  <div>
+    <div class="device ipad">
+      <div class="screen">
+        <div class="sidebar">
+          <div class="brand">Rolodeck</div>
+          <div class="nav">
+            <div class="nav-item active"><span class="ic">👥</span>Customers</div>
+            <div class="nav-item"><span class="ic">🧰</span>Services</div>
+            <div class="nav-item"><span class="ic">📅</span>Schedule</div>
+            <div class="nav-item"><span class="ic">💳</span>Square Sync</div>
+            <div class="nav-item"><span class="ic">🎨</span>Theme</div>
+            <div class="nav-item"><span class="ic">⚙</span>Settings</div>
+          </div>
+          <div class="foot">v0.24.2 · Signed in as Paul</div>
+        </div>
+        <div class="detail" style="padding:0">
+          <div class="topbar">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="icon-btn">‹</div>
+              <h2>Add Customer</h2>
+            </div>
+            <div style="background:var(--primary);color:#fff;padding:10px 22px;border-radius:10px;font-weight:600;font-size:14px">Save Customer</div>
+          </div>
+          <div style="padding:32px; display:flex; justify-content:center">
+            <div style="width:100%;max-width:720px">
+              <div class="panel" style="padding:22px 26px;margin-bottom:18px">
+                <h4>Identity</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">NAME</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="Chen Family">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">NICKNAME</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="">
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel" style="padding:22px 26px;margin-bottom:18px">
+                <h4>Address</h4>
+                <label style="font-size:12px;color:var(--text2);font-weight:600">STREET</label>
+                <input style="width:100%;padding:11px;margin:6px 0 14px;border:1px solid var(--border);border-radius:10px;background:#fff" value="14 Park Circle">
+                <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px">
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">CITY</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="Arlington">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">STATE</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="MA">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">ZIP</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="02474">
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel" style="padding:22px 26px">
+                <h4>Contact</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">PHONE</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="(555) 402-1188">
+                  </div>
+                  <div>
+                    <label style="font-size:12px;color:var(--text2);font-weight:600">EMAIL</label>
+                    <input style="width:100%;padding:11px;margin-top:6px;border:1px solid var(--border);border-radius:10px;background:#fff" value="chen.family@…">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="device-label">iPad — paired columns, capped width, stays centered</div>
+  </div>
+</div>
+
+<!-- ============================================================= -->
+<div class="section-title">Landscape (iPad only) <span class="tag">ORIENTATION UNLOCKED</span></div>
+<p class="section-note">App.json currently locks orientation to portrait. On iPad that's unlocked — rotating gives a wider detail pane, good for reading service history and editing notes side-by-side.</p>
+
+<div class="row">
+  <div>
+    <div class="device ipad" style="width:1280px">
+      <div class="screen" style="height:720px">
+        <div class="sidebar">
+          <div class="brand">Rolodeck</div>
+          <div class="nav">
+            <div class="nav-item"><span class="ic">👥</span>Customers</div>
+            <div class="nav-item active"><span class="ic">🧰</span>Services <span class="count">12</span></div>
+            <div class="nav-item"><span class="ic">📅</span>Schedule</div>
+            <div class="nav-item"><span class="ic">💳</span>Square Sync</div>
+            <div class="nav-item"><span class="ic">🎨</span>Theme</div>
+            <div class="nav-item"><span class="ic">⚙</span>Settings</div>
+          </div>
+          <div class="foot">v0.24.2</div>
+        </div>
+        <div class="master" style="width:320px">
+          <div class="search"><input placeholder="Search services…"></div>
+          <div class="list">
+            <div class="card"><div class="name">Lawn mow — biweekly</div><div class="meta">12 customers · interval 14d</div></div>
+            <div class="card selected"><div class="name">Gutter clean</div><div class="meta">8 customers · interval 180d</div></div>
+            <div class="card"><div class="name">Hedge trim</div><div class="meta">9 customers · interval 60d</div></div>
+            <div class="card"><div class="name">Driveway power wash</div><div class="meta">4 customers · interval 365d</div></div>
+            <div class="card"><div class="name">Fertilizer — spring</div><div class="meta">14 customers · seasonal</div></div>
+            <div class="card"><div class="name">Leaf removal — fall</div><div class="meta">21 customers · seasonal</div></div>
+          </div>
+        </div>
+        <div class="detail">
+          <h3>Gutter clean</h3>
+          <div class="sub">8 customers on this service · default interval 180d</div>
+          <div class="grid">
+            <div class="panel">
+              <h4>Settings</h4>
+              <div class="kv"><span class="k">Default interval</span><span class="v">180 days</span></div>
+              <div class="kv"><span class="k">Estimated duration</span><span class="v">45 min</span></div>
+              <div class="kv"><span class="k">Default price</span><span class="v">$150</span></div>
+              <div class="kv"><span class="k">Square item</span><span class="v">GUTTER-CLEAN-STD</span></div>
+            </div>
+            <div class="panel">
+              <h4>Upcoming (next 30d)</h4>
+              <div class="service-row"><span class="name">Chen Family</span><span class="due">Apr 22</span></div>
+              <div class="service-row"><span class="name">Eastman, Jill</span><span class="due">Apr 28</span></div>
+              <div class="service-row"><span class="name">Fisher, R.</span><span class="due">May 03</span></div>
+              <div class="service-row"><span class="name">Grayson, T.</span><span class="due">May 09</span></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h4>All customers</h4>
+            <div class="service-row"><span class="name">Alvarez, Maria</span><span class="due">Last: Nov 10 · Next: May 09</span><span class="pill ok">OK</span></div>
+            <div class="service-row"><span class="name">Chen Family</span><span class="due">Last: Oct 23 · Next: Apr 22</span><span class="pill warn">DUE SOON</span></div>
+            <div class="service-row"><span class="name">Delacroix, P.</span><span class="due">Last: Sep 01 · Next: Mar 01</span><span class="pill overdue">OVERDUE</span></div>
+            <div class="service-row"><span class="name">Eastman, Jill</span><span class="due">Last: Oct 30 · Next: Apr 28</span><span class="pill ok">OK</span></div>
+            <div class="service-row"><span class="name">Fisher, R.</span><span class="due">Last: Nov 04 · Next: May 03</span><span class="pill ok">OK</span></div>
+            <div class="service-row"><span class="name">Grayson, T.</span><span class="due">Last: Nov 10 · Next: May 09</span><span class="pill ok">OK</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="device-label">iPad landscape — sidebar + master-detail across 1280pt</div>
+  </div>
+</div>
+
+<p class="legend">
+  Mockup rendered with HTML/CSS using the Rolodeck Classic theme palette (teal/cream/rust). Not pixel-perfect to the app —
+  meant to show <em>structure and layout</em> differences only. Fonts use system default, not the app's Inter/Poppins stack.
+</p>
+
+</div>
+</body>
+</html>

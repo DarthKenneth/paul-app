@@ -16,6 +16,7 @@ ios/
 *.key
 *.mobileprovision
 *.orig.*
+secrets/
 
 # Environment
 .env
