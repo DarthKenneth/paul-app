@@ -2,11 +2,11 @@
 
 ---
 
-## Current State (as of v0.25.0, 2026-04-19)
+## Current State (as of v0.29.0, 2026-04-24)
 
-The app is feature-complete and builds cleanly. Pre-release hardening is done.
+The app is feature-complete and builds cleanly. Pre-release hardening is done. The profession-system architecture originally planned for v2.0 is now shipped end-to-end for Water Treatment. The iPad tablet buildout (Phases A–C) is now complete — landscape sidebar, master-detail split views in Customers + Services, CustomerDetailPane extraction. Remaining tablet polish (Phase D touch targets, Phase E photo lightbox) is optional before v1.0.
 
-- **iOS** — TestFlight build 11 (v0.23.0 shipped); v0.24.x + v0.25.0 builds in flight
+- **iOS** — TestFlight build 11 (v0.23.0 shipped); 0.24.x–0.29.x shipped via OTA + builds in flight
 - **Android** — Live on Play internal track (released Apr 16)
 - **Auto-submit** — GitHub Actions pipeline fully wired; `git tag vX.Y && git push --tags` builds + submits to both stores
 
@@ -51,11 +51,38 @@ The app is feature-complete and builds cleanly. Pre-release hardening is done.
 - **In-app camera** (v0.24.0) — same path; captures job-site photos during a service visit
 - **Tap-to-edit service log entries** (v0.25.0) — past service/install entries are selectable; edit notes, add/remove photos, or delete a mistake entry directly from the customer detail screen
 - **Tablet / iPad responsive polish** (v0.25.0) — primary screens cap content at 760pt and center on tablets (iPad mini through Pro) so forms and lists don't stretch edge-to-edge; phone layouts untouched
+- **Dark theme transition flash fix** (v0.25.3) — `NavigationContainer` now themed so Midnight and Ember no longer flash bright white on tab switch
+
+### Profession system (v0.26 – v0.28)
+
+The "Multi-Profession Upgrade" originally scoped for v2.0 landed as an additive series of minor bumps — no schema migration needed, existing data stayed untouched, Water Treatment stayed the default. Architecture is now in place; remaining work is adding more presets + onboarding picker.
+
+- **Infrastructure** (v0.26.0) — `src/data/professions/` registry, `ProfessionContext` provider, `useProfession()` hook, `@rolodeck_profession` AsyncStorage key (defaults to `'water'`)
+- **Water Treatment preset wired end-to-end** (v0.27.0) — 4 service types, 3 custom lists, 6-item checklist, 3 equipment fields, 2 entry field dropdowns
+- **Profession Settings screens** (v0.27.0) — Settings → Profession → Water Treatment hub; drill-downs for Service Types (duration steppers), Custom Lists (chip editor per list), Service Checklist (visibility toggles)
+- **Editable service types + custom types** (v0.28.0) — Service Types screen with eye toggle, trash button, Add Service Type card (name + icon grid + duration stepper); `effectiveServiceTypes` (for pickers) vs `allServiceTypes` (for log lookups) distinction
+- **Editable checklist** (v0.28.0) — Add Checklist Item card with label + check/measure type; custom items can be hidden or deleted; Measurement type supports a unit label (e.g. gpg, ppm) that appears in the checklist row
+- **Reusable `ListPickerModal`** (v0.27.0, extended v0.28.1) — single-select picker used for entry fields + equipment dropdowns; `multi: true` prop added in v0.28.1 for multi-select
+
+### Equipment + service entry polish (v0.28.1 – v0.28.5)
+
+- **Equipment as multi-select picker** (v0.28.1) — equipment field converted from inline checklist to a picker row matching the other entry fields; shown for both Install and Service types; label dynamically reads "Equipment Installed" or "Equipment Serviced"
+- **Last Service Details on customer card** (v0.28.2) — equipment + salt from the most recent entry with entryValues, visible without opening the log
+- **Service log entry summary line** (v0.28.2) — brief equipment/salt line under the type label in each log row
+- **Full details in view mode** (v0.28.2) — tapping a service entry shows Details + Checklist sections before Notes/Photos in the view sheet
+- **Subtle edit affordance** (v0.28.2) — edit pencil on customer card and entry modal uses `pencil-outline` + muted color
+- **View-mode default for all entries** (v0.28.3) — every service entry now opens in view mode (was 'edit' for same-day entries) to prevent accidental edits; pencil to enter edit mode deliberately
+- **Photos now actually save on new entries** (v0.28.3) — `addServiceEntry` in storage.js was silently dropping the `photos` field since photo support shipped; fixed
+- **Permission recovery** (v0.28.3) — "Permission Denied" alerts now include an "Open Settings" button via `Linking.openSettings()` across Add/Edit service paths and image/camera flows
+- **Calendar + photo orphan cleanup on delete** (v0.28.4) — deleting a customer now calls `removeCustomerEvent` + `removeScheduledServiceEvent` for every scheduled entry, and `deletePhotosFromDisk` for every photo across the service log; deleting a single entry or removing a photo in edit mode also cleans up the file
+- **Checklist unit preservation** (v0.28.4) — custom measure items were losing their `unit` label on any subsequent add/delete; fixed in `ChecklistScreen.handleDelete` + `handleAddItem`
+- **Detail row layout fix** (v0.28.5) — entry detail rows no longer squeeze the label into a character-wrapped column; label sizes to content, value takes remaining space and wraps multi-line
 
 ### Release pipeline fixes
 - `runtimeVersion: { policy: "appVersion" }` — Expo Go manifest crash
 - `promise@8.3.0` direct dep — Sentry launch crash
 - `patch-package` for `expo-modules-core` — `addListener` crash in Expo Go
+- Android auto-submit `releaseStatus: "draft"` (v0.25.2) — Google rejected auto-publish until listing metadata is complete; draft lets the AAB land in the Play Console for manual promotion
 
 ---
 
@@ -103,51 +130,37 @@ eas update --branch production --message "fix: describe the fix"
 
 For native changes, rebuild and submit.
 
-### Step 4 — Tablet / iPad buildout (optional for v1, required for iPad marketing)
+### Step 4 — Tablet / iPad buildout ✅ (Phases A–C complete in v0.29.0)
 
-`supportsTablet: true` is already on in `app.json`. v0.25.0 shipped the first pass of tablet polish: every primary screen (Customers, Customer Detail, Add Customer, Add Service, Services, Settings) now caps content at 760pt on tablets via `src/utils/responsive.js` (`useIsTablet`, `useContentContainerStyle`). That's enough to make the app *feel* native on iPad in portrait.
+`supportsTablet: true` is on in `app.json`. v0.25.0 shipped the first pass: content capped at 760pt on portrait tablet. v0.29.0 shipped the full iPad-native buildout (Phases A–C):
 
-Below is the remaining work to make Rolodeck a genuinely iPad-first app. Treat these as minor-version bumps (0.26.x, 0.27.x, …) landing before v1.0, or defer past v1.0 and ship as v1.x polish.
+**Phase A — Orientation + landscape ✅ (v0.29.0)**
+- [x] `app.json` `orientation` changed to `"default"` — iPad rotates freely
+- [x] `useSplitLayout()` hook gates all landscape features (`isTablet && isLandscape`)
+- [x] `useIsLandscape()` hook + `SIDEBAR_WIDTH`/`SPLIT_LIST_WIDTH` constants in `responsive.js`
 
-**Phase A — Orientation + landscape (minor bump, ~1 day):**
-- [ ] Change `app.json` `orientation` from `"portrait"` to `"default"` so iPad can rotate. This also unlocks phone landscape; either accept that or install `expo-screen-orientation` and lock phone runtime-only via `ScreenOrientation.lockAsync(PORTRAIT_UP)` when `!useIsTablet()` on app mount.
-- [ ] Test every screen in landscape: `CustomersScreen`, `CustomerDetailScreen`, `AddCustomerScreen`, `AddServiceScreen`, `ServicesScreen`, `SettingsScreen`, `ThemeScreen`, `ServiceIntervalScreen`, `SquareSyncScreen`, `SchedulingSettingsScreen`, plus modals (`AddServiceModal`, `EditServiceModal`, `ScheduleServiceModal`, `OnboardingModal`).
-- [ ] Fix any landscape regressions — most likely candidates: `KeyboardAvoidingView` offsets, modal max-height clipping, photo lightbox aspect ratio.
+**Phase B — Master-detail split views ✅ (v0.29.0)**
+- [x] `CustomerDetailPane` extracted from `CustomerDetailScreen` — works as both a pushed screen and an embedded pane; uses `useEffect` on `customerId` prop instead of `useFocusEffect`
+- [x] `CustomersScreen` → split view: list on left (320pt), `CustomerDetailPane` on right; tapping a card swaps the pane; pane callbacks refresh the list (no stale cards after service add)
+- [x] `ServicesScreen` → same pattern: due/overdue list + calendar on left, `CustomerDetailPane` on right; calendar taps still navigate on phone
+- [x] `CustomerDetailScreen` rewritten as thin nav wrapper (~60 lines): header back button + `safeGoBack`, then delegates to `CustomerDetailPane`
 
-**Phase B — Master-detail split views (minor bump, ~3-5 days):**
+**Phase C — Sidebar navigation ✅ (v0.29.0)**
+- [x] `TabletSidebar` in `App.js`: permanent left sidebar (240pt) with Rolodeck logo + 3 nav rows (icon + label + Services badge); no drawer package needed
+- [x] `TabNavigator` `hideTabs` prop suppresses bottom bar when sidebar is shown
+- [x] Active tab tracked via `NavigationContainer.onStateChange`; sidebar navigates via `navigationRef.current?.navigate()`
 
-Biggest UX win on iPad. Replace the "list → push detail → back" pattern with a persistent split view on tablet landscape. Keep phone behavior untouched.
+**Phase D — Touch-target + typography tuning (optional, deferred):**
+- [ ] Bump `FontSize.base` by ~1-2pt on tablet via `tabletScale()` (already in typography.js)
+- [ ] Increase card padding and row heights ~15-20% on tablet
+- [ ] Audit `Pressable` targets < 44pt — raise to 48pt on tablet
+- [ ] Calendar modal: cap width to 520pt on tablet (was 90%)
 
-- [ ] `CustomersScreen` → split view: list on left (320pt fixed), `CustomerDetailScreen` on right (flex). Tapping a row swaps the right pane without a navigation push. Use `useIsTablet() && width > height` to gate.
-- [ ] `ServicesScreen` → same pattern: due/overdue list on left, selected customer's history + upcoming on right.
-- [ ] `SettingsScreen` → list of categories on left, selected subscreen on right (ThemeScreen, ServiceIntervalScreen, SquareSyncScreen, SchedulingSettingsScreen).
-- [ ] Refactor: `CustomerDetailScreen`, `ThemeScreen`, etc. need to work both as pushed screens (phone) and embedded panes (tablet). Extract the visual body into a `CustomerDetailPane` component that the screen wrapper uses for navigation, and the split view mounts directly.
-- [ ] Update `TabNavigator` so the Customers and Settings tabs conditionally render a split-view container instead of a pushed Stack on tablet landscape.
-
-**Phase C — Sidebar navigation (minor bump, ~2 days):**
-
-Replace the bottom tab bar with a persistent left sidebar on tablet. iPad HIG expects this; bottom tabs on a 1024pt screen waste vertical space and feel phone-ish.
-
-- [ ] Add `createDrawerNavigator` from `@react-navigation/drawer` (already likely in deps — if not, install).
-- [ ] On tablet: render Drawer (permanently open, 240pt wide) instead of BottomTabNavigator. Nav items: Customers, Services, Settings, plus quick-access rows for Theme + Scheduling.
-- [ ] Customer count, service alert badge, and Square sync status move to sidebar footer.
-- [ ] Phone: unchanged — BottomTabNavigator as today.
-
-**Phase D — Touch-target + typography tuning on tablet (patch bump):**
-
-Fine-tune for the larger screen without going overboard. iPads don't need bigger everything — just the right things bigger.
-
-- [ ] Bump `FontSize.base` by ~1-2pt on tablet (via `useIsTablet()` in `typography.js`).
-- [ ] Increase card padding and row heights ~15-20% on tablet so the list doesn't feel cramped next to the detail pane.
-- [ ] Audit every `TouchableOpacity`/`Pressable` that's <44pt tall — raise to 48pt on tablet.
-- [ ] Calendar modal (`react-native-calendars`): widen `width: '90%'` → capped 520pt on tablet.
-
-**Phase E — Tablet-specific polish (patch bump):**
-
-- [ ] Photo lightbox: use aspect-ratio-preserving layout that fits iPad landscape (current 80% height is fine portrait, wastes space landscape).
-- [ ] iPad-specific splash screen asset at `store-assets/icons/` (2048×2732 for 12.9" Pro).
-- [ ] App Store listing: add iPad screenshots, update description to mention tablet support.
-- [ ] Google Play: tablet-optimized listing (Play Console → Store presence → Tablet section).
+**Phase E — Tablet-specific polish (optional, deferred):**
+- [ ] Photo lightbox: aspect-ratio-preserving layout for iPad landscape
+- [ ] iPad-specific splash screen asset (2048×2732 for 12.9" Pro)
+- [ ] App Store listing: add iPad screenshots, mention tablet support in description
+- [ ] Google Play: tablet-optimized listing (Play Console → Tablet section)
 
 **Phase F — Keyboard + pointer support (nice-to-have, post v1):**
 
@@ -177,7 +190,7 @@ GitHub Actions takes it from there. App Store review: 1–3 days. Google Play: u
 
 ## Multi-Profession Upgrade (v2.0)
 
-> **Status:** Design complete. Mockup at `/tmp/rolodeck-mockup/index.html` (can be regenerated — see "Mockup" section below). Not implemented. Expected to ship after v1.x has had time to stabilize in production.
+> **Status:** Architecture **shipped in v0.26 – v0.28** (see "Profession system" under Completed above). Water Treatment preset is fully wired end-to-end: service types + custom lists + checklist + equipment fields + entry field dropdowns + customize screens. Remaining work is **content** (the other 11 profession presets) + the first-run onboarding picker. No storage migration is required because the system was built additively — Water stays the default and existing installs were never disrupted, which means the "next big release" does not necessarily need a major-version bump. Mockup at `/tmp/rolodeck-mockup/index.html` (regenerable — see "Mockup" section below).
 
 ### Vision
 
@@ -319,9 +332,11 @@ Professions without a real "install" concept (some cleaning use-cases) can still
 
 ### Migration strategy
 
+> **Update (v0.28):** The system was built so additively that no explicit migration function was ever needed. Water stayed the default, old `type: 'service' | 'install'` entries already matched the Water preset's type IDs, and new profession data lives under separate keys. The `@rolodeck_schema_version` bump + migration function below is preserved for reference in case a future profession change requires it, but it has not been run.
+
 **Existing user data is 100% safe.** All changes are additive — no renames, no removals.
 
-**Migration function** (runs once on first v2 launch):
+**Migration function** (reference only — not currently wired):
 
 ```js
 // On app boot, check @rolodeck_schema_version
@@ -380,15 +395,16 @@ if (schemaVersion < 2) {
 
 ### Implementation sequencing
 
-Rough phase order. Each phase should be shippable-if-forced.
+Phases 1–3 and most of phase 4 are shipped. Remaining work: port the other 11 profession preset configs (the mockup is the authoritative source) + build the onboarding picker + end-to-end testing per profession.
 
-1. **Phase 1 — Infra** — profession config registry (one file per profession in `src/data/professions/`), AsyncStorage key handlers, migration function, schema version check on boot
-2. **Phase 2 — Core reads** — wire CustomerCard + CustomerDetail + AddService + AddCustomer to read from active profession. Water treatment behavior stays identical.
-3. **Phase 3 — Entry field dropdowns** — custom lists + dropdown UI in AddServiceScreen. User can add items to lists inline.
-4. **Phase 4 — Customize screens** — all 5 Settings drill-downs (Service Types, Custom Lists, Checklist, Equipment Fields, Default Interval)
-5. **Phase 5 — Onboarding** — first-run profession picker modal for fresh installs
-6. **Phase 6 — Testing** — seed and validate each of the 12 professions end-to-end; test migration on real v1 backup files
-7. **Phase 7 — Release** — tag `v2.0.0`, migration tested on real v1 AsyncStorage dumps before shipping
+1. **Phase 1 — Infra** ✅ (v0.26.0) — profession config registry at `src/data/professions/`, `ProfessionContext` provider, `useProfession()` hook, `@rolodeck_profession` AsyncStorage key (default `'water'`). Schema version / migration function deferred — not needed since everything was built additively.
+2. **Phase 2 — Core reads** ✅ (v0.26.0 – v0.27.0) — CustomerCard, CustomerDetail, AddService (modal + screen), ScheduleServiceModal, SchedulingSettings all read from active profession. Water treatment behavior unchanged for existing installs.
+3. **Phase 3 — Entry field dropdowns** ✅ (v0.27.0, multi-select added v0.28.1) — `ListPickerModal` reused for entry fields; Equipment Serviced / Salt Used pull from custom lists; multi-select Equipment shipped.
+4. **Phase 4 — Customize screens** — ✅ Service Types (v0.28.0), ✅ Custom Lists (v0.27.0), ✅ Checklist (v0.27.0, editable v0.28.0), ◻ Equipment Fields editor, ◻ Default Interval screen (preset grid + toggles)
+5. **Phase 5 — Onboarding** ◻ — first-run profession picker modal for fresh installs; pick from the 12 presets + Custom. Existing installs stay on Water without prompting.
+6. **Phase 6 — Port the other 11 profession presets** ◻ — HVAC, Pest Control, Lawn Care, Pool & Spa, Electrician, Cleaning, Chimney Sweep, Appliance Repair, Gutter & Window, Locksmith, Garage Door, plus the Custom blank slate. Preset contents live in the mockup — port verbatim.
+7. **Phase 7 — Testing** ◻ — seed + validate each profession end-to-end; verify profession switch on existing data doesn't rewrite history.
+8. **Phase 8 — Release** ◻ — tag and push. Whether this is a v2.0.0 marketing moment or a v1.x series is a judgment call since no schema migration is required.
 
 ### Mockup
 
@@ -426,6 +442,12 @@ The mockup data is the authoritative source for the preset contents — port it 
 - **Customer photos** — shipped as service note photo attachments in v0.24.0
 - **In-app camera** — `expo-image-picker` camera + library integration in v0.24.0
 - **Service note photo attachments** — v0.24.0
+- **Profession system infrastructure + Water Treatment preset** — v0.26.0 – v0.28.0
+- **Editable service types with custom types + icons + durations** — v0.28.0
+- **Editable checklist with custom items + measurement units** — v0.28.0
+- **Equipment as multi-select picker on Add Service** — v0.28.1
+- **Last Service Details on customer card + details in entry view** — v0.28.2
+- **Calendar + photo file cleanup on delete** — v0.28.4
 
 ### Rejected / out of scope
 - **Technician assignment** — violates solo-LLC / freelancer target user

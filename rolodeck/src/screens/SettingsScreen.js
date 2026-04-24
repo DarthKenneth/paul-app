@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.0.3
-// Last Updated: 2026-04-19
+// Version: 2.1
+// Last Updated: 2026-04-23
 //
-// PROJECT:      Rolodeck (project v0.25.0)
+// PROJECT:      Rolodeck (project v0.27)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -36,6 +36,10 @@
 //   - useEffect cleanup prevents state updates on unmounted component
 //
 // CHANGE LOG:
+// v2.1  2026-04-23  Claude  Profession section (nav row to ProfessionSettingsScreen)
+//       - Added useProfession(); Profession section after Scheduling shows
+//         profession.emoji + name with chevron to ProfessionSettings
+//       - Imported useProfession from ProfessionContext
 // v2.0.3 2026-04-19  Claude  Tablet width cap on ScrollView content
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Debug + harden
@@ -148,6 +152,7 @@ import {
   syncAll,
 } from '../utils/calendarSync';
 import { APP_VERSION } from '../appVersion';
+import { useProfession } from '../contexts/ProfessionContext';
 
 const INTERVAL_MODE_LABELS = {
   '30':   '30 Days',
@@ -172,6 +177,7 @@ const SORT_OPTIONS = [
 
 export default function SettingsScreen({ navigation }) {
   const { theme, themeKey, fontKey } = useTheme();
+  const { profession } = useProfession();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const widthCap = useContentContainerStyle();
 
@@ -359,6 +365,28 @@ export default function SettingsScreen({ navigation }) {
                 <Text style={styles.rowTitle}>Work Days & Hours</Text>
                 <Text style={styles.rowDesc}>
                   Work hours, appointment durations, travel time
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+          </Pressable>
+        </View>
+
+        {/* ── Profession ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Profession</Text>
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={() => navigation.navigate('ProfessionSettings')}
+            accessibilityRole="button"
+            accessibilityLabel="Profession settings"
+          >
+            <View style={styles.rowLeft}>
+              <Text style={styles.profEmoji}>{profession.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>{profession.name}</Text>
+                <Text style={styles.rowDesc}>
+                  Service types, custom lists, checklist
                 </Text>
               </View>
             </View>
@@ -678,6 +706,10 @@ function makeStyles(theme) {
       color:         theme.primary,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
+    },
+    profEmoji: {
+      fontSize:   22,
+      lineHeight: 26,
     },
     copyright: {
       fontFamily:    theme.fontBody,

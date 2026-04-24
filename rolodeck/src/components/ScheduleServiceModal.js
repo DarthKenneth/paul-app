@@ -1,9 +1,9 @@
 // =============================================================================
 // ScheduleServiceModal.js - Bottom-sheet modal for scheduling a future service
-// Version: 2.1
-// Last Updated: 2026-04-18
+// Version: 2.5
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.24.2)
+// PROJECT:      Rolodeck (project v0.28)
 // FILES:        ScheduleServiceModal.js  (this file)
 //               CustomerDetailScreen.js  (renders this modal)
 //               storage.js               (addScheduledService)
@@ -31,6 +31,20 @@
 // CHANGE LOG:
 // v1.0  2026-04-10  Claude  Initial implementation
 // v1.1  2026-04-10  Claude  Centered overlay instead of bottom sheet
+// v2.5  2026-04-24  Claude  Type selector → 2×2 wrap grid so 4 types don't squish
+// v2.4  2026-04-24  Claude  Use effectiveServiceTypes for type chips so hidden types
+//                           don't appear and custom types do
+// v2.3  2026-04-23  Claude  Pass typeDurations to generateSlots + durationLabel
+//       - Pulls typeDurations from useProfession(); passes to generateSlots as 5th arg
+//         so new types (salt_delivery, water_test) use correct durations for slot gen
+//         and conflict detection [updated ARCHITECTURE]
+//       - durationLabel now reads typeDurations[activeType.id] directly instead of
+//         schedSettings[settingsKey] fallback — single unified source
+// v2.2  2026-04-23  Claude  Wire appointment type selector to profession config
+//       - Added useProfession() hook; type chips now map over profession.serviceTypes
+//         instead of hardcoded 'Service' / 'Install' pair
+//       - durationLabel looks up schedSettings[sType.settingsKey] so durations
+//         track the per-type settings key rather than hardcoded serviceMins/installMins
 // v2.1  2026-04-18  Claude  Harden error paths in schedule modal
 //       - refreshSlots now catches storage failures and alerts the user instead
 //         of silently leaving the slot list empty (was an unhandled rejection)
@@ -72,6 +86,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { getAllCustomers } from '../data/storage';
 import { useTheme } from '../styles/theme';
+import { useProfession } from '../contexts/ProfessionContext';
 import { FontSize } from '../styles/typography';
 import {
   getScheduleSettings,
@@ -104,6 +119,7 @@ function toDateKey(d) {
 
 export default function ScheduleServiceModal({ visible, customer, onSave, onClose }) {
   const { theme } = useTheme();
+  const { effectiveServiceTypes, typeDurations } = useProfession();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [appointmentType, setAppointmentType] = useState('service');
@@ -167,7 +183,7 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
     try {
       const allCustomers = await getAllCustomers();
       const allScheduled = allCustomers.flatMap((c) => c.scheduledServices || []);
-      const generated = generateSlots(parsedDate, appointmentType, allScheduled, schedSettings);
+      const generated = generateSlots(parsedDate, appointmentType, allScheduled, schedSettings, typeDurations);
       setSlots(generated);
       setSelectedSlot(null);
     } catch {
@@ -266,9 +282,9 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
 
   const isWorkDayDate = parsedDate ? isWorkDay(parsedDate, schedSettings.workDays) : false;
   const availableCount = slots.filter((s) => s.available).length;
-  const durationLabel = formatDuration(
-    appointmentType === 'install' ? schedSettings.installMins : schedSettings.serviceMins,
-  );
+  const activeType = effectiveServiceTypes.find((t) => t.id === appointmentType)
+    ?? effectiveServiceTypes[0];
+  const durationLabel = formatDuration(typeDurations[activeType.id] ?? activeType.defaultMins);
 
   return (
     <Modal
@@ -308,41 +324,29 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
           {/* ── Appointment type ── */}
           <Text style={styles.label}>Type</Text>
           <View style={styles.typeRow}>
-            <Pressable
-              style={[styles.typeChip, appointmentType === 'service' && styles.typeChipActive]}
-              onPress={() => setAppointmentType('service')}
-            >
-              <Ionicons
-                name="construct-outline"
-                size={15}
-                color={appointmentType === 'service' ? '#fff' : theme.textSecondary}
-                style={styles.typeIcon}
-              />
-              <Text style={[styles.typeText, appointmentType === 'service' && styles.typeTextActive]}>
-                Service
-              </Text>
-              <Text style={[styles.typeDur, appointmentType === 'service' && styles.typeDurActive]}>
-                {formatDuration(schedSettings.serviceMins)}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[styles.typeChip, appointmentType === 'install' && styles.typeChipActive]}
-              onPress={() => setAppointmentType('install')}
-            >
-              <Ionicons
-                name="home-outline"
-                size={15}
-                color={appointmentType === 'install' ? '#fff' : theme.textSecondary}
-                style={styles.typeIcon}
-              />
-              <Text style={[styles.typeText, appointmentType === 'install' && styles.typeTextActive]}>
-                Install
-              </Text>
-              <Text style={[styles.typeDur, appointmentType === 'install' && styles.typeDurActive]}>
-                {formatDuration(schedSettings.installMins)}
-              </Text>
-            </Pressable>
+            {effectiveServiceTypes.map((sType) => {
+              const active = appointmentType === sType.id;
+              const durMins = typeDurations[sType.id] ?? sType.defaultMins;
+              return (
+                <Pressable
+                  key={sType.id}
+                  style={[styles.typeChip, active && styles.typeChipActive]}
+                  onPress={() => setAppointmentType(sType.id)}
+                >
+                  <Ionicons
+                    name={sType.icon}
+                    size={18}
+                    color={active ? '#fff' : theme.textSecondary}
+                  />
+                  <Text style={[styles.typeText, active && styles.typeTextActive]} numberOfLines={2}>
+                    {sType.label}
+                  </Text>
+                  <Text style={[styles.typeDur, active && styles.typeDurActive]}>
+                    {formatDuration(durMins)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* ── Date ── */}
@@ -601,30 +605,32 @@ function makeStyles(theme) {
     // ── Type selector ──
     typeRow: {
       flexDirection: 'row',
-      gap:            10,
+      flexWrap:      'wrap',
+      gap:            8,
       marginBottom:   18,
     },
     typeChip: {
-      flex:            1,
-      flexDirection:   'row',
+      width:           '48%',
+      flexDirection:   'column',
       alignItems:      'center',
       justifyContent:  'center',
-      paddingVertical: 10,
-      borderRadius:    10,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      borderRadius:    12,
       backgroundColor: theme.inputBg,
       borderWidth:     1.5,
       borderColor:     theme.border,
-      gap:              5,
+      gap:              4,
     },
     typeChipActive: {
       backgroundColor: theme.scheduled,
       borderColor:     theme.scheduled,
     },
-    typeIcon: {},
     typeText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   FontSize.xs,
       color:      theme.textSecondary,
+      textAlign:  'center',
     },
     typeTextActive: {
       color: '#fff',

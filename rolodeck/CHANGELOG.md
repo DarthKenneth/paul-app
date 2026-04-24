@@ -8,6 +8,126 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.29.0] - 2026-04-24
+
+### Added
+- **iPad landscape sidebar** — on tablet landscape a persistent left sidebar (240pt) replaces the bottom tab bar, showing Customers / Services / Settings navigation rows with icon, label, and Services alert badge. Bottom tabs are hidden when the sidebar is active.
+- **Split-pane customer detail** — on tablet landscape, the Customers screen renders a side-by-side layout: the customer list stays in a fixed 320pt left panel while tapping a card loads full customer detail (info, equipment, service log, modals) in the right panel without navigating away. Back (delete/archive) and service-added callbacks keep both panels in sync.
+- **Split-pane service list** — on tablet landscape, the Services screen renders a side-by-side layout: the list / calendar view stays on the left; tapping a customer row loads their detail in the right panel instead of cross-tab navigating.
+- `CustomerDetailPane` component — extracted from CustomerDetailScreen, contains all customer detail data logic and UI as an embeddable component. Supports `isPaneMode` prop to skip SafeAreaView when mounted inside a split panel; uses `useEffect` on `customerId` instead of `useFocusEffect` so it refreshes on prop change rather than navigation focus.
+- `useSplitLayout()`, `useIsLandscape()` hooks and `SIDEBAR_WIDTH`, `SPLIT_LIST_WIDTH` constants in `responsive.js`.
+- `tabletScale(size, isTablet)` utility in `typography.js` — bumps any font size by 2pt on tablet.
+- `app.json` orientation changed to `"default"` to allow iPad rotation (was locked to portrait).
+
+### Changed
+- `CustomerDetailScreen` rewritten as a thin navigation wrapper (~60 lines) — just handles header back button setup and delegates everything else to `CustomerDetailPane`.
+
+---
+
+## [0.28.5] - 2026-04-24
+
+### Fixed
+- Entry details rows (Equipment Installed, Salt Used, etc.) in the service entry view no longer squeeze the label into a tiny character-wrapped column when the value is long — the label now sizes to its content and the value takes the remaining space, wrapping onto multiple lines as needed.
+
+---
+
+## [0.28.4] - 2026-04-24
+
+### Fixed
+- Custom checklist items with a unit label (measurement type) were losing their unit on any subsequent add or delete operation — `handleDelete` and `handleAddItem` in ChecklistScreen were reconstructing the custom array without the `unit` field.
+- **Orphaned calendar events on customer delete** — deleting a customer left their service-due calendar event (and every scheduled-service event) in the user's calendar forever. Delete now calls `removeCustomerEvent` and `removeScheduledServiceEvent` for each scheduled service.
+- **Orphaned photo files on customer or entry delete** — deleting a customer or a single service entry left every attached photo sitting in `documentDirectory/service-photos/` indefinitely. Delete paths now call `deletePhotosFromDisk` to clean up.
+- Removing a photo from an existing entry in the edit modal now deletes the file from disk on save instead of leaving the orphaned file behind.
+
+---
+
+## [0.28.3] - 2026-04-24
+
+### Fixed
+- **Photos not saving on new service entries** — `addServiceEntry` in storage.js was not forwarding the `photos` field from the form data, so photos were silently dropped every time a new service was logged. Editing an existing entry was unaffected (used a spread).
+- Permission denied for camera/library now shows an "Open Settings" button so users aren't stuck if they previously tapped "Don't Allow".
+
+---
+
+## [0.28.2] - 2026-04-24
+
+### Added
+- **Last Service Details** on customer card — shows equipment types and salt used from the most recent service entry that has entry values, with the date of that entry. Visible at a glance without tapping into the service log.
+
+### Changed
+- Service log entry rows now show a brief equipment/salt summary line below the type label so key info is visible without opening the entry.
+- Tapping a service log entry now shows full Details (equipment, salt, etc.) and Checklist (readings, check items) in the view sheet before Notes and Photos.
+- Edit pencil on customer card and service entry modal made more subtle (outline icon, muted color) so it doesn't compete with the content.
+- Service entry type label in the edit modal now resolved from `allServiceTypes` instead of hardcoded — custom types display correctly.
+
+---
+
+## [0.28.1] - 2026-04-24
+
+### Changed
+- Equipment field on Add Service (modal and screen) converted from inline checklist to a multi-select picker row — same look as Salt Type and other entry fields. Opens a checkbox modal; selected items shown as comma list in the row. Equipment now appears for all service types (not just Equipment Install).
+
+---
+
+## [0.28.0] - 2026-04-24
+
+### Added
+- **Editable service types** — Service Types screen redesigned: eye toggle (hide/show) per type, trash button for custom types, and an "Add Service Type" card with name input, 30-icon picker grid, and duration stepper. At least one type must remain visible.
+- **Custom service types** — add named types with a chosen icon and duration; they appear in the Add Service and Schedule Service type pickers alongside profession defaults. Stored in `@rolodeck_type_config_{key}`.
+- **Editable checklist items** — Checklist screen now has an "Add Checklist Item" card with label input and check/measure type selector. Custom items can be hidden (eye toggle) or deleted (trash button).
+
+### Changed
+- Add Service (modal and screen), Schedule Service modal — type pickers now use `effectiveServiceTypes` (non-hidden defaults + custom types) instead of the raw profession config list.
+- Service log entries and scheduled appointments — type lookups now use `allServiceTypes` (all defaults + all custom) so entries logged with custom types still display correctly after those types are hidden.
+- `ProfessionContext` expanded with `typeConfig`, `effectiveServiceTypes`, `allServiceTypes`, `saveTypeConfig`, `saveChecklistCustom`; `typeDurations` and `checklistItems` now include custom type and checklist entries.
+- Customer Detail edit form — Address field now has Geoapify autocomplete (same inline suggestion list as Add Customer); City placeholder corrected; Zip no longer auto-fills City/State.
+- Schedule Service type selector redesigned as 2×2 wrap grid (was single horizontal row — crushed with 4 types).
+- Service Checklist Add Item — Measurement type now shows a Unit input (e.g. gpg, ppm) that appears in the checklist label on Add Service.
+
+---
+
+## [0.27.0] - 2026-04-23
+
+### Added
+- Full Water Treatment profession wired up end-to-end: 4 service types (Routine Service, Equipment Install, Salt Delivery, Water Test), 3 custom lists (Equipment Types, Brands, Salt Types), 6-item service checklist (Hardness, Iron, Salt level, Brine clean, Bypass, Regen cycle), 3 equipment fields (Softener, Salt type, Source), 2 entry field dropdowns (Equipment Serviced, Salt Used).
+- **Profession Settings screen** (`Settings → Profession → Water Treatment`) — hub with nav rows for Service Types, Custom Lists, Service Checklist.
+- **Service Types screen** — duration steppers for all 4 types; auto-saves. Legacy types (service/install) write to existing `scheduleSettings` keys; new types (salt_delivery, water_test) write to `@rolodeck_type_durations_water`.
+- **Custom Lists screen** — chip editor for Equipment Types, Brands, Salt Types. Add/remove items; per-list Reset restores profession defaults.
+- **Service Checklist screen** — master "Show on Add Service" toggle plus individual visibility toggles per item (check/measure badge shown per type).
+- **ListPickerModal** — reusable single-select modal picker used by entry field dropdowns and equipment field dropdowns.
+- Entry field dropdowns on Add Service (modal and screen) — Equipment Serviced (required) and Salt Used (optional) saved as `entry.entryValues`.
+- Service checklist on Add Service (modal and screen) — check items toggle, measure items take numeric input; saved as `entry.checklist`.
+- Equipment section on Customer Detail — view mode shows populated fields; edit mode shows text inputs and dropdown picker for Salt type.
+- `ProfessionContext` expanded with `typeDurations`, `customLists`, `checklistItems`, `checklistVisible` and corresponding save functions (`saveTypeDuration`, `saveCustomList`, `saveChecklistItem`, `saveChecklistVisible`).
+
+### Changed
+- Add Service type selector redesigned from horizontal chip row to **2×2 grid** to accommodate 4 types (Equipment Install cell shows rust/accent color when selected).
+- `getAppointmentDuration` and `generateSlots` in `scheduleSettings.js` now accept an optional `typeDurations` map so new service types get correct slot durations in the Schedule Service modal.
+- Appointment Duration section removed from Scheduling Settings (moved to `Settings → Profession → Service Types`).
+
+---
+
+## [0.26.0] - 2026-04-23
+
+### Added
+- Profession system infrastructure — `src/data/professions/water.js` (Water Treatment preset), `src/data/professions/index.js` (registry), `src/contexts/ProfessionContext.js` (provider + `useProfession()` hook). `ProfessionProvider` wraps the app root and reads `@rolodeck_profession` from AsyncStorage; defaults to `'water'` so all existing installs get identical behavior.
+- Service type selector on the Add Service modal and Add Service screen — chips for "Routine Service" and "Equipment Install" appear above the date field. Selecting Equipment Install turns the save button rust-colored.
+
+### Changed
+- Schedule Service modal type chips (`ScheduleServiceModal`) now driven by `profession.serviceTypes` instead of hardcoded Service/Install strings.
+- Scheduling Settings appointment-duration steppers now map over `profession.serviceTypes` — labels and icons come from the config.
+- Service log entry type label and icon (`ServiceLogEntry`) now look up `entry.type` in the profession config; "Initial Install/Service" label is now "Initial {type.label}".
+- Scheduled service entries in the Customer Detail screen now read type label and icon from the profession config.
+
+---
+
+## [0.25.3] - 2026-04-23
+
+### Fixed
+- Bright white flash on tab switch and screen navigation in dark themes (Midnight, Ember). Root cause: `NavigationContainer` had no theme, so React Navigation used its default white background for all scene containers during transitions. Fix: pass a `navTheme` derived from the active color theme so the background color is correct from the first render frame. Also fixed `isDark` check to include Ember (was only checking for Midnight).
+
+---
+
 ## [0.25.2] - 2026-04-20
 
 ### Infrastructure

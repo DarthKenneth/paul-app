@@ -3,11 +3,11 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.25.2",
+    "version": "0.29.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "orientation": "portrait",
+    "orientation": "default",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./store-assets/icons/icon.png",

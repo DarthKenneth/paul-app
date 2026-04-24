@@ -1,9 +1,9 @@
 // =============================================================================
 // SchedulingSettingsScreen.js - Configure scheduling rules and defaults
-// Version: 1.0
-// Last Updated: 2026-04-17
+// Version: 1.2
+// Last Updated: 2026-04-23
 //
-// PROJECT:      Rolodeck (project v0.22.8)
+// PROJECT:      Rolodeck (project v0.27)
 // FILES:        SchedulingSettingsScreen.js  (this file)
 //               scheduleSettings.js          (settings storage + helpers)
 //               SettingsScreen.js            (navigates here)
@@ -25,6 +25,13 @@
 //   - "Reset to Defaults" button restores SCHEDULE_DEFAULTS and re-saves
 //
 // CHANGE LOG:
+// v1.2  2026-04-23  Claude  Remove Appointment Duration section (moved to ServiceTypesScreen)
+//       - Removed useProfession() import and usage; removed Appointment Duration card
+//       - Duration config now lives in Settings → Profession → Service Types
+// v1.1  2026-04-23  Claude  Appointment Duration section driven by profession config
+//       - Added useProfession(); duration steppers map over profession.serviceTypes
+//         instead of hardcoded Service/Install pair; settingsKey on each type
+//         determines which settings field to update (serviceMins / installMins)
 // v1.0  2026-04-17  Claude  Initial implementation
 // =============================================================================
 
@@ -191,62 +198,6 @@ export default function SchedulingSettingsScreen() {
                 <Pressable
                   style={styles.stepBtn}
                   onPress={() => stepHour('workEnd', 1)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="add" size={18} color={theme.text} />
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* ── Appointment Duration ── */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appointment Duration</Text>
-          <View style={styles.card}>
-            <View style={styles.stepRow}>
-              <View style={styles.stepLabelWrap}>
-                <Ionicons name="construct-outline" size={16} color={theme.textSecondary} style={styles.stepIcon} />
-                <Text style={styles.stepLabel}>Service</Text>
-              </View>
-              <View style={styles.stepper}>
-                <Pressable
-                  style={styles.stepBtn}
-                  onPress={() => stepMins('serviceMins', -15)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="remove" size={18} color={theme.text} />
-                </Pressable>
-                <Text style={styles.stepValue}>{formatDuration(settings.serviceMins)}</Text>
-                <Pressable
-                  style={styles.stepBtn}
-                  onPress={() => stepMins('serviceMins', 15)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="add" size={18} color={theme.text} />
-                </Pressable>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.stepRow}>
-              <View style={styles.stepLabelWrap}>
-                <Ionicons name="home-outline" size={16} color={theme.textSecondary} style={styles.stepIcon} />
-                <Text style={styles.stepLabel}>Install</Text>
-              </View>
-              <View style={styles.stepper}>
-                <Pressable
-                  style={styles.stepBtn}
-                  onPress={() => stepMins('installMins', -15)}
-                  hitSlop={8}
-                >
-                  <Ionicons name="remove" size={18} color={theme.text} />
-                </Pressable>
-                <Text style={styles.stepValue}>{formatDuration(settings.installMins)}</Text>
-                <Pressable
-                  style={styles.stepBtn}
-                  onPress={() => stepMins('installMins', 15)}
                   hitSlop={8}
                 >
                   <Ionicons name="add" size={18} color={theme.text} />

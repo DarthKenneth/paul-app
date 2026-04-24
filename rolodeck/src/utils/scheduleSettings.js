@@ -1,9 +1,9 @@
 // =============================================================================
 // scheduleSettings.js - Scheduling settings storage and time-slot generation
-// Version: 1.1
-// Last Updated: 2026-04-18
+// Version: 1.2
+// Last Updated: 2026-04-23
 //
-// PROJECT:      Rolodeck (project v0.24.2)
+// PROJECT:      Rolodeck (project v0.27)
 // FILES:        scheduleSettings.js          (this file — scheduling engine)
 //               SchedulingSettingsScreen.js  (reads/writes settings)
 //               ScheduleServiceModal.js      (uses generateSlots)
@@ -26,6 +26,11 @@
 //     so the UI can show both available (teal) and booked (gray) slots
 //
 // CHANGE LOG:
+// v1.2  2026-04-23  Claude  typeDurations optional param on getAppointmentDuration + generateSlots
+//       - getAppointmentDuration(type, settings, typeDurations?): if typeDurations[type]
+//         is defined, use it; otherwise fall back to settings.installMins/serviceMins
+//       - generateSlots gains optional typeDurations 5th param; passes it through to
+//         getAppointmentDuration for both the selected type and conflict detection
 // v1.1  2026-04-18  Claude  Harden work-day helpers against corrupted settings
 //       - isWorkDay returns false (instead of throwing) when workDays is
 //         undefined or not an array
@@ -133,8 +138,13 @@ export function nextWorkDay(fromDate, workDays) {
   return d; // fallback: shouldn't happen if workDays is non-empty
 }
 
-/** Returns appointment duration in minutes for the given type. */
-export function getAppointmentDuration(type, settings) {
+/**
+ * Returns appointment duration in minutes for the given type.
+ * If typeDurations map is provided and has an entry for `type`, that wins.
+ * Otherwise falls back to the legacy settings.installMins / settings.serviceMins keys.
+ */
+export function getAppointmentDuration(type, settings, typeDurations) {
+  if (typeDurations && typeDurations[type] !== undefined) return typeDurations[type];
   return type === 'install' ? settings.installMins : settings.serviceMins;
 }
 
@@ -175,14 +185,15 @@ export function formatHour(h) {
  * hours, marking each as available or booked.
  *
  * @param {Date}   date               - The date to generate slots for (time ignored)
- * @param {string} appointmentType    - 'service' | 'install'
+ * @param {string} appointmentType    - 'service' | 'install' | any profession type id
  * @param {Array}  existingScheduled  - Array of scheduledEntry objects for ALL dates
  *                                      (filtered internally to this date)
  * @param {object} settings           - Result of getScheduleSettings()
+ * @param {object} [typeDurations]    - Optional { [typeId]: mins } from ProfessionContext
  * @returns {Array} [{ startTime: Date, endTime: Date, label: string, available: boolean }]
  */
-export function generateSlots(date, appointmentType, existingScheduled, settings) {
-  const durationMins = getAppointmentDuration(appointmentType, settings);
+export function generateSlots(date, appointmentType, existingScheduled, settings, typeDurations) {
+  const durationMins = getAppointmentDuration(appointmentType, settings, typeDurations);
 
   // Appointments on this specific date (by local date match)
   const y = date.getFullYear();
@@ -205,7 +216,7 @@ export function generateSlots(date, appointmentType, existingScheduled, settings
 
     const available = !sameDay.some((entry) => {
       const existStart   = new Date(entry.date);
-      const existDur     = getAppointmentDuration(entry.type || 'service', settings);
+      const existDur     = getAppointmentDuration(entry.type || 'service', settings, typeDurations);
       const existEnd     = new Date(existStart.getTime() + existDur * 60000);
       // Blocked zone = work time + travel buffers on each side.
       // Travel windows between consecutive appointments are allowed to overlap,

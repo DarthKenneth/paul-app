@@ -1,9 +1,9 @@
 // =============================================================================
 // TabNavigator.js - Root navigation: BottomTabNavigator + Stack navigators
-// Version: 1.5.3
-// Last Updated: 2026-04-17
+// Version: 1.7
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.23)
+// PROJECT:      Rolodeck (project v0.29.0)
 // FILES:        TabNavigator.js           (this file — navigation structure)
 //               App.js                    (renders TabNavigator inside
 //                                          NavigationContainer + ThemeProvider)
@@ -48,6 +48,15 @@
 // v1.3.1  2026-04-12  Claude  Added SquareSyncScreen to Settings stack
 // v1.4    2026-04-14  Claude  Accessibility: Services badge announces count to
 //                             screen readers via tabBarAccessibilityLabel
+// v1.7  2026-04-24  Claude  hideTabs prop suppresses bottom bar when sidebar is shown
+// v1.6  2026-04-23  Claude  Add profession settings screens to Settings stack
+//       - Imported ProfessionSettingsScreen, ServiceTypesScreen, CustomListsScreen,
+//         ChecklistScreen
+//       - Added ProfessionSettings, ServiceTypes, CustomLists, Checklist screens
+//         to SettingsStack.Navigator [updated ARCHITECTURE]
+// v1.5.4  2026-04-23  Claude  Add sceneContainerStyle to Tab.Navigator screenOptions so the
+//                             scene container uses theme.background — fixes bright white flash
+//                             on tab switch in dark mode (midnight/ember themes)
 // v1.5.3  2026-04-17  Claude  Fix icon size: tabBarIconSize is not a valid RN v6 bottom-tabs
 //                             option (confirmed absent from installed package); replaced with
 //                             hardcoded size={30} directly in tabBarIcon render function
@@ -76,6 +85,10 @@ import ThemeScreen             from '../screens/ThemeScreen';
 import ServiceIntervalScreen   from '../screens/ServiceIntervalScreen';
 import SquareSyncScreen           from '../screens/SquareSyncScreen';
 import SchedulingSettingsScreen   from '../screens/SchedulingSettingsScreen';
+import ProfessionSettingsScreen   from '../screens/ProfessionSettingsScreen';
+import ServiceTypesScreen         from '../screens/ServiceTypesScreen';
+import CustomListsScreen          from '../screens/CustomListsScreen';
+import ChecklistScreen            from '../screens/ChecklistScreen';
 
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
@@ -229,6 +242,26 @@ function SettingsStackNavigator() {
           component={SchedulingSettingsScreen}
           options={{ title: 'Scheduling' }}
         />
+        <SettingsStack.Screen
+          name="ProfessionSettings"
+          component={ProfessionSettingsScreen}
+          options={{ title: 'Profession' }}
+        />
+        <SettingsStack.Screen
+          name="ServiceTypes"
+          component={ServiceTypesScreen}
+          options={{ title: 'Service Types' }}
+        />
+        <SettingsStack.Screen
+          name="CustomLists"
+          component={CustomListsScreen}
+          options={{ title: 'Custom Lists' }}
+        />
+        <SettingsStack.Screen
+          name="Checklist"
+          component={ChecklistScreen}
+          options={{ title: 'Service Checklist' }}
+        />
       </SettingsStack.Navigator>
     </AnimatedTabScreen>
   );
@@ -242,14 +275,15 @@ const TAB_ICONS = {
   SettingsTab:  { focused: 'settings',   outline: 'settings-outline'   },
 };
 
-export default function TabNavigator({ alertCount, onAlertsRefresh }) {
+export default function TabNavigator({ alertCount, onAlertsRefresh, hideTabs }) {
   const { theme } = useTheme();
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: {
+        sceneContainerStyle: { backgroundColor: theme.background },
+        tabBarStyle: hideTabs ? { display: 'none' } : {
           backgroundColor: theme.tabBar,
           borderTopColor:  theme.tabBarBorder,
           borderTopWidth:   1,

@@ -1,9 +1,9 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 2.0.2
-// Last Updated: 2026-04-18
+// Version: 2.0.4
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.24.1)
+// PROJECT:      Rolodeck (project v0.28)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
@@ -70,13 +70,18 @@
 //               squareConflictData (object|null) }
 //   ServiceEntry:   { id, date (ISO string), type ('service'|'install'), notes,
 //                     intervalDays? (number, custom-interval entries only),
-//                     photos?: string[] (local file URIs) }
+//                     photos?: string[] (local file URIs),
+//                     entryValues?: object (per-visit field values, e.g. equipmentInstalled, saltUsed),
+//                     checklist?: object (checklist item id → bool|string) }
 //   ScheduledEntry: { id, date (ISO string), type ('service'|'install'), notes, createdAt (ISO string) }
 //   SquareSyncMeta: { lastSyncAt (ISO|null), syncLog: [SyncLogEntry],
 //                     pendingLowConf: [{ squareCustomer, rolodeckCustomerId }] }
 //   SyncLogEntry:   { at, merged, created, lowConf, conflicts, errors }
 //
 // CHANGE LOG:
+// v2.0.4 2026-04-24  Claude  addServiceEntry now forwards photos — was silently dropped
+//                            [updated SCHEMA to include entryValues and checklist]
+// v2.0.3 2026-04-24  Claude  addServiceEntry forwards entryValues and checklist from data
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Debug + harden + futureproof
 //       - Added JSON parse safety in loadCustomers (returns [] on corrupt data)
@@ -448,10 +453,10 @@ export async function addServiceEntry(customerId, data) {
       notes: data.notes || '',
     };
 
-    // Forward intervalDays if present (custom-interval entries)
-    if (data.intervalDays != null) {
-      entry.intervalDays = data.intervalDays;
-    }
+    if (data.intervalDays  != null)       entry.intervalDays  = data.intervalDays;
+    if (data.photos?.length > 0)          entry.photos        = data.photos;
+    if (data.entryValues   != null)       entry.entryValues   = data.entryValues;
+    if (data.checklist     != null)       entry.checklist     = data.checklist;
 
     const updated = {
       ...customer,

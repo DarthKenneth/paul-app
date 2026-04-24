@@ -1,9 +1,9 @@
 // =============================================================================
 // AddServiceModal.js - Centered modal for logging a completed service entry
-// Version: 1.3
-// Last Updated: 2026-04-17
+// Version: 1.8
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.24.0)
+// PROJECT:      Rolodeck (project v0.28)
 // FILES:        AddServiceModal.js       (this file)
 //               CustomerDetailScreen.js  (renders this modal)
 //               storage.js               (addServiceEntry, getCustomerById,
@@ -53,6 +53,39 @@
 // v1.2.1 2026-04-14  Claude  Fixed syntax error from unescaped apostrophe in the
 //                            invoice-leave Alert message (customer's profile); swapped
 //                            string delimiters from single to double quotes
+// v1.9  2026-04-24  Claude  Equipment multi-select picker, dynamic label, deduplicated
+//       - Equipment shows as a picker row for all service types using ListPickerModal
+//         in multi mode; label is "Equipment Installed" (install type) or
+//         "Equipment Serviced" (all other types) based on activeType
+//       - equipmentServiced entryField filtered out of the entryFields loop since
+//         equipment is now handled by the dedicated multi-select row
+//       - Updated ListPickerModal call to pass multi + array selected for equipment
+// v1.8  2026-04-24  Claude  Equipment Install → multi-select "Equipment Installed" checklist
+//       - Entry fields section is now conditional on active service type: install
+//         types show a checklist of equipmentTypes (multi-select, stored as array
+//         under entryValues.equipmentInstalled); all other types keep the existing
+//         single-select pickers from profession.entryFields
+//       - activeType computed at render level so it's available to both the entry
+//         fields section and the save button (previously only in the save IIFE)
+//       - filledEntryValues filter handles array values (length > 0)
+// v1.7  2026-04-24  Claude  Show unit in measure checklist labels (e.g. "Hardness (gpg)")
+// v1.6  2026-04-24  Claude  Use effectiveServiceTypes for type picker grid so hidden
+//                           types don't appear and custom types do
+// v1.5  2026-04-23  Claude  2×2 type grid, entry fields, service checklist
+//       - Type chips replaced with 2×2 flexWrap grid (works for 2–4 types)
+//       - Entry fields: per-visit dropdowns from profession.entryFields shown after
+//         type selector; tap opens ListPickerModal; values stored on entry as entryValues
+//       - Checklist section: shown when checklistVisible + visible items exist;
+//         'check' items toggle, 'measure' items have numeric TextInput; stored as checklist
+//       - Pulls customLists, checklistItems, checklistVisible from useProfession()
+//       - Checklist + entry state resets on modal open [updated ARCHITECTURE]
+// v1.4  2026-04-23  Claude  Service type selector + profession-driven save button
+//       - Added useProfession(); serviceType state (defaults to first type on open)
+//       - Type chip row renders when profession has >1 service type; chips use
+//         profession.serviceTypes icon/label instead of hardcoded strings
+//       - type: serviceType saved on entry instead of hardcoded 'service'
+//       - Save button shows rust color (theme.accent) when install:true type selected
+//       - Button label reads "Log {type.label}" (e.g. "Log Equipment Install")
 // v1.3  2026-04-17  Claude  Photo attachments on service entries
 //       - Added camera + library photo pickers (expo-image-picker) to the form phase
 //       - Photos copied to permanent local storage via savePhotoLocally (photoUtils.js)
@@ -73,6 +106,7 @@ import {
   Platform,
   ScrollView,
   Image,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -88,6 +122,8 @@ import {
 import { syncCustomerDueDate } from '../utils/calendarSync';
 import { sendSquareInvoice } from '../utils/squarePlaceholder';
 import { useTheme } from '../styles/theme';
+import { useProfession } from '../contexts/ProfessionContext';
+import ListPickerModal from './ListPickerModal';
 import { FontSize } from '../styles/typography';
 
 function todayParts() {
@@ -105,23 +141,33 @@ function todayString() {
 
 export default function AddServiceModal({ visible, customer, onSave, onClose }) {
   const { theme } = useTheme();
+  const { profession, customLists, checklistItems, checklistVisible, effectiveServiceTypes } = useProfession();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const [dd, setDd]         = useState('');
-  const [mm, setMm]         = useState('');
-  const [yyyy, setYyyy]     = useState('');
-  const [notes, setNotes]   = useState('');
-  const [customDays, setCustomDays]   = useState('30');
+  const [serviceType, setServiceType]   = useState(effectiveServiceTypes[0]?.id ?? 'service');
+  const [dd, setDd]                     = useState('');
+  const [mm, setMm]                     = useState('');
+  const [yyyy, setYyyy]                 = useState('');
+  const [notes, setNotes]               = useState('');
+  const [customDays, setCustomDays]     = useState('30');
   const [intervalMode, setIntervalMode] = useState('365');
-  const [calVisible, setCalVisible] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [photos, setPhotos] = useState([]);
+  const [calVisible, setCalVisible]     = useState(false);
+  const [saving, setSaving]             = useState(false);
+  const [photos, setPhotos]             = useState([]);
+  const [entryValues, setEntryValues]   = useState({});
+  const [clValues, setClValues]         = useState({});
+  const [pickerField, setPickerField]   = useState(null); // { key, label, source, optional }
 
   // Post-save invoice flow
   const [phase, setPhase]                 = useState('form'); // 'form' | 'success' | 'invoice'
   const [savedDateDisplay, setSavedDateDisplay] = useState('');
   const [invoiceAmount, setInvoiceAmount] = useState('');
   const [invoiceSending, setInvoiceSending] = useState(false);
+
+  const activeType = useMemo(
+    () => effectiveServiceTypes.find((t) => t.id === serviceType) ?? effectiveServiceTypes[0],
+    [effectiveServiceTypes, serviceType],
+  );
 
   const mmRef   = useRef(null);
   const ddRef   = useRef(null);
@@ -133,6 +179,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
   useEffect(() => {
     if (visible) {
       const p = todayParts();
+      setServiceType(effectiveServiceTypes[0]?.id ?? 'service');
       setMm(p.mm);
       setDd(p.dd);
       setYyyy(p.yyyy);
@@ -145,6 +192,9 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
       setInvoiceAmount('');
       setInvoiceSending(false);
       setPhotos([]);
+      setEntryValues({});
+      setClValues({});
+      setPickerField(null);
       Promise.all([getServiceIntervalMode(), getServiceIntervalCustomDays()])
         .then(([mode, days]) => {
           setIntervalMode(mode);
@@ -261,11 +311,19 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
     setSaving(true);
     try {
       const dateObj = new Date(y, m - 1, d, 12, 0, 0);
+      const filledEntryValues = Object.fromEntries(
+        Object.entries(entryValues).filter(([, v]) => Array.isArray(v) ? v.length > 0 : Boolean(v)),
+      );
+      const filledClValues = Object.fromEntries(
+        Object.entries(clValues).filter(([, v]) => v !== undefined && v !== ''),
+      );
       const entryData = {
         date:  dateObj.toISOString(),
-        type:  'service',
+        type:  serviceType,
         notes: notes.trim(),
-        ...(photos.length > 0 && { photos }),
+        ...(photos.length > 0              && { photos }),
+        ...(Object.keys(filledEntryValues).length > 0 && { entryValues: filledEntryValues }),
+        ...(Object.keys(filledClValues).length   > 0 && { checklist:   filledClValues }),
       };
       if (isCustom) {
         entryData.intervalDays = Math.max(1, parseInt(customDays, 10));
@@ -317,7 +375,14 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      Alert.alert(
+        'Camera Access Required',
+        'Allow Rolodeck to use your camera in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -334,7 +399,14 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
   const handleChoosePhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Photo library access is needed to choose photos.');
+      Alert.alert(
+        'Photo Library Access Required',
+        'Allow Rolodeck to access your photos in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -388,6 +460,92 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
                   <Ionicons name="close" size={22} color={theme.textSecondary} />
                 </Pressable>
               </View>
+
+              {/* Type (2×2 grid) */}
+              {effectiveServiceTypes.length > 1 && (
+                <>
+                  <Text style={styles.label}>Type</Text>
+                  <View style={styles.typeGrid}>
+                    {effectiveServiceTypes.map((sType) => {
+                      const active = serviceType === sType.id;
+                      const isInstall = sType.install === true;
+                      return (
+                        <Pressable
+                          key={sType.id}
+                          style={[
+                            styles.typeCell,
+                            active && (isInstall ? styles.typeCellInstall : styles.typeCellActive),
+                          ]}
+                          onPress={() => setServiceType(sType.id)}
+                        >
+                          <Ionicons
+                            name={sType.icon}
+                            size={18}
+                            color={active ? '#fff' : theme.textSecondary}
+                          />
+                          <Text style={[styles.typeText, active && styles.typeTextActive]}>
+                            {sType.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {/* Equipment multi-select */}
+              {(customLists.equipmentTypes?.length ?? 0) > 0 && (() => {
+                const isInstall = activeType?.install === true;
+                const eqLabel = isInstall ? 'Equipment Installed' : 'Equipment Serviced';
+                return (
+                  <>
+                    <Text style={styles.label}>{eqLabel}</Text>
+                    <Pressable
+                      style={styles.pickerRow}
+                      onPress={() => setPickerField({
+                        key: 'equipmentInstalled',
+                        label: eqLabel,
+                        source: 'equipmentTypes',
+                        optional: true,
+                        multi: true,
+                      })}
+                    >
+                      <Text
+                        style={(entryValues.equipmentInstalled?.length ?? 0) > 0 ? styles.pickerValue : styles.pickerPlaceholder}
+                        numberOfLines={1}
+                      >
+                        {(entryValues.equipmentInstalled?.length ?? 0) > 0
+                          ? entryValues.equipmentInstalled.join(', ')
+                          : `Select equipment…`}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={theme.textMuted} />
+                    </Pressable>
+                  </>
+                );
+              })()}
+
+              {/* Single-select entry fields (salt type, etc.) — skip equipmentServiced since handled above */}
+              {(profession.entryFields?.length ?? 0) > 0 && profession.entryFields
+                .filter((field) => field.key !== 'equipmentServiced')
+                .map((field) => {
+                  const val = entryValues[field.key] || '';
+                  return (
+                    <React.Fragment key={field.key}>
+                      <Text style={styles.label}>
+                        {field.label}{field.optional ? '' : ' *'}
+                      </Text>
+                      <Pressable
+                        style={styles.pickerRow}
+                        onPress={() => setPickerField(field)}
+                      >
+                        <Text style={val ? styles.pickerValue : styles.pickerPlaceholder}>
+                          {val || `Select ${field.label}…`}
+                        </Text>
+                        <Ionicons name="chevron-down" size={16} color={theme.textMuted} />
+                      </Pressable>
+                    </React.Fragment>
+                  );
+                })}
 
               {/* Date */}
               <Text style={styles.label}>Date</Text>
@@ -502,6 +660,55 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
                 </ScrollView>
               )}
 
+              {/* Checklist */}
+              {checklistVisible && checklistItems.some((i) => i.visible) && (
+                <>
+                  <Text style={styles.label}>Service Checklist</Text>
+                  <View style={styles.checklistCard}>
+                    {checklistItems.filter((i) => i.visible).map((item, idx, arr) => (
+                      <View
+                        key={item.id}
+                        style={[
+                          styles.checklistRow,
+                          idx < arr.length - 1 && styles.checklistRowBorder,
+                        ]}
+                      >
+                        <Text style={styles.checklistLabel}>
+                          {item.label}{item.unit ? ` (${item.unit})` : ''}
+                        </Text>
+                        {item.type === 'check' ? (
+                          <Pressable
+                            onPress={() =>
+                              setClValues((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
+                            }
+                            hitSlop={8}
+                            accessibilityRole="checkbox"
+                            accessibilityState={{ checked: !!clValues[item.id] }}
+                          >
+                            <Ionicons
+                              name={clValues[item.id] ? 'checkbox' : 'square-outline'}
+                              size={24}
+                              color={clValues[item.id] ? theme.primary : theme.border}
+                            />
+                          </Pressable>
+                        ) : (
+                          <TextInput
+                            style={styles.measureInput}
+                            value={clValues[item.id] || ''}
+                            onChangeText={(v) =>
+                              setClValues((prev) => ({ ...prev, [item.id]: v }))
+                            }
+                            keyboardType="decimal-pad"
+                            placeholder="—"
+                            placeholderTextColor={theme.placeholder}
+                          />
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+
               {/* Custom interval */}
               {isCustom && (
                 <>
@@ -521,6 +728,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
               <Pressable
                 style={({ pressed }) => [
                   styles.saveBtn,
+                  activeType?.install && styles.saveBtnInstall,
                   pressed && styles.saveBtnPressed,
                   saving  && styles.saveBtnDisabled,
                 ]}
@@ -529,11 +737,29 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
               >
                 <Ionicons name="add-circle-outline" size={18} color="#fff" style={styles.saveBtnIcon} />
                 <Text style={styles.saveBtnText}>
-                  {saving ? 'Saving…' : 'Add a Service'}
+                  {saving ? 'Saving…' : `Log ${activeType?.label ?? 'Service'}`}
                 </Text>
               </Pressable>
             </ScrollView>
           </View>
+        )}
+
+        {/* ── Entry field picker ── */}
+        {pickerField && (
+          <ListPickerModal
+            visible={!!pickerField}
+            title={pickerField.label}
+            items={customLists[pickerField.source] || []}
+            selected={
+              pickerField.multi
+                ? (entryValues[pickerField.key] || [])
+                : (entryValues[pickerField.key] || '')
+            }
+            onSelect={(v) => setEntryValues((prev) => ({ ...prev, [pickerField.key]: v }))}
+            onClose={() => setPickerField(null)}
+            allowClear={pickerField.optional && !pickerField.multi}
+            multi={!!pickerField.multi}
+          />
         )}
 
         {/* ── Success phase ── */}
@@ -811,7 +1037,105 @@ function makeStyles(theme) {
       top:      -6,
       right:    -6,
     },
-    // ── Form: Save button ──
+    // ── Type grid (2×2) ──
+    typeGrid: {
+      flexDirection: 'row',
+      flexWrap:      'wrap',
+      gap:            8,
+      marginBottom:  14,
+    },
+    typeCell: {
+      width:           '48%',
+      flexDirection:   'column',
+      alignItems:      'center',
+      justifyContent:  'center',
+      gap:              5,
+      paddingVertical: 12,
+      borderRadius:    12,
+      backgroundColor: theme.inputBg,
+      borderWidth:      1,
+      borderColor:     theme.inputBorder,
+    },
+    typeCellActive: {
+      backgroundColor: theme.primary,
+      borderColor:     theme.primary,
+    },
+    typeCellInstall: {
+      backgroundColor: theme.accent,
+      borderColor:     theme.accent,
+    },
+    typeText: {
+      fontFamily: theme.fontBodyMedium,
+      fontSize:   FontSize.xs,
+      color:      theme.textSecondary,
+      textAlign:  'center',
+    },
+    typeTextActive: {
+      color: '#fff',
+    },
+    // ── Entry fields ──
+    pickerRow: {
+      flexDirection:     'row',
+      alignItems:        'center',
+      justifyContent:    'space-between',
+      backgroundColor:   theme.inputBg,
+      borderWidth:        1,
+      borderColor:       theme.inputBorder,
+      borderRadius:      10,
+      paddingVertical:   11,
+      paddingHorizontal: 13,
+      marginBottom:      12,
+    },
+    pickerValue: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.base,
+      color:      theme.text,
+    },
+    pickerPlaceholder: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.base,
+      color:      theme.placeholder,
+    },
+    // ── Checklist ──
+    checklistCard: {
+      backgroundColor: theme.inputBg,
+      borderWidth:      1,
+      borderColor:     theme.inputBorder,
+      borderRadius:    10,
+      marginBottom:    12,
+    },
+    checklistRow: {
+      flexDirection:     'row',
+      alignItems:        'center',
+      justifyContent:    'space-between',
+      paddingVertical:   10,
+      paddingHorizontal: 13,
+    },
+    checklistRowBorder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    checklistLabel: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.base,
+      color:      theme.text,
+      flex:        1,
+      paddingRight: 10,
+    },
+    measureInput: {
+      width:           70,
+      borderWidth:      1,
+      borderColor:     theme.border,
+      borderRadius:    8,
+      paddingVertical:  6,
+      paddingHorizontal: 8,
+      textAlign:       'right',
+      fontFamily:      theme.fontBodyMedium,
+      fontSize:        FontSize.base,
+      color:           theme.text,
+      backgroundColor: theme.surface,
+    },
+    // ── Save button ──
     saveBtn: {
       flexDirection:     'row',
       alignItems:        'center',
@@ -820,6 +1144,9 @@ function makeStyles(theme) {
       borderRadius:      12,
       paddingVertical:   14,
       paddingHorizontal: 20,
+    },
+    saveBtnInstall: {
+      backgroundColor: theme.accent,
     },
     saveBtnPressed: {
       opacity: 0.85,

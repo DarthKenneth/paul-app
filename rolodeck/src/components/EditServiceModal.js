@@ -1,14 +1,14 @@
 // =============================================================================
 // EditServiceModal.js - View or edit notes + photos on a service log entry
-// Version: 1.1
-// Last Updated: 2026-04-19
+// Version: 1.2.2
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.25.0)
+// PROJECT:      Rolodeck (project v0.28.4)
 // FILES:        EditServiceModal.js      (this file)
 //               CustomerDetailScreen.js  (renders this modal when a log row is tapped)
 //               ServiceLogEntry.js       (the row that triggers this modal)
 //               storage.js               (updateServiceEntry, deleteServiceEntry)
-//               photoUtils.js            (savePhotoLocally)
+//               photoUtils.js            (savePhotoLocally, deletePhotosFromDisk)
 //               dateUtils.js             (isSameLocalDay)
 //               theme.js                 (useTheme)
 //               typography.js            (FontSize)
@@ -24,8 +24,8 @@
 //   - Date is read-only (shown in the header) — editing the date of a past entry
 //     would invalidate interval calculations and history ordering; if the user
 //     needs a different date, they should delete and re-add
-//   - View mode: shows notes as wrapped text + read-only thumbnail strip (tap to
-//     open lightbox). No Save/Delete buttons; just Close + Edit pencil.
+//   - View mode: entry details (entryValues + checklist) → notes → photos (lightbox).
+//     No Save/Delete buttons; just Close + subtle Edit pencil.
 //   - Edit mode: notes textarea + photo pickers (camera, library) + Save + Delete.
 //     Photos array is working copy; changes only persist on Save.
 //   - Save calls updateServiceEntry(customerId, entryId, { notes, photos })
@@ -33,8 +33,20 @@
 //   - Delete prompts a destructive Alert; calls deleteServiceEntry then onDelete()
 //   - On re-open, mode resets to initialMode and the working copy is seeded from
 //     the entry so dropped edits don't leak between opens
+//   - typeLabel resolved from allServiceTypes so custom types display correctly
 //
 // CHANGE LOG:
+// v1.2.2  2026-04-24  Claude  Detail row label no longer squeezed — label sizes to content,
+//                             value takes remaining space and wraps to multiple lines instead
+// v1.2.1  2026-04-24  Claude  Photo file cleanup on entry delete + on photo removal during edit
+// v1.2    2026-04-24  Claude  Full entry details in view mode + subtle pencil
+//       - Added useProfession(); typeLabel now resolved from allServiceTypes
+//         instead of the hardcoded 'install'/'service' switch
+//       - View mode now shows entry details section (entryValues: equipment,
+//         salt, etc.) and checklist section (check items + measure readings)
+//         above the Notes and Photos sections
+//       - Edit pencil changed to pencil-outline + textMuted (more subtle)
+//         [updated ARCHITECTURE]
 // v1.1  2026-04-19  Claude  View/edit split for accidental-change protection
 //       - Added 'view' mode (read-only notes + thumbnails + lightbox) with an
 //         Edit pencil in the header that transitions to 'edit' mode
@@ -59,12 +71,14 @@ import {
   Platform,
   ScrollView,
   Image,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { savePhotoLocally } from '../utils/photoUtils';
+import { savePhotoLocally, deletePhotosFromDisk } from '../utils/photoUtils';
 import { updateServiceEntry, deleteServiceEntry } from '../data/storage';
 import { useTheme } from '../styles/theme';
+import { useProfession } from '../contexts/ProfessionContext';
 import { FontSize } from '../styles/typography';
 
 export default function EditServiceModal({
@@ -78,6 +92,7 @@ export default function EditServiceModal({
   onClose,
 }) {
   const { theme } = useTheme();
+  const { allServiceTypes, profession, checklistItems } = useProfession();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [mode, setMode]       = useState(initialMode);
@@ -98,9 +113,37 @@ export default function EditServiceModal({
 
   if (!entry) return null;
 
-  const typeLabel = isInitial
-    ? 'Initial Install/Service'
-    : entry.type === 'install' ? 'Install' : 'Service';
+  const sType = allServiceTypes.find((t) => t.id === entry.type) ?? allServiceTypes[0];
+  const typeLabel = isInitial ? `Initial ${sType?.label ?? 'Service'}` : (sType?.label ?? 'Service');
+
+  // Build display rows for entry values (view mode)
+  const entryDetailRows = (() => {
+    const rows = [];
+    const ev = entry.entryValues;
+    if (!ev) return rows;
+    const eq = ev.equipmentInstalled;
+    if (Array.isArray(eq) && eq.length > 0) {
+      rows.push({ label: sType?.install ? 'Equipment Installed' : 'Equipment Serviced', value: eq.join(', ') });
+    }
+    for (const field of (profession.entryFields || [])) {
+      if (field.key === 'equipmentServiced') continue;
+      const val = ev[field.key];
+      if (val) rows.push({ label: field.label, value: String(val) });
+    }
+    return rows;
+  })();
+
+  const checklistRows = (() => {
+    const cl = entry.checklist;
+    if (!cl) return [];
+    return checklistItems
+      .filter((item) => cl[item.id] !== undefined && cl[item.id] !== '' && cl[item.id] !== null)
+      .map((item) => ({
+        label: item.label,
+        value: item.type === 'check' ? (cl[item.id] ? 'Yes' : '—') : String(cl[item.id]),
+        isCheck: item.type === 'check' && !!cl[item.id],
+      }));
+  })();
 
   const formattedDate = new Date(entry.date).toLocaleDateString('en-US', {
     year:  'numeric',
@@ -111,7 +154,14 @@ export default function EditServiceModal({
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Camera access is needed to take photos.');
+      Alert.alert(
+        'Camera Access Required',
+        'Allow Rolodeck to use your camera in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
       return;
     }
     const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
@@ -128,7 +178,14 @@ export default function EditServiceModal({
   const handleChoosePhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Photo library access is needed to choose photos.');
+      Alert.alert(
+        'Photo Library Access Required',
+        'Allow Rolodeck to access your photos in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -159,7 +216,11 @@ export default function EditServiceModal({
       } else {
         updates.photos = [];
       }
+      // Find photos that were removed in this edit so we can clean up the files
+      const originalPhotos = Array.isArray(entry.photos) ? entry.photos : [];
+      const removed = originalPhotos.filter((uri) => !photos.includes(uri));
       await updateServiceEntry(customerId, entry.id, updates);
+      if (removed.length > 0) deletePhotosFromDisk(removed); // fire-and-forget
       onSave?.();
     } catch {
       Alert.alert('Error', 'Failed to save changes.');
@@ -179,7 +240,9 @@ export default function EditServiceModal({
           style:   'destructive',
           onPress: async () => {
             try {
+              const entryPhotos = Array.isArray(entry.photos) ? entry.photos : [];
               await deleteServiceEntry(customerId, entry.id);
+              if (entryPhotos.length > 0) deletePhotosFromDisk(entryPhotos); // fire-and-forget
               onDelete?.();
             } catch {
               Alert.alert('Error', 'Failed to delete entry.');
@@ -234,7 +297,7 @@ export default function EditServiceModal({
                     accessibilityLabel="Edit entry"
                     style={styles.headerIconBtn}
                   >
-                    <Ionicons name="pencil" size={20} color={theme.primary} />
+                    <Ionicons name="pencil-outline" size={18} color={theme.textMuted} />
                   </Pressable>
                 )}
                 <Pressable onPress={onClose} hitSlop={12} accessibilityLabel="Close">
@@ -242,6 +305,38 @@ export default function EditServiceModal({
                 </Pressable>
               </View>
             </View>
+
+            {/* Entry details (view mode) */}
+            {!isEditing && entryDetailRows.length > 0 && (
+              <>
+                <Text style={styles.label}>Details</Text>
+                <View style={styles.detailsCard}>
+                  {entryDetailRows.map((row, idx) => (
+                    <View key={row.label} style={[styles.detailRow, idx < entryDetailRows.length - 1 && styles.detailRowBorder]}>
+                      <Text style={styles.detailLabel}>{row.label}</Text>
+                      <Text style={styles.detailValue}>{row.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+
+            {/* Checklist (view mode) */}
+            {!isEditing && checklistRows.length > 0 && (
+              <>
+                <Text style={styles.label}>Checklist</Text>
+                <View style={styles.detailsCard}>
+                  {checklistRows.map((row, idx) => (
+                    <View key={row.label} style={[styles.detailRow, idx < checklistRows.length - 1 && styles.detailRowBorder]}>
+                      <Text style={styles.detailLabel}>{row.label}</Text>
+                      <Text style={[styles.detailValue, row.isCheck && styles.detailValueCheck]}>
+                        {row.value}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
 
             {/* Notes */}
             <Text style={styles.label}>Notes</Text>
@@ -430,6 +525,40 @@ function makeStyles(theme) {
       backgroundColor:   theme.inputBg,
       minHeight:         96,
       marginBottom:      20,
+    },
+    detailsCard: {
+      backgroundColor: theme.background,
+      borderWidth:      1,
+      borderColor:     theme.borderLight,
+      borderRadius:    10,
+      marginBottom:    20,
+    },
+    detailRow: {
+      flexDirection:     'row',
+      alignItems:        'flex-start',
+      justifyContent:    'space-between',
+      paddingVertical:   10,
+      paddingHorizontal: 14,
+    },
+    detailRowBorder: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.border,
+    },
+    detailLabel: {
+      fontFamily:  theme.fontBody,
+      fontSize:    FontSize.sm,
+      color:       theme.textMuted,
+      marginRight: 12,
+    },
+    detailValue: {
+      fontFamily: theme.fontBodyMedium,
+      fontSize:   FontSize.sm,
+      color:      theme.textSecondary,
+      textAlign:  'right',
+      flex:        1,
+    },
+    detailValueCheck: {
+      color: theme.primary,
     },
     notesView: {
       paddingHorizontal: 14,

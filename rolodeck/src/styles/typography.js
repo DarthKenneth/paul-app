@@ -1,9 +1,9 @@
 // =============================================================================
 // typography.js - Font family references and type scale constants
-// Version: 1.2
-// Last Updated: 2026-04-09
+// Version: 1.3
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.14.1)
+// PROJECT:      Rolodeck (project v0.29.0)
 // FILES:        colors.js       (palette + theme objects)
 //               typography.js   (this file — font constants)
 //               theme.js        (ThemeContext + ThemeProvider)
@@ -27,6 +27,7 @@
 //     Inter is tight + angular, DM Sans is rounded + relaxed.
 //
 // CHANGE LOG:
+// v1.3  2026-04-24  Claude  Tablet font scale — tabletScale(size) bumps by 2pt on tablet
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added Inter and Playfair Display font families
 //                           [updated ARCHITECTURE]
@@ -133,6 +134,11 @@ export const FontSize = {
   xxl:  30,
   hero: 38,
 };
+
+// Bump any font size by 2pt on tablet. Pass isTablet from useIsTablet().
+export function tabletScale(size, isTablet) {
+  return isTablet ? size + 2 : size;
+}
 
 export const FontWeight = {
   regular: '400',

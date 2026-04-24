@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.6
-// Last Updated: 2026-04-14
+// Version: 1.8
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.22.5)
+// PROJECT:      Rolodeck (project v0.29.0)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -39,6 +39,19 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v1.8  2026-04-24  Claude  Tablet landscape sidebar layout
+//       - Added navigationRef + activeTab state tracking via NavigationContainer
+//         onStateChange; on tablet landscape AppInner renders sidebar + TabNavigator
+//         side-by-side instead of the standard bottom-tab-only layout
+//       - TabNavigator gets hideTabs={showSidebar} to suppress the bottom bar
+// v1.7  2026-04-23  Claude  Add ProfessionProvider to root tree
+//       - Imported ProfessionProvider from src/contexts/ProfessionContext.js
+//       - Wrapped AppInner in ProfessionProvider (inside ThemeProvider so theme
+//         is available to all screens; profession loaded from AsyncStorage on mount)
+// v1.6.1  2026-04-23  Claude  Fix dark-mode flash on tab/screen transitions — pass a
+//                             navTheme to NavigationContainer so React Navigation uses
+//                             theme.background instead of its default white for scene
+//                             containers; also fixed isDark to include ember theme
 // v1.6  2026-04-14  Claude  Remove Sentry test button (DSN confirmed, fully wired)
 // v1.5  2026-04-14  Claude  Fix badge count not showing on Services tab
 //       - Run refreshAlerts after initStorage completes (not concurrently) so
@@ -58,9 +71,10 @@
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, ActivityIndicator, AppState, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { View, Text, Pressable, ActivityIndicator, AppState, StyleSheet } from 'react-native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import * as Sentry from '@sentry/react-native';
 import { useFonts } from 'expo-font';
 import {
@@ -82,9 +96,12 @@ import {
 } from '@expo-google-fonts/playfair-display';
 
 import { ThemeProvider, useTheme } from './src/styles/theme';
+import { ProfessionProvider } from './src/contexts/ProfessionContext';
 import TabNavigator from './src/components/TabNavigator';
 import OnboardingModal from './src/components/OnboardingModal';
 import ErrorBoundary from './src/components/ErrorBoundary';
+import { useSplitLayout, SIDEBAR_WIDTH } from './src/utils/responsive';
+import { FontSize } from './src/styles/typography';
 import {
   getAllCustomers,
   initStorage,
@@ -115,11 +132,120 @@ const SPLASH_BG      = '#F5F0E8';
 
 // ── Inner component: has ThemeContext access ───────────────────────────────────
 
+// ── Tablet sidebar ────────────────────────────────────────────────────────────
+
+const SIDEBAR_TABS = [
+  { name: 'CustomersTab', label: 'Customers', icon: 'people',    outline: 'people-outline'    },
+  { name: 'ServicesTab',  label: 'Services',  icon: 'construct', outline: 'construct-outline'  },
+  { name: 'SettingsTab',  label: 'Settings',  icon: 'settings',  outline: 'settings-outline'   },
+];
+
+function TabletSidebar({ navigationRef, activeTab, alertCount, theme }) {
+  return (
+    <View style={sidebarStyles.sidebar}>
+      <View style={sidebarStyles.logoRow}>
+        <Text style={[sidebarStyles.logoText, { fontFamily: theme.fontHeading, color: theme.primary }]}>
+          Rolodeck
+        </Text>
+      </View>
+      {SIDEBAR_TABS.map(({ name, label, icon, outline }) => {
+        const focused = activeTab === name;
+        return (
+          <Pressable
+            key={name}
+            onPress={() => navigationRef.current?.navigate(name)}
+            style={({ pressed }) => [
+              sidebarStyles.navRow,
+              focused && { backgroundColor: theme.primary + '18' },
+              pressed && { opacity: 0.75 },
+            ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: focused }}
+          >
+            <Ionicons
+              name={focused ? icon : outline}
+              size={22}
+              color={focused ? theme.primary : theme.textMuted}
+              style={sidebarStyles.navIcon}
+            />
+            <Text style={[
+              sidebarStyles.navLabel,
+              {
+                fontFamily: focused ? theme.fontUiMedium : theme.fontUi,
+                color: focused ? theme.primary : theme.textSecondary,
+              },
+            ]}>
+              {label}
+            </Text>
+            {name === 'ServicesTab' && alertCount > 0 && (
+              <View style={[sidebarStyles.badge, { backgroundColor: theme.badge }]}>
+                <Text style={[sidebarStyles.badgeText, { color: theme.badgeText }]}>
+                  {alertCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const sidebarStyles = StyleSheet.create({
+  sidebar: {
+    width:           SIDEBAR_WIDTH,
+    backgroundColor: 'transparent',
+    borderRightWidth: 1,
+    paddingTop:       56,
+    paddingHorizontal: 12,
+  },
+  logoRow: {
+    paddingHorizontal: 8,
+    paddingBottom:     32,
+  },
+  logoText: {
+    fontSize: 22,
+  },
+  navRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    paddingHorizontal: 12,
+    paddingVertical:   13,
+    borderRadius:     10,
+    marginBottom:      4,
+  },
+  navIcon: {
+    width: 28,
+  },
+  navLabel: {
+    fontSize:   FontSize.base,
+    marginLeft:  4,
+    flex:        1,
+  },
+  badge: {
+    minWidth:    20,
+    height:      20,
+    borderRadius: 10,
+    alignItems:  'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  badgeText: {
+    fontSize:   10,
+    lineHeight: 20,
+  },
+});
+
+// ── AppInner ──────────────────────────────────────────────────────────────────
+
 function AppInner() {
-  const { themeKey } = useTheme();
+  const { theme, themeKey } = useTheme();
   const [alertCount, setAlertCount]       = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const appState = useRef(AppState.currentState);
+  const [activeTab, setActiveTab]         = useState('CustomersTab');
+  const appState     = useRef(AppState.currentState);
+  const navigationRef = useRef(null);
+  const showSidebar  = useSplitLayout();
 
   const refreshAlerts = useCallback(async () => {
     try {
@@ -162,14 +288,45 @@ function AppInner() {
     return () => subscription.remove();
   }, [refreshAlerts]);
 
-  const isDark = themeKey === 'midnight';
+  const isDark = themeKey === 'midnight' || themeKey === 'ember';
+
+  const navTheme = {
+    ...DefaultTheme,
+    colors: { ...DefaultTheme.colors, background: theme.background },
+  };
+
+  const handleNavStateChange = (state) => {
+    if (state?.routes) {
+      setActiveTab(state.routes[state.index]?.name ?? 'CustomersTab');
+    }
+  };
 
   return (
-    <NavigationContainer>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <TabNavigator alertCount={alertCount} onAlertsRefresh={refreshAlerts} />
+    <View style={[styles.root, { backgroundColor: theme.surface }]}>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navTheme}
+        onStateChange={handleNavStateChange}
+      >
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        {showSidebar && (
+          <TabletSidebar
+            navigationRef={navigationRef}
+            activeTab={activeTab}
+            alertCount={alertCount}
+            theme={theme}
+          />
+        )}
+        <View style={[styles.content, showSidebar && { marginLeft: SIDEBAR_WIDTH, borderLeftWidth: 1, borderLeftColor: theme.border }]}>
+          <TabNavigator
+            alertCount={alertCount}
+            onAlertsRefresh={refreshAlerts}
+            hideTabs={showSidebar}
+          />
+        </View>
+      </NavigationContainer>
       <OnboardingModal visible={showOnboarding} onComplete={handleOnboardingComplete} />
-    </NavigationContainer>
+    </View>
   );
 }
 
@@ -199,13 +356,22 @@ export default Sentry.wrap(function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <AppInner />
+        <ProfessionProvider>
+          <AppInner />
+        </ProfessionProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
 });
 
 const styles = StyleSheet.create({
+  root: {
+    flex:           1,
+    flexDirection:  'row',
+  },
+  content: {
+    flex: 1,
+  },
   splash: {
     flex:            1,
     alignItems:      'center',

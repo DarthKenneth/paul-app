@@ -1,31 +1,54 @@
 // =============================================================================
 // CustomersScreen.js - Customer list with search, sort filter, and add button
-// Version: 1.6
-// Last Updated: 2026-04-19
+// Version: 1.7
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.25.0)
+// PROJECT:      Rolodeck (project v0.29.0)
 // FILES:        CustomersScreen.js      (this file)
 //               CustomerCard.js         (list item component)
+//               CustomerDetailPane.js   (right-panel detail in split view)
 //               storage.js              (getAllCustomers, getSortPreference,
 //                                        saveSortPreference)
 //               theme.js                (useTheme)
 //               typography.js           (FontFamily, FontSize)
 //               SyncStatusBanner.js     (Square sync status banner)
+//               responsive.js           (useSplitLayout, SPLIT_LIST_WIDTH)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
 // ARCHITECTURE:
-//   - useFocusEffect reloads customers + saved sort preference on every focus
+//   - useFocusEffect reloads customers + sort on every focus; loadCustomers()
+//     is extracted so the split-pane callbacks can trigger background reloads
 //   - "Add Customer" button lives at the top of the screen content (not a FAB)
-//   - Sort is a 4-option filter modal: name, address, zip code, email
-//   - Active sort shown as a chip with the current label + chevron
-//   - Search: case-insensitive match on name, email, phone, address, zipCode
+//   - Sort: 4-option filter modal (first name, last name, city, zip code)
+//   - Active sort shown as a chip with current label + chevron
+//   - Search: case-insensitive match on name, email, phone, address, city, state, zipCode
 //   - Sort preference persisted to AsyncStorage via saveSortPreference()
 //   - Filtered + sorted list memoized with useMemo to avoid recalc on
 //     unrelated re-renders
 //   - Storage errors caught with try/catch
+//   - TABLET LANDSCAPE (useSplitLayout): renders a two-panel side-by-side layout
+//     — left panel is SPLIT_LIST_WIDTH (320pt) wide and holds the customer list;
+//     right panel holds CustomerDetailPane when a customer is selected, or an
+//     empty-state prompt. Tapping a card sets selectedCustomerId instead of
+//     navigating. The pane's onBack/onAlertsRefresh callbacks trigger a
+//     background list reload to keep cards fresh after service changes.
 //
 // CHANGE LOG:
+// v1.7  2026-04-24  Claude  Tablet landscape split-pane layout
+//       - Imported CustomerDetailPane, useSplitLayout, SPLIT_LIST_WIDTH
+//       - Extracted loadCustomers() from useFocusEffect so background reloads
+//         are possible from split-pane callbacks
+//       - Added selectedCustomerId state (split mode only)
+//       - handlePaneBack: clears selection + triggers list reload + badge refresh
+//       - handlePaneAlertsRefresh: badge refresh + list reload (service added)
+//       - SectionList renderItem: navigates on phone, sets selectedCustomerId
+//         on tablet; selected card highlighted with primary left border
+//       - Split layout: SafeAreaView flex-row root; left panel SPLIT_LIST_WIDTH;
+//         right panel flex:1 bordered; CustomerDetailPane or empty state prompt
+//       - widthCap suppressed inside left panel (already constrained)
+//       - Added splitRoot, splitListPanel, splitDetailPanel, emptyPane,
+//         emptyPaneText, emptyPaneIcon styles [updated ARCHITECTURE]
 // v1.6  2026-04-19  Claude  Tablet width cap — action row, search bar, and
 //                           SectionList content are wrapped in useContentContainerStyle
 //                           so the list centers at 760pt on iPad instead of stretching
@@ -61,11 +84,11 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import CustomerCard from '../components/CustomerCard';
+import CustomerDetailPane from '../components/CustomerDetailPane';
 import SyncStatusBanner from '../components/SyncStatusBanner';
 import {
   getAllCustomers,
@@ -78,7 +101,7 @@ import {
 } from '../data/storage';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
-import { useContentContainerStyle } from '../utils/responsive';
+import { useSplitLayout, SPLIT_LIST_WIDTH, useContentContainerStyle } from '../utils/responsive';
 
 const SORT_OPTIONS = [
   { key: 'firstName', label: 'First Name' },
@@ -116,43 +139,56 @@ export default function CustomersScreen({ navigation, route }) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const widthCap = useContentContainerStyle();
+  const isSplit  = useSplitLayout();
 
-  const [customers, setCustomers]   = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [query, setQuery]           = useState('');
-  const [sortMode, setSortMode]     = useState('firstName');
-  const [sortModal, setSortModal]   = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
-  const [intervalDays, setIntervalDays] = useState(365);
+  const [customers, setCustomers]           = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [query, setQuery]                   = useState('');
+  const [sortMode, setSortMode]             = useState('firstName');
+  const [sortModal, setSortModal]           = useState(false);
+  const [showArchived, setShowArchived]     = useState(false);
+  const [intervalDays, setIntervalDays]     = useState(365);
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+
+  // Extracted so split-pane callbacks can trigger background reloads without
+  // setting the loading spinner (list stays visible while data refreshes).
+  const loadCustomers = useCallback(async () => {
+    const [all, pref, archived, mode, customDays] = await Promise.all([
+      getAllCustomers(),
+      getSortPreference(),
+      getShowArchived(),
+      getServiceIntervalMode(),
+      getServiceIntervalCustomDays(),
+    ]);
+    setCustomers(all);
+    setSortMode(pref);
+    setShowArchived(archived);
+    setIntervalDays(modeToIntervalDays(mode, customDays));
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setLoading(true);
-      (async () => {
-        try {
-          const [all, pref, archived, mode, customDays] = await Promise.all([
-            getAllCustomers(),
-            getSortPreference(),
-            getShowArchived(),
-            getServiceIntervalMode(),
-            getServiceIntervalCustomDays(),
-          ]);
-          if (active) {
-            setCustomers(all);
-            setSortMode(pref);
-            setShowArchived(archived);
-            setIntervalDays(modeToIntervalDays(mode, customDays));
-          }
-        } catch {
-          // Storage read failed — keep stale data rather than crashing
-        } finally {
-          if (active) setLoading(false);
-        }
-      })();
+      loadCustomers()
+        .catch(() => {})
+        .finally(() => { if (active) setLoading(false); });
       return () => { active = false; };
-    }, []),
+    }, [loadCustomers]),
   );
+
+  // Split-pane: customer was deleted or archived — clear selection, refresh list + badge
+  const handlePaneBack = useCallback(() => {
+    setSelectedCustomerId(null);
+    loadCustomers().catch(() => {});
+    route.params?.onAlertsRefresh?.();
+  }, [loadCustomers, route.params?.onAlertsRefresh]);
+
+  // Split-pane: service added/removed — refresh badge + list cards (last service date)
+  const handlePaneAlertsRefresh = useCallback(() => {
+    route.params?.onAlertsRefresh?.();
+    loadCustomers().catch(() => {});
+  }, [route.params?.onAlertsRefresh, loadCustomers]);
 
   const handleSortSelect = async (key) => {
     setSortMode(key);
@@ -177,7 +213,6 @@ export default function CustomersScreen({ navigation, route }) {
     });
     const sorted = sortCustomers(matched, sortMode);
 
-    // Group into sections by the first character of the sort key
     const groups = new Map();
     for (const c of sorted) {
       let groupKey;
@@ -206,11 +241,13 @@ export default function CustomersScreen({ navigation, route }) {
 
   const activeSortLabel = SORT_OPTIONS.find((o) => o.key === sortMode)?.label ?? 'Name';
 
-  return (
-    <SafeAreaView style={styles.safe}>
+  // ── Shared list UI ────────────────────────────────────────────────────────────
+  // Rendered in both split (left panel) and non-split (full screen) layouts.
 
-      {/* ── Top action row: Add Customer + Sort ── */}
-      <View style={[styles.actionRow, widthCap]}>
+  const listSide = (
+    <>
+      {/* Top action row: Add Customer + Sort */}
+      <View style={[styles.actionRow, !isSplit && widthCap]}>
         <Pressable
           style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]}
           onPress={() => navigation.navigate('AddCustomer')}
@@ -231,18 +268,12 @@ export default function CustomersScreen({ navigation, route }) {
           <Text style={styles.sortChipText}>{activeSortLabel}</Text>
           <Ionicons name="chevron-down" size={13} color={theme.primary} />
         </Pressable>
-
       </View>
 
-      {/* ── Search bar ── */}
-      <View style={[styles.searchRow, widthCap]}>
+      {/* Search bar */}
+      <View style={[styles.searchRow, !isSplit && widthCap]}>
         <View style={styles.searchWrap}>
-          <Ionicons
-            name="search-outline"
-            size={18}
-            color={theme.placeholder}
-            style={styles.searchIcon}
-          />
+          <Ionicons name="search-outline" size={18} color={theme.placeholder} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search customers…"
@@ -256,12 +287,12 @@ export default function CustomersScreen({ navigation, route }) {
         </View>
       </View>
 
-      {/* ── Square sync status banner ── */}
+      {/* Square sync banner */}
       <SyncStatusBanner
         onPress={() => navigation.navigate('SettingsTab', { screen: 'SquareSync' })}
       />
 
-      {/* ── Customer list ── */}
+      {/* Customer list */}
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={theme.primary} />
@@ -277,13 +308,25 @@ export default function CustomersScreen({ navigation, route }) {
             </View>
           )}
           renderItem={({ item }) => (
-            <CustomerCard
-              customer={item}
-              intervalDays={intervalDays}
-              onPress={() => navigation.navigate('CustomerDetail', { customerId: item.id, backLabel: 'Customers', onAlertsRefresh: route.params?.onAlertsRefresh })}
-            />
+            <View style={isSplit && selectedCustomerId === item.id ? styles.selectedCard : undefined}>
+              <CustomerCard
+                customer={item}
+                intervalDays={intervalDays}
+                onPress={() => {
+                  if (isSplit) {
+                    setSelectedCustomerId(item.id);
+                  } else {
+                    navigation.navigate('CustomerDetail', {
+                      customerId: item.id,
+                      backLabel: 'Customers',
+                      onAlertsRefresh: route.params?.onAlertsRefresh,
+                    });
+                  }
+                }}
+              />
+            </View>
           )}
-          contentContainerStyle={[styles.listContent, widthCap]}
+          contentContainerStyle={[styles.listContent, !isSplit && widthCap]}
           keyboardShouldPersistTaps="handled"
           stickySectionHeadersEnabled={false}
           ListEmptyComponent={
@@ -302,7 +345,7 @@ export default function CustomersScreen({ navigation, route }) {
         />
       )}
 
-      {/* ── Sort filter modal ── */}
+      {/* Sort filter modal */}
       <Modal
         visible={sortModal}
         transparent
@@ -325,12 +368,7 @@ export default function CustomersScreen({ navigation, route }) {
                 accessibilityLabel={`Sort by ${label}`}
                 accessibilityState={{ selected: sortMode === key }}
               >
-                <Text
-                  style={[
-                    styles.modalOptionText,
-                    sortMode === key && styles.modalOptionTextActive,
-                  ]}
-                >
+                <Text style={[styles.modalOptionText, sortMode === key && styles.modalOptionTextActive]}>
                   {label}
                 </Text>
                 {sortMode === key && (
@@ -341,7 +379,41 @@ export default function CustomersScreen({ navigation, route }) {
           </View>
         </Pressable>
       </Modal>
+    </>
+  );
 
+  // ── Split layout ──────────────────────────────────────────────────────────────
+
+  if (isSplit) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.splitRoot]}>
+        <View style={styles.splitListPanel}>
+          {listSide}
+        </View>
+        <View style={[styles.splitDetailPanel, { borderLeftColor: theme.border }]}>
+          {selectedCustomerId ? (
+            <CustomerDetailPane
+              customerId={selectedCustomerId}
+              onBack={handlePaneBack}
+              onAlertsRefresh={handlePaneAlertsRefresh}
+              isPaneMode
+            />
+          ) : (
+            <View style={styles.emptyPane}>
+              <Ionicons name="person-outline" size={48} color={theme.border} />
+              <Text style={styles.emptyPaneText}>Select a customer</Text>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Full-screen layout (phone / portrait tablet) ──────────────────────────────
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      {listSide}
     </SafeAreaView>
   );
 }
@@ -352,6 +424,36 @@ function makeStyles(theme) {
       flex:            1,
       backgroundColor: theme.background,
     },
+    // ── Split layout ──
+    splitRoot: {
+      flexDirection: 'row',
+    },
+    splitListPanel: {
+      width:           SPLIT_LIST_WIDTH,
+      borderRightWidth: 1,
+      borderRightColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    splitDetailPanel: {
+      flex:            1,
+      borderLeftWidth: 1,
+      backgroundColor: theme.background,
+    },
+    selectedCard: {
+      backgroundColor: theme.primaryPale,
+    },
+    emptyPane: {
+      flex:            1,
+      alignItems:      'center',
+      justifyContent:  'center',
+      gap:             12,
+    },
+    emptyPaneText: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.base,
+      color:      theme.textMuted,
+    },
+    // ── Action row ──
     actionRow: {
       flexDirection:     'row',
       alignItems:        'center',
@@ -404,6 +506,7 @@ function makeStyles(theme) {
       fontSize:   FontSize.sm,
       color:      theme.primary,
     },
+    // ── Search ──
     searchRow: {
       paddingHorizontal: 16,
       paddingBottom:      10,
@@ -427,6 +530,7 @@ function makeStyles(theme) {
       color:           theme.text,
       paddingVertical: 12,
     },
+    // ── List ──
     loadingWrap: {
       flex:            1,
       alignItems:      'center',
@@ -445,11 +549,11 @@ function makeStyles(theme) {
       gap:                10,
     },
     sectionLabel: {
-      fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.sm,
-      color:      theme.textMuted,
+      fontFamily:    theme.fontUiBold,
+      fontSize:      FontSize.sm,
+      color:         theme.textMuted,
       textTransform: 'uppercase',
-      letterSpacing: 0.8,
+      letterSpacing:  0.8,
     },
     sectionLine: {
       flex:            1,

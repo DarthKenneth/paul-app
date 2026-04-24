@@ -1,9 +1,9 @@
 // =============================================================================
 // ServiceLogEntry.js - Single row in a customer's service log list
-// Version: 1.3
-// Last Updated: 2026-04-19
+// Version: 1.5
+// Last Updated: 2026-04-24
 //
-// PROJECT:      Rolodeck (project v0.25.0)
+// PROJECT:      Rolodeck (project v0.28)
 // FILES:        ServiceLogEntry.js       (this file)
 //               CustomerDetailScreen.js  (renders these in a list)
 //               EditServiceModal.js      (opened when row is pressed)
@@ -36,6 +36,14 @@
 //       - Horizontal ScrollView thumbnail strip below notes for entries with photos
 //       - Tap any thumbnail to open a full-screen lightbox Modal
 //         [updated ARCHITECTURE]
+// v1.6  2026-04-24  Claude  Show brief entry values summary in the row
+//       - Added profession to useProfession() destructure
+//       - detailLine computed from entryValues (equipment, salt, etc.) and shown
+//         as a muted line below the type label so key info is visible without opening
+// v1.5  2026-04-24  Claude  Use allServiceTypes so custom type entries resolve correctly
+// v1.4  2026-04-23  Claude  Use profession config for type icon/label instead of
+//                           hardcoded TYPE_CONFIG object; isInitial label reads
+//                           "Initial {sType.label}" (e.g. "Initial Routine Service")
 // v1.3  2026-04-19  Claude  Row is now pressable; opens edit modal in parent
 //       - Outer View swapped for Pressable; onPress prop wired through
 //       - Thumbnail press opens lightbox without bubbling to row press
@@ -47,19 +55,31 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, Pressable, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
+import { useProfession } from '../contexts/ProfessionContext';
 import { FontSize } from '../styles/typography';
-
-const TYPE_CONFIG = {
-  install: { icon: 'construct-outline', label: 'Install' },
-  service: { icon: 'build-outline',     label: 'Service' },
-};
 
 function ServiceLogEntry({ entry, isInitial, isLast, onPress }) {
   const { theme } = useTheme();
+  const { allServiceTypes, profession } = useProfession();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const config = TYPE_CONFIG[entry.type] || TYPE_CONFIG.service;
-  const label = isInitial ? 'Initial Install/Service' : config.label;
+  const sType = allServiceTypes.find((t) => t.id === entry.type)
+    ?? allServiceTypes[0];
+  const label = isInitial ? `Initial ${sType.label}` : sType.label;
   const [lightboxUri, setLightboxUri] = useState(null);
+
+  const detailLine = useMemo(() => {
+    const ev = entry.entryValues;
+    if (!ev) return null;
+    const parts = [];
+    const eq = ev.equipmentInstalled;
+    if (Array.isArray(eq) && eq.length > 0) parts.push(eq.join(', '));
+    for (const field of (profession.entryFields || [])) {
+      if (field.key === 'equipmentServiced') continue;
+      const val = ev[field.key];
+      if (val) parts.push(String(val));
+    }
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }, [entry.entryValues, profession.entryFields]);
 
   const formattedDate = new Date(entry.date).toLocaleDateString('en-US', {
     year:  'numeric',
@@ -81,13 +101,16 @@ function ServiceLogEntry({ entry, isInitial, isLast, onPress }) {
     <>
       <RowContainer {...rowProps}>
         <View style={styles.iconWrap}>
-          <Ionicons name={config.icon} size={18} color={theme.primary} />
+          <Ionicons name={sType.icon} size={18} color={theme.primary} />
         </View>
         <View style={styles.content}>
           <View style={styles.topRow}>
             <Text style={styles.typeLabel}>{label}</Text>
             <Text style={styles.dateText}>{formattedDate}</Text>
           </View>
+          {!!detailLine && (
+            <Text style={styles.detailLine} numberOfLines={1}>{detailLine}</Text>
+          )}
           {!!entry.notes && (
             <Text style={styles.notes}>{entry.notes}</Text>
           )}
@@ -186,6 +209,12 @@ function makeStyles(theme) {
       fontFamily: theme.fontBody,
       fontSize:   FontSize.sm,
       color:      theme.textMuted,
+    },
+    detailLine: {
+      fontFamily: theme.fontBody,
+      fontSize:   FontSize.xs,
+      color:      theme.textMuted,
+      marginBottom: 3,
     },
     notes: {
       fontFamily: theme.fontBody,
