@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.30.0] - 2026-04-25
+
+### Infrastructure
+- **Square OAuth now fully wired up.** Square Developer app (Application ID + Location ID `L097PCBJCVMMT`) added to `.env`, OAuth redirect URI registered as `https://crm.ardingate.com/api/square-oauth-callback.php` (Square requires HTTPS). A new PHP relay at `crm.ardingate.com` receives Square's callback and immediately redirects to `rolodeck://square/callback` for the app to intercept. `squarePlaceholder.js` updated to use the HTTPS `redirectUri` with Square and the custom `appScheme` for browser detection.
+
+---
+
 ## [0.29.0] - 2026-04-24
 
 ### Added

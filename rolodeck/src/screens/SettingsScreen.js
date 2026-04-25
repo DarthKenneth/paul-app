@@ -1,20 +1,26 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.1
-// Last Updated: 2026-04-23
+// Version: 2.2
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.27)
+// PROJECT:      Rolodeck (project v0.30.0)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
 //               ServiceIntervalScreen.js  (interval picker; navigated to from the
 //                                          Default Service Interval row)
+//               SquareSyncScreen.js       (sync management; navigated to from
+//                                          Square Account → Sync Customers row)
 //               colors.js                 (Themes, ThemeNames)
 //               typography.js             (FontPresetNames, FontSize)
 //               storage.js                (getSortPreference, saveSortPreference,
 //                                          getServiceIntervalMode,
 //                                          getServiceIntervalCustomDays,
-//                                          modeToIntervalDays)
+//                                          modeToIntervalDays,
+//                                          getSquareSyncMetadata,
+//                                          getSquareAutoSync, saveSquareAutoSync)
+//               squarePlaceholder.js      (isSquareConnected, connectSquare,
+//                                          disconnectSquare)
 //               calendarSync.js           (getCalendarSyncEnabled, enableCalendarSync,
 //                                          disableCalendarSync)
 //               theme.js                  (useTheme)
@@ -25,8 +31,7 @@
 //
 // ARCHITECTURE:
 //   - Layout (top to bottom): Default Sort Order → Default Service Interval →
-//     Appearance card → Square (coming soon) →
-//     Backup & Restore (coming soon) → copyright
+//     Appearance card → Square Account → Backup & Restore (coming soon) → copyright
 //   - Service Interval row shows current value as subtitle (e.g. "1 Year",
 //     "Custom (45 days)"); chevron navigates to ServiceIntervalScreen
 //   - Appearance card groups three rows in one surface: Theme (nav to ThemeScreen),
@@ -36,6 +41,91 @@
 //   - useEffect cleanup prevents state updates on unmounted component
 //
 // CHANGE LOG:
+// v2.1  2026-04-23  Claude  Profession section (nav row to ProfessionSettingsScreen)
+//       - Added useProfession(); Profession section after Scheduling shows
+//         profession.emoji + name with chevron to ProfessionSettings
+//       - Imported useProfession from ProfessionContext
+// v2.0.3 2026-04-19  Claude  Tablet width cap on ScrollView content
+// v1.0  2026-04-03  Claude  Initial scaffold
+// v1.1  2026-04-03  Claude  Debug + harden
+//       - Fixed APP_VERSION constant: was '1.0.0', now '1.2' to match VERSION
+//       - Fixed sort toggle: was 2-option (Name/Zip), now 4-option
+//         (Name/Address/Zip/Email) matching CustomersScreen sort options
+//       - Fixed memory leak: added cleanup flag to useEffect so setState
+//         calls don't fire after unmount
+// v1.2  2026-04-04  Claude  Updated APP_VERSION to '1.4' to match project bump
+// v1.3  2026-04-04  Claude  Updated APP_VERSION to '1.5' to match project bump
+// v1.4  2026-04-04  Claude  Added Backup & Restore Coming Soon section
+//       - Imported cloudProviderLabel from backup.js for platform-specific copy
+//       - Added backup section UI (Coming Soon badge, platform-specific description)
+//       - Updated APP_VERSION to '1.6'
+// v1.5.3  2026-04-09  Claude  Added flex: 1 to inner text View in both toggle rows
+//                             to prevent description text clipping behind the toggle
+// v1.5.2  2026-04-06  Claude  Added paddingRight: 12 to archiveLeft to prevent
+//                             description text from clipping behind the toggle
+// v1.5.1  2026-04-06  Claude  Platform-specific calendar permission denied message
+//                             (iOS: Settings > Privacy & Security > Calendars;
+//                              Android: Settings > Apps > Rolodeck > Permissions)
+// v1.5  2026-04-06  Claude  Calendar Sync section
+//       - Added Calendar Sync toggle section (below Backup & Restore)
+//       - Toggle calls enableCalendarSync (requests permission + initial sync)
+//         or disableCalendarSync on change
+//       - Permission denial shows an Alert and reverts the toggle
+//       - Animated toggle shares same spring animation as archive toggle
+//       - calendarSyncAnim / calendarSyncKnob mirrors archive toggle pattern
+//       - Imported getCalendarSyncEnabled, enableCalendarSync, disableCalendarSync
+//       - Updated APP_VERSION to '1.8'
+// v1.6  2026-04-09  Claude  Restructured layout + extracted theme pickers
+//       - Color scheme and font style pickers moved to ThemeScreen.js
+//       - Appearance card groups Theme nav row + Archive toggle + Calendar toggle
+//         in a single surface between Sort Order and Square Invoicing
+//       - Backup & Restore moved to last (before copyright)
+//       - Added navigation prop; Theme row pushes ThemeScreen onto Settings stack
+//       - Updated APP_VERSION to '1.13'
+// v1.7  2026-04-09  Claude  Default Service Interval row
+//       - Added Default Service Interval card between Sort Order and Appearance
+//       - Row shows current interval as subtitle; chevron navigates to
+//         ServiceIntervalScreen
+//       - Loads intervalMode + intervalCustomDays in useEffect (with active flag)
+//       - Refreshes interval display on useFocusEffect (so it updates after
+//         returning from ServiceIntervalScreen)
+//       - Imported getServiceIntervalMode, getServiceIntervalCustomDays,
+//         modeToIntervalDays from storage.js [updated ARCHITECTURE]
+//       - Updated APP_VERSION to '1.14'
+// v1.7.1 2026-04-10  Claude  Updated APP_VERSION to '0.14.1' (scheme normalized to 0.x pre-release)
+// v1.7.2 2026-04-10  Claude  Updated APP_VERSION to '0.16' (covers missing 0.15 and
+//                             0.15.1 bumps that weren't logged in prior sessions)
+// v1.7.3 2026-04-10  Claude  APP_VERSION now derived from package.json instead of
+//                             hardcoded, stripping trailing ".0" — never goes stale
+//                             on future bumps [updated ARCHITECTURE dependency]
+// v1.7.4 2026-04-10  Claude  APP_VERSION import moved to shared src/appVersion.js
+//                             so backup.js (and future callers) share one source
+// v1.8  2026-04-10  Claude  Calendar sync status banner
+//       - Loads calendar sync status on mount via getCalendarSyncStatus()
+//       - Renders a warning banner under the Calendar Sync toggle when sync
+//         is enabled AND last sync didn't succeed; distinct copy for
+//         'permission-denied' vs generic 'error' states
+//       - Tapping the banner calls handleCalSyncRetry which runs syncAllCustomers
+//         and refreshes the status
+//       - Toggling sync off clears the stale status [updated ARCHITECTURE]
+// v2.0.2 2026-04-17  Claude  handleCalSyncRetry: add catch block safety net + null-coalesce
+//                             on getCalendarSyncStatus result
+// v2.0.1 2026-04-17  Claude  Retry sync now calls syncAll (due dates + scheduled services)
+// v2.2  2026-04-25  Claude  Square Account section — live (replacing coming-soon)
+//       - Imported isSquareConnected, connectSquare, disconnectSquare from
+//         squarePlaceholder.js
+//       - Imported getSquareSyncMetadata, getSquareAutoSync, saveSquareAutoSync
+//         from storage.js
+//       - Added squareConnected, squareConnecting, squareAutoSync, squareSyncMeta
+//         state; autoSyncAnim ref
+//       - Loads Square connection + auto-sync pref + sync meta in mount useEffect
+//       - handleSquareConnect: opens OAuth flow, updates connected state
+//       - handleSquareDisconnect: Alert confirm → disconnectSquare, clears state
+//       - handleSquareAutoSyncToggle: animated toggle + saveSquareAutoSync
+//       - Square section renders connect button (disconnected) or three rows
+//         (Sync Customers nav → SquareSync, Auto-sync toggle, Disconnect)
+//       - Added connectButton / connectButtonBusy / connectButtonText styles
+//         [updated ARCHITECTURE, FILES]
 // v2.1  2026-04-23  Claude  Profession section (nav row to ProfessionSettingsScreen)
 //       - Added useProfession(); Profession section after Scheduling shows
 //         profession.emoji + name with chevron to ProfessionSettings
@@ -142,7 +232,15 @@ import {
   getServiceIntervalMode,
   getServiceIntervalCustomDays,
   modeToIntervalDays,
+  getSquareSyncMetadata,
+  getSquareAutoSync,
+  saveSquareAutoSync,
 } from '../data/storage';
+import {
+  isSquareConnected,
+  connectSquare,
+  disconnectSquare,
+} from '../utils/squarePlaceholder';
 import { cloudProviderLabel } from '../utils/backup';
 import {
   getCalendarSyncEnabled,
@@ -168,6 +266,18 @@ function intervalLabel(mode, customDays) {
   return INTERVAL_MODE_LABELS[mode] || '1 Year';
 }
 
+function formatSyncTime(iso) {
+  if (!iso) return null;
+  const diffMs  = Date.now() - new Date(iso).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1)  return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24)  return `${diffHr}h ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return diffDay === 1 ? 'yesterday' : `${diffDay} days ago`;
+}
+
 const SORT_OPTIONS = [
   { key: 'firstName', label: 'First Name', icon: 'person-outline'        },
   { key: 'lastName',  label: 'Last Name',  icon: 'person-circle-outline' },
@@ -188,8 +298,13 @@ export default function SettingsScreen({ navigation }) {
   const [calSyncBusy, setCalSyncBusy]         = useState(false);
   const [intervalMode, setIntervalMode]       = useState('365');
   const [intervalCustomDays, setIntervalCustomDays] = useState(30);
+  const [squareConnected, setSquareConnected]   = useState(false);
+  const [squareConnecting, setSquareConnecting] = useState(false);
+  const [squareAutoSync, setSquareAutoSync]     = useState(false);
+  const [squareSyncMeta, setSquareSyncMeta]     = useState(null);
   const toggleAnim    = useRef(new Animated.Value(0)).current;
   const calSyncAnim   = useRef(new Animated.Value(0)).current;
+  const autoSyncAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let active = true;
@@ -203,6 +318,11 @@ export default function SettingsScreen({ navigation }) {
     getCalendarSyncStatus().then((s) => {
       if (active) setCalSyncStatus(s);
     });
+    isSquareConnected().then((c) => { if (active) setSquareConnected(c); });
+    getSquareAutoSync().then((v) => {
+      if (active) { setSquareAutoSync(v); autoSyncAnim.setValue(v ? 1 : 0); }
+    });
+    getSquareSyncMetadata().then((m) => { if (active) setSquareSyncMeta(m); });
     return () => { active = false; };
   }, []);
 
@@ -280,6 +400,49 @@ export default function SettingsScreen({ navigation }) {
     }
   };
 
+  const handleSquareConnect = async () => {
+    if (squareConnecting) return;
+    setSquareConnecting(true);
+    try {
+      const token = await connectSquare();
+      if (token) {
+        setSquareConnected(true);
+        const meta = await getSquareSyncMetadata();
+        setSquareSyncMeta(meta);
+      }
+    } catch (e) {
+      Alert.alert('Connection Failed', e.message || 'Could not connect to Square. Please try again.');
+    } finally {
+      setSquareConnecting(false);
+    }
+  };
+
+  const handleSquareDisconnect = () => {
+    Alert.alert(
+      'Disconnect Square',
+      'This will remove your Square access token. You can reconnect anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: async () => {
+            await disconnectSquare();
+            setSquareConnected(false);
+            setSquareSyncMeta(null);
+          },
+        },
+      ],
+    );
+  };
+
+  const handleSquareAutoSyncToggle = async () => {
+    const next = !squareAutoSync;
+    setSquareAutoSync(next);
+    Animated.spring(autoSyncAnim, { toValue: next ? 1 : 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
+    await saveSquareAutoSync(next);
+  };
+
   const toggleBg = toggleAnim.interpolate({
     inputRange:  [0, 1],
     outputRange: [theme.border, theme.primary],
@@ -296,6 +459,15 @@ export default function SettingsScreen({ navigation }) {
     inputRange:  [0, 1],
     outputRange: [2, 20],
   });
+  const autoSyncBg = autoSyncAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [theme.border, theme.primary],
+  });
+  const autoSyncKnob = autoSyncAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [2, 20],
+  });
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={[styles.content, widthCap]}>
@@ -493,18 +665,88 @@ export default function SettingsScreen({ navigation }) {
           )}
         </View>
 
-        {/* ── Square (coming soon) ── */}
-        <View style={[styles.section, styles.comingSoonSection]}>
-          <View style={styles.comingSoonHeader}>
-            <Ionicons name="card-outline" size={22} color={theme.textMuted} />
-            <Text style={styles.sectionTitle}>Square</Text>
-          </View>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Coming Soon</Text>
-          </View>
-          <Text style={styles.sectionDesc}>
-            Sync customers and send invoices directly through your Square account.
-          </Text>
+        {/* ── Square Account ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Square Account</Text>
+
+          {squareConnected ? (
+            <>
+              {/* Sync Customers nav row */}
+              <Pressable
+                style={styles.appearanceRow}
+                onPress={() => navigation.navigate('SquareSync')}
+                accessibilityRole="button"
+                accessibilityLabel="Sync customers with Square"
+              >
+                <View style={styles.rowLeft}>
+                  <Ionicons name="sync-outline" size={20} color={theme.textSecondary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>Sync Customers</Text>
+                    <Text style={styles.rowDesc}>
+                      {squareSyncMeta?.lastSyncAt
+                        ? `Last synced ${formatSyncTime(squareSyncMeta.lastSyncAt)}`
+                        : 'Never synced'}
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />
+              </Pressable>
+
+              <View style={styles.rowDivider} />
+
+              {/* Auto-sync toggle */}
+              <Pressable
+                style={styles.appearanceRow}
+                onPress={handleSquareAutoSyncToggle}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: squareAutoSync }}
+                accessibilityLabel="Auto-sync customers on app open"
+              >
+                <View style={styles.rowLeft}>
+                  <Ionicons name="repeat-outline" size={20} color={theme.textSecondary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>Auto-sync on Open</Text>
+                    <Text style={styles.rowDesc}>Sync customers each time the app opens</Text>
+                  </View>
+                </View>
+                <Animated.View style={[styles.toggle, { backgroundColor: autoSyncBg }]}>
+                  <Animated.View style={[styles.toggleKnob, { transform: [{ translateX: autoSyncKnob }] }]} />
+                </Animated.View>
+              </Pressable>
+
+              <View style={styles.rowDivider} />
+
+              {/* Disconnect */}
+              <Pressable
+                style={styles.appearanceRow}
+                onPress={handleSquareDisconnect}
+                accessibilityRole="button"
+                accessibilityLabel="Disconnect Square account"
+              >
+                <View style={styles.rowLeft}>
+                  <Ionicons name="log-out-outline" size={20} color={theme.overdue} />
+                  <Text style={[styles.rowTitle, { color: theme.overdue }]}>Disconnect Square</Text>
+                </View>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={styles.sectionDesc}>
+                Sync customers and send invoices directly through your Square account.
+              </Text>
+              <Pressable
+                style={[styles.connectButton, squareConnecting && styles.connectButtonBusy]}
+                onPress={handleSquareConnect}
+                disabled={squareConnecting}
+                accessibilityRole="button"
+                accessibilityLabel="Connect Square account"
+              >
+                {squareConnecting
+                  ? <ActivityIndicator size="small" color={theme.surface} />
+                  : <Text style={styles.connectButtonText}>Connect Square Account</Text>}
+              </Pressable>
+            </>
+          )}
         </View>
 
         {/* ── Backup & Restore (coming soon) ── */}
@@ -681,6 +923,21 @@ function makeStyles(theme) {
       shadowOpacity:   0.2,
       shadowRadius:    2,
       elevation:       2,
+    },
+    // ── Square connect button ──
+    connectButton: {
+      backgroundColor: theme.primary,
+      borderRadius:    12,
+      paddingVertical: 13,
+      alignItems:      'center',
+    },
+    connectButtonBusy: {
+      opacity: 0.7,
+    },
+    connectButtonText: {
+      fontFamily: theme.fontUiBold,
+      fontSize:   FontSize.base,
+      color:      theme.surface,
     },
     // ── Coming soon ──
     comingSoonSection: {

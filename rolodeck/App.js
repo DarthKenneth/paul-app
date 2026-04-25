@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.8
-// Last Updated: 2026-04-24
+// Version: 1.9
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.29.0)
+// PROJECT:      Rolodeck (project v0.30.0)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -39,6 +39,11 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v1.9  2026-04-25  Claude  Square auto-sync on app open
+//       - Imports getSquareAutoSync from storage, isSquareConnected from
+//         squarePlaceholder, runSync from squareSync
+//       - After initStorage, if auto-sync is enabled and Square is connected,
+//         runs runSync() in the background (non-blocking, errors swallowed)
 // v1.8  2026-04-24  Claude  Tablet landscape sidebar layout
 //       - Added navigationRef + activeTab state tracking via NavigationContainer
 //         onStateChange; on tablet landscape AppInner renders sidebar + TabNavigator
@@ -110,7 +115,10 @@ import {
   getServiceIntervalMode,
   getServiceIntervalCustomDays,
   modeToIntervalDays,
+  getSquareAutoSync,
 } from './src/data/storage';
+import { isSquareConnected } from './src/utils/squarePlaceholder';
+import { runSync } from './src/utils/squareSync';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
 // ── Sentry init ────────────────────────────────────────────────────────────────
@@ -273,7 +281,14 @@ function AppInner() {
     // initStorage is fast on existing V2 installs (~1 AsyncStorage read).
     initStorage()
       .catch(() => {})
-      .then(() => refreshAlerts());
+      .then(async () => {
+        refreshAlerts();
+        // Fire-and-forget Square auto-sync if enabled and connected
+        try {
+          const [autoSync, connected] = await Promise.all([getSquareAutoSync(), isSquareConnected()]);
+          if (autoSync && connected) runSync().catch(() => {});
+        } catch { /* non-critical — sync will work when user opens SquareSyncScreen */ }
+      });
     getOnboardingComplete().then((done) => {
       if (!done) setShowOnboarding(true);
     });

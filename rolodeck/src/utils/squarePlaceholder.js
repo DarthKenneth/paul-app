@@ -1,9 +1,9 @@
 // =============================================================================
 // squarePlaceholder.js - Square OAuth (PKCE), token storage, invoice sending
-// Version: 4.0
-// Last Updated: 2026-04-14
+// Version: 4.1.1
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Rolodeck (project v0.30.0)
 // FILES:        squarePlaceholder.js  (this file — OAuth + invoice engine)
 //               squareCustomers.js    (Customers API wrapper)
 //               squareSync.js         (sync orchestrator)
@@ -63,6 +63,8 @@
 //         netinfo is unavailable [updated ARCHITECTURE]
 //       - assertOnline() exported; called at start of connectSquare() and
 //         sendSquareInvoice()
+// v4.1.1  2026-04-25  Claude  Switch redirect URI to HTTPS relay so Square accepts it;
+//                              app scheme kept for browser interception
 // =============================================================================
 
 import * as Crypto from 'expo-crypto';
@@ -99,8 +101,13 @@ const SQUARE_CONFIG = {
   // location is used automatically. For now, hardcode or set via env.
   locationId: process.env.EXPO_PUBLIC_SQUARE_LOCATION_ID || 'YOUR_SQUARE_LOCATION_ID',
 
-  // Must match the redirect URL registered in your Square app's OAuth settings.
-  redirectUri: 'rolodeck://square/callback',
+  // Registered in Square Developer Dashboard → OAuth → Redirect URL.
+  // Square requires HTTPS; crm.ardingate.com relays to the app scheme below.
+  redirectUri: 'https://crm.ardingate.com/api/square-oauth-callback.php',
+
+  // Custom scheme the relay redirects to; used by openAuthSessionAsync to
+  // detect when the browser flow is complete and close the in-app browser.
+  appScheme: 'rolodeck://square/callback',
 
   scopes: [
     'INVOICES_WRITE',
@@ -253,7 +260,7 @@ export async function connectSquare() {
   const challenge  = await generateCodeChallenge(verifier);
   const { url }    = buildAuthUrl(challenge);
 
-  const result = await WebBrowser.openAuthSessionAsync(url, SQUARE_CONFIG.redirectUri);
+  const result = await WebBrowser.openAuthSessionAsync(url, SQUARE_CONFIG.appScheme);
 
   if (result.type !== 'success' || !result.url) return null;
 
