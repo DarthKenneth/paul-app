@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # =============================================================================
 # asc_submit_review.py - Submit the current VERSION to App Store review via ASC API
-# Version: 1.0
+# Version: 1.1
 # Last Updated: 2026-04-25
 #
-# PROJECT:      Rolodeck (project v0.30.1)
+# PROJECT:      Rolodeck (project v1.0.0)
 # FILES:        fastlane/asc_submit_review.py  (this file — ASC submission script)
 #               fastlane/Fastfile              (calls this via sh action)
 #               secrets/AuthKey_P54S7V43K5.p8 (ASC API private key — gitignored)
@@ -25,6 +25,8 @@
 #
 # CHANGE LOG:
 # v1.0  2026-04-25  Claude  Initial — direct ASC API review submission
+# v1.1  2026-04-25  Claude  Accept DEVELOPER_REJECTED state in version search so
+#                            a rejected version can be re-submitted without recreating
 # =============================================================================
 
 import sys, os, jwt, time, json, textwrap, urllib.request, urllib.error
@@ -73,7 +75,7 @@ def main():
 
     pk = private_key  # shorthand for api() calls
 
-    # 1. Find the PREPARE_FOR_SUBMISSION version
+    # 1. Find the submittable version (PREPARE_FOR_SUBMISSION or DEVELOPER_REJECTED)
     print("Step 1: Finding App Store version...")
     versions = api("GET",
         f"https://api.appstoreconnect.apple.com/v1/apps/{APP_ID}/appStoreVersions"
@@ -82,13 +84,15 @@ def main():
         f"&fields[appStoreVersions]=versionString,appVersionState",
         private_key=pk)["data"]
 
+    SUBMITTABLE = {"PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED"}
     version_obj = next(
-        (v for v in versions if v["attributes"]["appVersionState"] == "PREPARE_FOR_SUBMISSION"),
+        (v for v in versions if v["attributes"]["appVersionState"] in SUBMITTABLE),
         None
     )
     if not version_obj:
         states = [v["attributes"]["appVersionState"] for v in versions]
-        print(f"  No PREPARE_FOR_SUBMISSION version found for {version}. States: {states}")
+        print(f"  No submittable version found for {version}. States: {states}")
+        print("  EAS may still be uploading the build — wait a moment and retry.")
         sys.exit(1)
 
     version_id = version_obj["id"]
