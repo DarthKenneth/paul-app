@@ -1,9 +1,9 @@
 // =============================================================================
 // CustomerDetailPane.js - Embeddable customer detail body (no nav header)
-// Version: 1.0
-// Last Updated: 2026-04-24
+// Version: 1.1
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.29.0)
+// PROJECT:      Rolodeck (project v1.1.0)
 // FILES:        CustomerDetailPane.js     (this file — embeddable pane body)
 //               CustomerDetailScreen.js   (thin nav wrapper using this pane)
 //               CustomersScreen.js        (mounts pane in split view on tablet)
@@ -31,6 +31,7 @@
 //
 // CHANGE LOG:
 // v1.0  2026-04-24  Claude  Extracted from CustomerDetailScreen for tablet split view
+// v1.1  2026-04-25  Claude  Tap-to-call and tap-to-email on phone/email info rows
 // =============================================================================
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
@@ -42,6 +43,7 @@ import {
   Pressable,
   StyleSheet,
   Alert,
+  Linking,
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
@@ -93,13 +95,24 @@ const INFO_FIELDS = [
   { key: 'zipCode', label: 'Zip',     icon: 'map-outline',      placeholder: '00000',             keyboardType: 'number-pad', maxLength: 5 },
 ];
 
-function InfoRow({ icon, value, styles, theme }) {
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon} size={15} color={theme.textMuted} style={styles.infoIcon} />
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
+function InfoRow({ icon, value, onPress, styles, theme }) {
+  const iconColor = onPress ? theme.tint : theme.textMuted;
+  const textStyle = onPress ? [styles.infoValue, styles.infoValueTappable] : styles.infoValue;
+  const inner = (
+    <>
+      <Ionicons name={icon} size={15} color={iconColor} style={styles.infoIcon} />
+      <Text style={textStyle}>{value}</Text>
+    </>
   );
+  if (onPress) {
+    return (
+      <Pressable style={({ pressed }) => [styles.infoRow, pressed && styles.infoRowPressed]}
+        onPress={onPress} accessibilityRole="button">
+        {inner}
+      </Pressable>
+    );
+  }
+  return <View style={styles.infoRow}>{inner}</View>;
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -276,6 +289,18 @@ export default function CustomerDetailPane({
     setScheduleModal(false);
   };
 
+  const handleContactPress = useCallback((type, value) => {
+    const isPhone = type === 'phone';
+    Alert.alert(
+      isPhone ? 'Call Customer' : 'Email Customer',
+      isPhone ? `Call ${value}?` : `Email ${value}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: isPhone ? 'Call' : 'Email', onPress: () => Linking.openURL(isPhone ? `tel:${value}` : `mailto:${value}`) },
+      ]
+    );
+  }, []);
+
   const handleDelete = () => {
     Alert.alert(
       'Delete Customer',
@@ -384,7 +409,10 @@ export default function CustomerDetailPane({
                     );
                   }
                   if (customer[key]) {
-                    rows.push(<InfoRow key={key} icon={icon} value={customer[key]} styles={styles} theme={theme} />);
+                    const onPress = (key === 'phone' || key === 'email')
+                      ? () => handleContactPress(key, customer[key])
+                      : undefined;
+                    rows.push(<InfoRow key={key} icon={icon} value={customer[key]} onPress={onPress} styles={styles} theme={theme} />);
                   }
                   return rows;
                 })}
@@ -725,9 +753,11 @@ function makeStyles(theme) {
     infoActions:    { flexDirection: 'row', gap: 4, marginTop: 4 },
     iconBtn:        { padding: 4 },
     viewFields:     { gap: 6 },
-    infoRow:        { flexDirection: 'row', alignItems: 'center' },
-    infoIcon:       { width: 22, marginRight: 6 },
-    infoValue:      { fontFamily: theme.fontBody, fontSize: FontSize.sm, color: theme.textSecondary, flex: 1 },
+    infoRow:          { flexDirection: 'row', alignItems: 'center' },
+    infoRowPressed:   { opacity: 0.5 },
+    infoIcon:         { width: 22, marginRight: 6 },
+    infoValue:        { fontFamily: theme.fontBody, fontSize: FontSize.sm, color: theme.textSecondary, flex: 1 },
+    infoValueTappable: { color: theme.tint },
     editFields:     {},
     rowFields:      { flexDirection: 'row', gap: 12, marginBottom: 12 },
     rowField:       { flex: 1 },

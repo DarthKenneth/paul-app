@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.1.0] - 2026-04-25
+
+### Added
+- Tap-to-call and tap-to-email on customer contact cards — tapping a phone number or email prompts a confirmation dialog, then dials or opens the mail app directly.
+
+---
+
 ## [1.0.0] - 2026-04-25
 
 ### Changed
