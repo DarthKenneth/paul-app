@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.0.0] - 2026-04-25
+
+### Changed
+- Version bumped to 1.0.0 — app is now live on the App Store. Square integration fully wired (connect, sync, auto-sync, invoice sending). This is the first public production update.
+
+---
+
 ## [0.30.1] - 2026-04-25
 
 ### Fixed
