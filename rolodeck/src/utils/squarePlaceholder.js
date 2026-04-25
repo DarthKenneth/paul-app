@@ -1,6 +1,6 @@
 // =============================================================================
 // squarePlaceholder.js - Square OAuth (PKCE), token storage, invoice sending
-// Version: 4.1.1
+// Version: 4.1.2
 // Last Updated: 2026-04-25
 //
 // PROJECT:      Rolodeck (project v0.30.0)
@@ -65,6 +65,10 @@
 //         sendSquareInvoice()
 // v4.1.1  2026-04-25  Claude  Switch redirect URI to HTTPS relay so Square accepts it;
 //                              app scheme kept for browser interception
+// v4.1.2  2026-04-25  Claude  Fix "crypto doesn't exist" crash in buildAuthUrl — state
+//                              generation used global crypto.getRandomValues() which
+//                              doesn't exist in RN; switched to Crypto.getRandomBytesAsync
+//                              and made buildAuthUrl async
 // =============================================================================
 
 import * as Crypto from 'expo-crypto';
@@ -229,9 +233,8 @@ async function generateCodeChallenge(verifier) {
 
 // ── OAuth flow ────────────────────────────────────────────────────────────────
 
-function buildAuthUrl(codeChallenge) {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
+async function buildAuthUrl(codeChallenge) {
+  const bytes = await Crypto.getRandomBytesAsync(16);
   const state = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 
   const params = new URLSearchParams({
@@ -258,7 +261,7 @@ export async function connectSquare() {
   await assertOnline();
   const verifier   = await generateCodeVerifier();
   const challenge  = await generateCodeChallenge(verifier);
-  const { url }    = buildAuthUrl(challenge);
+  const { url }    = await buildAuthUrl(challenge);
 
   const result = await WebBrowser.openAuthSessionAsync(url, SQUARE_CONFIG.appScheme);
 

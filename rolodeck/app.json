@@ -3,7 +3,7 @@
     "name": "Rolodeck",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "0.30.0",
+    "version": "0.30.1",
     "runtimeVersion": {
       "policy": "appVersion"
     },

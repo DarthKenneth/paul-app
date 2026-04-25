@@ -1,0 +1,6 @@
+app_identifier "com.ardingate.rolodeck"
+skip_binary_upload true
+skip_metadata true
+overwrite_screenshots true
+api_key_path "./secrets/asc_api_key.json"
+screenshots_path "/tmp/deliver-screenshots"

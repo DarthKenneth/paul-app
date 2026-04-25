@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [0.30.1] - 2026-04-25
+
+### Fixed
+- Square "Connect Square Account" button crashed with "Property 'crypto' doesn't exist" — the OAuth state generation was calling the browser global `crypto.getRandomValues()` which doesn't exist in React Native. Switched to `expo-crypto`'s `Crypto.getRandomBytesAsync()` and made `buildAuthUrl` async.
+
+---
+
 ## [0.30.0] - 2026-04-25
 
 ### Infrastructure
