@@ -1,0 +1,93 @@
+# =============================================================================
+# Fastfile - Rolodeck release pipeline
+# Version: 1.0
+# Last Updated: 2026-04-25
+#
+# PROJECT:      Rolodeck (project v0.30.1)
+# FILES:        fastlane/Fastfile     (this file — release automation)
+#               fastlane/Deliverfile  (App Store Connect deliver config)
+#               secrets/AuthKey_P54S7V43K5.p8   (ASC API private key)
+#               secrets/asc_api_key.json         (ASC API key metadata)
+#               secrets/google-play-service-account.json (Play service account)
+#
+# Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
+#
+# ARCHITECTURE:
+#   - Builds are handled by EAS (eas build + eas submit → TestFlight/Play draft)
+#   - This Fastfile handles the final mile: App Store review submission + release
+#   - iOS:     deliver submits the latest TestFlight build for the current VERSION
+#              for App Store review (automatic_release: true = releases on approval)
+#   - Android: supply promotes the production-track draft to a full rollout
+#   - Secrets are in secrets/ (gitignored). Never commit those files.
+#
+# USAGE:
+#   fastlane ios submit_review          — submit current version for iOS review
+#   fastlane android promote_production — release Android draft to 100% rollout
+#   fastlane release                    — do both
+#
+# CHANGE LOG:
+# v1.0  2026-04-25  Claude  Initial pipeline — iOS review submission + Android promote
+# v1.1  2026-04-25  Claude  Replace deliver-based iOS lane with direct ASC API script
+#       - deliver was failing with "not in valid state" because it didn't set whatsNew
+#         before submitting; asc_submit_review.py handles the full 7-step flow
+#       - submit_review lane now calls the Python script via sh
+# =============================================================================
+
+require 'shellwords'
+
+REPO_ROOT    = File.expand_path('..', __dir__)
+SECRETS_DIR  = File.join(REPO_ROOT, 'secrets')
+VERSION_FILE = File.join(REPO_ROOT, 'VERSION')
+
+def current_version
+  File.read(VERSION_FILE).strip
+end
+
+# ── iOS ───────────────────────────────────────────────────────────────────────
+
+platform :ios do
+
+  desc "Submit the current VERSION build from TestFlight for App Store review"
+  lane :submit_review do |options|
+    version = current_version
+    notes   = options[:notes] || "Bug fixes and improvements for version #{version}."
+    script  = File.join(REPO_ROOT, 'fastlane', 'asc_submit_review.py')
+    sh "python3 #{script} #{Shellwords.escape(notes)}"
+  end
+
+end
+
+# ── Android ───────────────────────────────────────────────────────────────────
+
+platform :android do
+
+  desc "Promote the production-track draft to a full 100% rollout"
+  lane :promote_production do
+    version = current_version
+    UI.message "Promoting Android #{version} draft to full production rollout..."
+
+    supply(
+      package_name:     "com.ardingate.rolodeck",
+      json_key:         File.join(SECRETS_DIR, 'google-play-service-account.json'),
+      track:            "production",
+      rollout:          "1.0",
+      skip_upload_apk:  true,
+      skip_upload_aab:  true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+
+    UI.success "Android #{version} released to production (100% rollout)."
+  end
+
+end
+
+# ── Combined ──────────────────────────────────────────────────────────────────
+
+desc "Submit iOS for review AND promote Android draft to production"
+lane :release do
+  Fastlane::LaneManager.cruise_lane('ios',     'submit_review')
+  Fastlane::LaneManager.cruise_lane('android', 'promote_production')
+end
