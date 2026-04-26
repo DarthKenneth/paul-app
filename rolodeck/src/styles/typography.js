@@ -1,9 +1,9 @@
 // =============================================================================
 // typography.js - Font family references and type scale constants
-// Version: 1.3
-// Last Updated: 2026-04-24
+// Version: 1.4
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.29.0)
+// PROJECT:      Rolodeck (project v1.2.0)
 // FILES:        colors.js       (palette + theme objects)
 //               typography.js   (this file — font constants)
 //               theme.js        (ThemeContext + ThemeProvider)
@@ -13,9 +13,11 @@
 // ARCHITECTURE:
 //   - Font families match the exact string keys registered by App.js via
 //     @expo-google-fonts packages (useFonts call)
+//   - Aptos is bundled locally from assets/fonts/ (Microsoft OFL, ships with Office)
 //   - Components use FontFamily.* and FontSize.* constants exclusively —
 //     never hardcode font strings or numeric sizes
-//   - Four presets across two axes (serif/sans) with distinct visual personalities:
+//   - Five presets — aptos is the default (humanist sans, clean/neutral):
+//       aptos ("Aptos"): Aptos Bold headings + Aptos body — default; clean, neutral
 //       classic ("Editorial"): Playfair Display 700 Bold (bold, dramatic, editorial
 //         serifs with high stroke contrast) + Inter body (tight, neutral)
 //       elegant ("Refined"): DM Serif Display (graceful, fine-stroked, airy) +
@@ -27,6 +29,9 @@
 //     Inter is tight + angular, DM Sans is rounded + relaxed.
 //
 // CHANGE LOG:
+// v1.4  2026-04-25  Claude  Added Aptos preset as new default font
+//       - Added 'aptos' preset (Aptos_700Bold heading, Aptos_400Regular body)
+//       - Added 'Aptos' to FontPresetNames [updated ARCHITECTURE]
 // v1.3  2026-04-24  Claude  Tablet font scale — tabletScale(size) bumps by 2pt on tablet
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added Inter and Playfair Display font families
@@ -61,6 +66,18 @@ export const FontFamily = {
 // Added to the theme object as theme.fontHeading, theme.fontBody, etc.
 
 export const FontPresets = {
+  // Humanist sans: Aptos throughout — clean, neutral, highly legible (Microsoft OFL)
+  aptos: {
+    fontHeading:     'Aptos_700Bold',
+    fontBody:        'Aptos_400Regular',
+    fontBodyMedium:  'Aptos_600SemiBold',
+    fontBodyBold:    'Aptos_700Bold',
+    fontUi:          'Aptos_400Regular',
+    fontUiMedium:    'Aptos_600SemiBold',
+    fontUiBold:      'Aptos_700Bold',
+    fontDisplay:     'Aptos_700Bold',
+    fontDisplayBold: 'Aptos_700Bold',
+  },
   // Bold serif: Playfair Display 700 Bold headings (dramatic, high-contrast editorial strokes)
   // + Inter body (tight, neutral) — punchy and high-contrast
   classic: {
@@ -115,6 +132,7 @@ export const FontPresets = {
 };
 
 export const FontPresetNames = {
+  aptos:   'Aptos',
   classic: 'Editorial',
   elegant: 'Refined',
   modern:  'Geometric',

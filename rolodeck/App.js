@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 1.9
+// Version: 2.0
 // Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.30.0)
+// PROJECT:      Rolodeck (project v1.2.0)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -39,6 +39,10 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v2.0  2026-04-25  Claude  Rustic Trade default theme + Aptos default font
+//       - Load Aptos_400Regular, Aptos_600SemiBold, Aptos_700Bold from assets/fonts/
+//       - Updated SPLASH_PRIMARY / SPLASH_BG to Rustic Trade light colors
+//       - isDark now sourced from ThemeContext instead of local themeKey check
 // v1.9  2026-04-25  Claude  Square auto-sync on app open
 //       - Imports getSquareAutoSync from storage, isSquareConnected from
 //         squarePlaceholder, runSync from squareSync
@@ -100,6 +104,10 @@ import {
   PlayfairDisplay_700Bold,
 } from '@expo-google-fonts/playfair-display';
 
+const Aptos_400Regular  = require('./assets/fonts/Aptos-Regular.ttf');
+const Aptos_600SemiBold = require('./assets/fonts/Aptos-SemiBold.ttf');
+const Aptos_700Bold     = require('./assets/fonts/Aptos-Bold.ttf');
+
 import { ThemeProvider, useTheme } from './src/styles/theme';
 import { ProfessionProvider } from './src/contexts/ProfessionContext';
 import TabNavigator from './src/components/TabNavigator';
@@ -134,9 +142,9 @@ if (SENTRY_DSN) {
 
 // ── Splash fallback color ─────────────────────────────────────────────────────
 // Used only during font load before ThemeProvider is mounted. Matches the
-// Classic theme primary so the spinner looks intentional on any theme.
-const SPLASH_PRIMARY = '#4AACA5';
-const SPLASH_BG      = '#F5F0E8';
+// Rustic Trade light theme so the spinner looks intentional on any theme.
+const SPLASH_PRIMARY = '#8B4513';
+const SPLASH_BG      = '#FDF0E0';
 
 // ── Inner component: has ThemeContext access ───────────────────────────────────
 
@@ -247,7 +255,7 @@ const sidebarStyles = StyleSheet.create({
 // ── AppInner ──────────────────────────────────────────────────────────────────
 
 function AppInner() {
-  const { theme, themeKey } = useTheme();
+  const { theme, themeKey, isDark } = useTheme();
   const [alertCount, setAlertCount]       = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [activeTab, setActiveTab]         = useState('CustomersTab');
@@ -303,7 +311,7 @@ function AppInner() {
     return () => subscription.remove();
   }, [refreshAlerts]);
 
-  const isDark = themeKey === 'midnight' || themeKey === 'ember';
+  // isDark comes from ThemeContext (handles rustic auto-dark + midnight + ember)
 
   const navTheme = {
     ...DefaultTheme,
@@ -349,6 +357,9 @@ function AppInner() {
 
 export default Sentry.wrap(function App() {
   const [fontsLoaded] = useFonts({
+    Aptos_400Regular,
+    Aptos_600SemiBold,
+    Aptos_700Bold,
     DMSerifDisplay_400Regular,
     DMSans_400Regular,
     DMSans_500Medium,

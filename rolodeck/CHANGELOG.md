@@ -8,6 +8,16 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.2.0] - 2026-04-25
+
+### Changed
+- Default color scheme is now **Rustic Trade** — a warm sienna/parchment palette that automatically follows the system light/dark setting. Existing users who've already picked a theme are unaffected.
+- Default font is now **Aptos** — Microsoft's clean humanist sans-serif (bundled from Office, released under OFL). All four previous font presets remain available in Theme Settings.
+- "Classic" theme renamed from "Rolodeck Classic" to "Classic" in the theme picker.
+- Theme picker now shows Rustic Trade first.
+
+---
+
 ## [1.1.0] - 2026-04-25
 
 ### Added

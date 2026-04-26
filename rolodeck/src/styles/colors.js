@@ -1,9 +1,9 @@
 // =============================================================================
 // colors.js - Brand color palette and multi-theme definitions
-// Version: 1.3
-// Last Updated: 2026-04-10
+// Version: 1.4
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.19)
+// PROJECT:      Rolodeck (project v1.2.0)
 // FILES:        colors.js       (this file — palette + theme objects)
 //               typography.js   (font family + size constants)
 //               theme.js        (ThemeContext + ThemeProvider)
@@ -13,13 +13,23 @@
 // ARCHITECTURE:
 //   - Palette: raw hex values — never referenced directly in components
 //   - buildTheme(overrides): merges overrides into the default theme shape,
-//     ensuring all 4 themes expose the same semantic keys
+//     ensuring all themes expose the same semantic keys
 //   - Themes: named resolved color maps keyed to semantic roles
 //     (primary, accent, background, surface, text, etc.)
 //   - Components import from theme.js (useTheme) not from here directly
-//   - ThemeNames / ThemeKeys: used by SettingsScreen for the theme picker
+//   - ThemeNames / ThemeKeys: used by ThemeScreen and SettingsScreen
+//   - 'rustic' is an auto light/dark theme: ThemeProvider picks rusticLight or
+//     rusticDark based on the system color scheme. Themes.rustic is an alias for
+//     rusticLight and exists only for swatch display in ThemeScreen/SettingsScreen.
+//   - ThemeKeys is a manually ordered array — rusticLight + rusticDark are
+//     internal and intentionally excluded from the user-facing picker.
 //
 // CHANGE LOG:
+// v1.4  2026-04-25  Claude  Rustic Trade auto light/dark theme
+//       - Added rusticLight and rusticDark themes (warm sienna / parchment palette)
+//       - Added Themes.rustic alias → rusticLight for swatch display
+//       - Changed ThemeKeys to a manually ordered array (excludes rusticLight/Dark)
+//       - Added ThemeNames.rustic = 'Rustic Trade'
 // v1.3  2026-04-10  Claude  Added Stone (grey) and Ember (dark warm) themes
 //       - Added Stone theme: cool grey background, slate-blue primary, amber accent
 //       - Added Ember theme: dark warm charcoal, amber primary, pink-red accent
@@ -255,8 +265,81 @@ export const Themes = {
   }),
 };
 
+  // ── Rustic Trade light (system light mode) ────────────────────────────────
+  rusticLight: buildTheme({
+    primary:          '#8B4513',
+    primaryDark:      '#6B2E0E',
+    primaryLight:     '#B87040',
+    primaryPale:      '#F5E3C8',
+    accent:           '#D4A853',
+    accentLight:      '#E8C882',
+    background:       '#FDF0E0',
+    surface:          '#FFF7EE',
+    border:           '#E8D4B0',
+    borderLight:      '#F2E8D0',
+    text:             '#2A1506',
+    textSecondary:    '#6B4B30',
+    textMuted:        '#B89878',
+    cardBg:           '#FFF7EE',
+    tabBar:           '#FFF7EE',
+    tabBarBorder:     '#E8D4B0',
+    tabIconActive:    '#8B4513',
+    tabIconInactive:  '#B89878',
+    badge:            '#D4A853',
+    badgeText:        '#2A1506',
+    overdue:          '#CC3311',
+    warning:          '#E07700',
+    success:          '#4A7C40',
+    scheduled:        '#3A6CA8',
+    inputBg:          '#FFF7EE',
+    inputBorder:      '#E8D4B0',
+    placeholder:      '#B89878',
+    headerBg:         '#FFF7EE',
+    headerText:       '#2A1506',
+    headerBorder:     '#E8D4B0',
+  }),
+
+  // ── Rustic Trade dark (system dark mode) ──────────────────────────────────
+  rusticDark: buildTheme({
+    primary:          '#C8853A',
+    primaryDark:      '#A86A2A',
+    primaryLight:     '#DFA060',
+    primaryPale:      '#4A2810',
+    accent:           '#D4A853',
+    accentLight:      '#E8C882',
+    background:       '#2A1506',
+    surface:          '#3A1E08',
+    border:           '#4A2810',
+    borderLight:      '#5A3318',
+    text:             '#F5E3C8',
+    textSecondary:    '#C8A880',
+    textMuted:        '#8B7055',
+    cardBg:           '#3A1E08',
+    tabBar:           '#241206',
+    tabBarBorder:     '#4A2810',
+    tabIconActive:    '#C8853A',
+    tabIconInactive:  '#8B7055',
+    badge:            '#D4A853',
+    badgeText:        '#2A1506',
+    overdue:          '#FF6B6B',
+    warning:          '#FFAA44',
+    success:          '#4CC87A',
+    scheduled:        '#60A5FA',
+    inputBg:          '#2A1506',
+    inputBorder:      '#4A2810',
+    placeholder:      '#8B7055',
+    headerBg:         '#241206',
+    headerText:       '#F5E3C8',
+    headerBorder:     '#4A2810',
+  }),
+};
+
+// Alias for swatch display in ThemeScreen/SettingsScreen — do not use for rendering
+Themes.rustic = Themes.rusticLight;
+
 export const ThemeNames = {
-  default:  'Rolodeck Classic',
+  rustic:   'Rustic Trade',
+  default:  'Classic',
   ocean:    'Ocean Blue',
   forest:   'Forest Green',
   midnight: 'Midnight',
@@ -264,4 +347,5 @@ export const ThemeNames = {
   ember:    'Ember',
 };
 
-export const ThemeKeys = Object.keys(Themes);
+// Manually ordered — rusticLight + rusticDark are internal, excluded from picker
+export const ThemeKeys = ['rustic', 'default', 'ocean', 'forest', 'midnight', 'stone', 'ember'];
