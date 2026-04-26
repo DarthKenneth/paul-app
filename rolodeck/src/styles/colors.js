@@ -1,6 +1,6 @@
 // =============================================================================
 // colors.js - Brand color palette and multi-theme definitions
-// Version: 1.4
+// Version: 1.4.1
 // Last Updated: 2026-04-25
 //
 // PROJECT:      Rolodeck (project v1.2.0)
@@ -25,6 +25,7 @@
 //     internal and intentionally excluded from the user-facing picker.
 //
 // CHANGE LOG:
+// v1.4.1  2026-04-25  Claude  Fix syntax error: rusticLight/rusticDark placed outside Themes object
 // v1.4  2026-04-25  Claude  Rustic Trade auto light/dark theme
 //       - Added rusticLight and rusticDark themes (warm sienna / parchment palette)
 //       - Added Themes.rustic alias → rusticLight for swatch display
@@ -263,7 +264,6 @@ export const Themes = {
     headerText:       '#F5EDD8',
     headerBorder:     '#2E2518',
   }),
-};
 
   // ── Rustic Trade light (system light mode) ────────────────────────────────
   rusticLight: buildTheme({
