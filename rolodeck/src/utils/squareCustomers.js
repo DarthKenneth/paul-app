@@ -1,9 +1,9 @@
 // =============================================================================
 // squareCustomers.js - Square Customers API calls (paginated fetch, create, update)
-// Version: 1.1
-// Last Updated: 2026-04-14
+// Version: 1.1.1
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        squareCustomers.js    (this file — Square Customers API wrapper)
 //               squarePlaceholder.js  (getSquareAccessToken, SQUARE_API_BASE)
 //               squareSync.js         (calls all exports here as orchestrator)
@@ -32,6 +32,7 @@
 //         can distinguish 401 (bad token) from 429 (rate limit) from 5xx
 //       - Added MAX_TOTAL_MS (30s) wall-clock cap: if retries exhaust the
 //         budget the loop bails out even if attempts remain
+// v1.1.1  2026-04-25  Claude  Rename rolodeck → callout idempotency key prefix
 // =============================================================================
 
 import { getSquareAccessToken, SQUARE_API_BASE } from './squarePlaceholder';
@@ -155,7 +156,7 @@ export async function createSquareCustomer(customerBody) {
   const token = await getSquareAccessToken();
   if (!token) throw new Error('NOT_CONNECTED');
 
-  const idempotencyKey = `rolodeck-create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const idempotencyKey = `callout-create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const data = await squareFetch('POST', '/v2/customers', {
     idempotency_key: idempotencyKey,
     ...customerBody,

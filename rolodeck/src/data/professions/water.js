@@ -1,9 +1,9 @@
 // =============================================================================
 // water.js - Water Treatment profession preset
-// Version: 1.1
-// Last Updated: 2026-04-23
+// Version: 1.1.1
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.26)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        water.js   (this file — water treatment config)
 //               index.js   (profession registry — imports this)
 //
@@ -18,7 +18,7 @@
 //   - install: true marks the type that gets rust-colored save button and
 //     "Initial {label}" on the oldest log entry
 //   - customLists provide default items; user overrides stored per-profession
-//     in @rolodeck_lists_water
+//     in @callout_lists_water
 //   - checklist items have type 'check' (boolean) or 'measure' (numeric value)
 //   - equipmentFields: per-customer site/equipment info stored on customer.equipment
 //   - entryFields: per-visit dropdowns shown on the Add Service form;
@@ -31,6 +31,7 @@
 //       - Added customLists: Equipment Types, Brands, Salt Types
 //       - Added checklist: Hardness, Iron, Salt level, Brine clean, Bypass, Regen
 //       - Added equipmentFields and entryFields
+// v1.1.1  2026-04-25  Claude  Update project block + storage key comment reference
 // =============================================================================
 
 export const water = {

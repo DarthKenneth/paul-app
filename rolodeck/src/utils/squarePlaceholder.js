@@ -1,9 +1,9 @@
 // =============================================================================
 // squarePlaceholder.js - Square OAuth (PKCE), token storage, invoice sending
-// Version: 4.1.2
+// Version: 4.1.3
 // Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.30.0)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        squarePlaceholder.js  (this file — OAuth + invoice engine)
 //               squareCustomers.js    (Customers API wrapper)
 //               squareSync.js         (sync orchestrator)
@@ -69,6 +69,8 @@
 //                              generation used global crypto.getRandomValues() which
 //                              doesn't exist in RN; switched to Crypto.getRandomBytesAsync
 //                              and made buildAuthUrl async
+// v4.1.3  2026-04-25  Claude  Rename rolodeck → callout identifiers
+//                              (SECURE_TOKEN_KEY, idempotency key prefix)
 // =============================================================================
 
 import * as Crypto from 'expo-crypto';
@@ -127,7 +129,7 @@ const SQUARE_CONFIG = {
 };
 
 const REQUEST_TIMEOUT    = 10000;
-const SECURE_TOKEN_KEY   = 'rolodeck_square_token'; // SecureStore key (no @ prefix)
+const SECURE_TOKEN_KEY   = 'callout_square_token'; // SecureStore key (no @ prefix)
 
 // ── Offline check ─────────────────────────────────────────────────────────────
 //
@@ -382,7 +384,7 @@ export async function sendSquareInvoice(customer, amountCents) {
     );
   }
 
-  const idempotencyKey = `rolodeck-${customer.id}-${Date.now()}`;
+  const idempotencyKey = `callout-${customer.id}-${Date.now()}`;
 
   const orderData = await squareApi('POST', '/v2/orders', {
     idempotency_key: `${idempotencyKey}-order`,
