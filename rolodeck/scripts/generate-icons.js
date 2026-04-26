@@ -1,7 +1,7 @@
 // =============================================================================
 // generate-icons.js - Generates all required app icon PNGs from icon.svg
-// Version: 1.2
-// Last Updated: 2026-04-17
+// Version: 1.3
+// Last Updated: 2026-04-25
 //
 // PROJECT:      Rolodeck (project v0.22.8)
 // FILES:        scripts/generate-icons.js       (this file — icon pipeline)
@@ -38,6 +38,9 @@
 //         - Added SVG_DARK_SRC and BRAND_BG_DARK constants
 //         - Added icon-dark.png entry with per-entry src/flattenBg overrides
 //         - Updated render loop to use per-icon src and flattenBg if present
+// v1.3  2026-04-25  Claude  Rustic Trade brand colors
+//         - BRAND_BG: #C6ECEA → #FDF0E0 (Rustic Trade parchment)
+//         - BRAND_BG_DARK: #0E2422 → #2A1506 (Rustic Trade dark brown)
 // v1.2  2026-04-17  Claude  Android monochrome + Expo upgrade housekeeping
 //         - Added generateMonochrome() — renders SVG, makes all opaque pixels
 //           white, preserves alpha; outputs adaptive-icon-monochrome.png
@@ -64,8 +67,8 @@ const ADAPTIVE_ICON_SZ = 432;
 const ADAPTIVE_PAD     = (ADAPTIVE_TOTAL - ADAPTIVE_ICON_SZ) / 2; // 108px each side
 
 // Brand background colors for flatten operations (removes alpha channel)
-const BRAND_BG      = { r: 198, g: 236, b: 234, alpha: 1 }; // #C6ECEA  (light)
-const BRAND_BG_DARK = { r:  14, g:  36, b:  34, alpha: 1 }; // #0E2422  (dark)
+const BRAND_BG      = { r: 253, g: 240, b: 224, alpha: 1 }; // #FDF0E0  Rustic Trade parchment (light)
+const BRAND_BG_DARK = { r:  42, g:  21, b:   6, alpha: 1 }; // #2A1506  Rustic Trade dark brown
 
 // ── Export manifest ───────────────────────────────────────────────────────────
 //
@@ -190,7 +193,7 @@ async function main() {
     .png()
     .toFile(path.join(OUT_DIR, 'adaptive-icon-bg.png'));
 
-  console.log(`  ✓  ${'adaptive-icon-bg.png'.padEnd(28)} ${ADAPTIVE_TOTAL}×${ADAPTIVE_TOTAL}   Android adaptive background (#C6ECEA solid)`);
+  console.log(`  ✓  ${'adaptive-icon-bg.png'.padEnd(28)} ${ADAPTIVE_TOTAL}×${ADAPTIVE_TOTAL}   Android adaptive background (#FDF0E0 solid)`);
 
   // ── Android monochrome (Material You themed icon) ─────────────────────────
 

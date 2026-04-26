@@ -12,7 +12,7 @@
     "splash": {
       "image": "./store-assets/icons/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#C6ECEA"
+      "backgroundColor": "#FDF0E0"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -58,7 +58,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./store-assets/icons/adaptive-icon-fg.png",
         "monochromeImage": "./store-assets/icons/adaptive-icon-monochrome.png",
-        "backgroundColor": "#C6ECEA"
+        "backgroundColor": "#FDF0E0"
       },
       "package": "com.ardingate.rolodeck",
       "permissions": [

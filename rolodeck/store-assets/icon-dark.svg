@@ -1,91 +1,41 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024"
+<svg width="1024" height="1024" viewBox="0 0 120 120"
      fill="none" xmlns="http://www.w3.org/2000/svg">
 
-  <!-- Dark app icon background -->
-  <rect width="1024" height="1024" rx="230"
-        fill="url(#bgGradDark)"/>
+  <!-- Rustic Trade dark icon — dark brown background, burnt-orange clipboard -->
 
-  <!-- Subtle highlight shine top-left -->
-  <ellipse cx="320" cy="200" rx="280" ry="120"
-           fill="white" opacity="0.06"/>
+  <!-- Background -->
+  <rect width="120" height="120" fill="#2A1506"/>
 
-  <!-- Drop shadow under drum -->
-  <ellipse cx="512" cy="720" rx="370" ry="115"
-           fill="#0A1F1E" opacity="0.4"/>
+  <!-- Subtle warm highlight top-left -->
+  <rect width="120" height="120" fill="url(#bgShineDark)"/>
 
-  <!-- Drum cylinder back half (depth) -->
-  <path d="M185 348 Q185 720 512 720 Q839 720 839 348"
-        fill="#1A4E4A" opacity="0.4"/>
+  <!-- Clipboard body -->
+  <rect x="17" y="30" width="86" height="82" rx="10" fill="#C8853A"/>
 
-  <!-- Drum cylinder body -->
-  <rect x="185" y="256" width="654" height="442"
-        rx="70" fill="#1E5550"/>
-  <rect x="185" y="256" width="654" height="442"
-        rx="70" fill="url(#drumGradDark)"/>
+  <!-- Clipboard body highlight (top edge shimmer) -->
+  <rect x="17" y="30" width="86" height="14" rx="10" fill="white" opacity="0.10"/>
 
-  <!-- Card 3 — back, rotated left -->
-  <rect x="256" y="163" width="512" height="302"
-        rx="46" fill="#0C2725" stroke="#1E4845" stroke-width="9"
-        transform="rotate(-6 512 314)"/>
+  <!-- Clip assembly -->
+  <rect x="38" y="18" width="44" height="25" rx="13" fill="#8B4513"/>
+  <!-- Clip hole -->
+  <rect x="46" y="22" width="28" height="16" rx="8" fill="#2A1506"/>
 
-  <!-- Card 2 — middle -->
-  <rect x="256" y="163" width="512" height="302"
-        rx="46" fill="#0F2D2B" stroke="#224A47" stroke-width="9"
-        transform="rotate(-2 512 314)"/>
+  <!-- Ruled lines on clipboard -->
+  <rect x="26" y="52" width="68" height="6"  rx="3" fill="white" opacity="0.52"/>
+  <rect x="26" y="64" width="50" height="6"  rx="3" fill="white" opacity="0.34"/>
+  <rect x="26" y="76" width="62" height="6"  rx="3" fill="white" opacity="0.52"/>
+  <rect x="26" y="88" width="36" height="6"  rx="3" fill="white" opacity="0.34"/>
 
-  <!-- Card 1 — front / active -->
-  <rect x="256" y="140" width="512" height="326"
-        rx="46" fill="#132E2C" stroke="#2A5450" stroke-width="11"/>
-
-  <!-- Card: avatar circle -->
-  <circle cx="360" cy="255" r="58" fill="#2E8A84" opacity="0.55"/>
-  <!-- Avatar person silhouette -->
-  <circle cx="360" cy="238" r="22" fill="white" opacity="0.5"/>
-  <ellipse cx="360" cy="292" rx="32" ry="18" fill="white" opacity="0.5"/>
-
-  <!-- Card: name line -->
-  <rect x="442" y="222" width="210" height="34"
-        rx="17" fill="#4AACA5" opacity="0.7"/>
-  <!-- Card: subtitle line -->
-  <rect x="442" y="270" width="140" height="22"
-        rx="11" fill="#C9B99A" opacity="0.6"/>
-
-  <!-- Card: horizontal rule -->
-  <rect x="302" y="360" width="420" height="11"
-        rx="5.5" fill="#2A4A47"/>
-
-  <!-- Card: detail row — dot + line -->
-  <circle cx="348" cy="407" r="17" fill="#D4795A" opacity="0.7"/>
-  <rect x="392" y="396" width="164" height="22"
-        rx="11" fill="#C9B99A" opacity="0.4"/>
-
-  <!-- Card: second detail row -->
-  <circle cx="348" cy="452" r="17" fill="#4AACA5" opacity="0.5"/>
-  <rect x="392" y="441" width="120" height="22"
-        rx="11" fill="#C9B99A" opacity="0.3"/>
-
-  <!-- Drum highlight stripe -->
-  <rect x="185" y="256" width="654" height="80"
-        rx="70" fill="white" opacity="0.08"/>
-
-  <!-- Axle cap — left -->
-  <circle cx="185" cy="477" r="58" fill="#0A1F1E" opacity="0.7"/>
-  <circle cx="185" cy="477" r="28" fill="#4AACA5" opacity="0.4"/>
-  <!-- Axle cap — right -->
-  <circle cx="839" cy="477" r="58" fill="#0A1F1E" opacity="0.7"/>
-  <circle cx="839" cy="477" r="28" fill="#4AACA5" opacity="0.4"/>
+  <!-- Cream accent dot -->
+  <circle cx="89" cy="94" r="13" fill="#EDD9C0"/>
+  <!-- Dot highlight -->
+  <circle cx="85" cy="90" r="4"  fill="white" opacity="0.40"/>
 
   <defs>
-    <linearGradient id="bgGradDark" x1="0" y1="0" x2="1024" y2="1024"
+    <linearGradient id="bgShineDark" x1="0" y1="0" x2="120" y2="120"
                     gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="#1A3836"/>
-      <stop offset="45%"  stop-color="#0E2422"/>
-      <stop offset="100%" stop-color="#071A18"/>
-    </linearGradient>
-    <linearGradient id="drumGradDark" x1="185" y1="256" x2="839" y2="698"
-                    gradientUnits="userSpaceOnUse">
-      <stop offset="0%"   stop-color="white"   stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#071A18" stop-opacity="0.4"/>
+      <stop offset="0%"   stop-color="white"   stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#6B2E0E" stop-opacity="0.08"/>
     </linearGradient>
   </defs>
 </svg>
