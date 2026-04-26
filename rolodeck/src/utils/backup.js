@@ -110,7 +110,7 @@ export async function exportBackup() {
   };
 
   const dateStr  = new Date().toISOString().split('T')[0];
-  const filename = `rolodeck-backup-${dateStr}.json`;
+  const filename = `callout-backup-${dateStr}.json`;
   const fileUri  = FileSystem.documentDirectory + filename;
 
   await FileSystem.writeAsStringAsync(
@@ -126,7 +126,7 @@ export async function exportBackup() {
 
   await Sharing.shareAsync(fileUri, {
     mimeType:    'application/json',
-    dialogTitle: 'Save Rolodeck Backup',
+    dialogTitle: 'Save Callout Backup',
     UTI:         'public.json', // iOS uniform type identifier
   });
 

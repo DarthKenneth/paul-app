@@ -382,7 +382,7 @@ export default function SquareSyncScreen() {
               <Text style={styles.cardTitle}>Conflicts ({conflicts.length})</Text>
             </View>
             <Text style={styles.cardDesc}>
-              Both Square and Rolodeck have different values. Choose which wins.
+              Both Square and Callout have different values. Choose which wins.
             </Text>
 
             {conflicts.map((customer, idx) => (
@@ -408,9 +408,9 @@ export default function SquareSyncScreen() {
                         style={({ pressed }) => [styles.conflictOpt, pressed && styles.btnPressed]}
                         onPress={() => handleConflict(customer.id, field, 'rolodeck')}
                         accessibilityRole="button"
-                        accessibilityLabel={`Use Rolodeck value for ${field}`}
+                        accessibilityLabel={`Use Callout value for ${field}`}
                       >
-                        <Text style={styles.conflictSource}>Rolodeck</Text>
+                        <Text style={styles.conflictSource}>Callout</Text>
                         <Text style={styles.conflictVal} numberOfLines={2}>{vals.rolodeck}</Text>
                       </Pressable>
                     </View>
@@ -450,12 +450,12 @@ export default function SquareSyncScreen() {
 
           {localOnly.length === 0 ? (
             <Text style={styles.cardDesc}>
-              All Rolodeck customers are linked to Square.
+              All Callout customers are linked to Square.
             </Text>
           ) : (
             <>
               <Text style={styles.cardDesc}>
-                {localOnly.length} customer{localOnly.length !== 1 ? 's' : ''} exist only in Rolodeck.
+                {localOnly.length} customer{localOnly.length !== 1 ? 's' : ''} exist only in Callout.
               </Text>
 
               <Pressable
@@ -531,7 +531,7 @@ function LowConfRoloSide({ roloId, styles, theme }) {
 
   return (
     <View style={styles.compareCol}>
-      <Text style={styles.compareSource}>Rolodeck</Text>
+      <Text style={styles.compareSource}>Callout</Text>
       <Text style={styles.compareValue}>{rolo?.name || '—'}</Text>
       <Text style={styles.compareDetail}>{rolo?.email || ''}</Text>
       <Text style={styles.compareDetail}>{rolo?.phone || ''}</Text>

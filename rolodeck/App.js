@@ -161,7 +161,7 @@ function TabletSidebar({ navigationRef, activeTab, alertCount, theme }) {
     <View style={sidebarStyles.sidebar}>
       <View style={sidebarStyles.logoRow}>
         <Text style={[sidebarStyles.logoText, { fontFamily: theme.fontHeading, color: theme.primary }]}>
-          Rolodeck
+          Callout
         </Text>
       </View>
       {SIDEBAR_TABS.map(({ name, label, icon, outline }) => {

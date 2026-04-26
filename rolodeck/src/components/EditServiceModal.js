@@ -156,7 +156,7 @@ export default function EditServiceModal({
     if (status !== 'granted') {
       Alert.alert(
         'Camera Access Required',
-        'Allow Rolodeck to use your camera in Settings.',
+        'Allow Callout to use your camera in Settings.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: () => Linking.openSettings() },
@@ -180,7 +180,7 @@ export default function EditServiceModal({
     if (status !== 'granted') {
       Alert.alert(
         'Photo Library Access Required',
-        'Allow Rolodeck to access your photos in Settings.',
+        'Allow Callout to access your photos in Settings.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: () => Linking.openSettings() },

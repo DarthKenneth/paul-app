@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Rolodeck",
+    "name": "Callout",
     "slug": "rolodeck",
     "scheme": "rolodeck",
     "version": "1.3.0",
@@ -26,14 +26,14 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "Rolodeck uses your calendar to sync service due dates for your customers."
+          "calendarPermission": "Callout uses your calendar to sync service due dates for your customers."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Rolodeck uses your photo library to attach photos to service notes.",
-          "cameraPermission": "Rolodeck uses your camera to take photos for service notes."
+          "photosPermission": "Callout uses your photo library to attach photos to service notes.",
+          "cameraPermission": "Callout uses your camera to take photos for service notes."
         }
       ],
       "expo-font",

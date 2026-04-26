@@ -373,8 +373,8 @@ export default function SettingsScreen({ navigation }) {
           Alert.alert(
             'Calendar Access Required',
             Platform.OS === 'ios'
-              ? 'Rolodeck needs access to your calendar to sync service due dates. Enable it in Settings > Privacy & Security > Calendars.'
-              : 'Rolodeck needs access to your calendar to sync service due dates. Enable it in Settings > Apps > Rolodeck > Permissions > Calendar.',
+              ? 'Callout needs access to your calendar to sync service due dates. Enable it in Settings > Privacy & Security > Calendars.'
+              : 'Callout needs access to your calendar to sync service due dates. Enable it in Settings > Apps > Callout > Permissions > Calendar.',
           );
         }
         setCalSyncStatus(await getCalendarSyncStatus());

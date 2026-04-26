@@ -141,7 +141,7 @@ const EVENT_IDS_KEY               = '@rolodeck_calendar_event_ids';
 const SCHEDULED_EVENT_IDS_KEY     = '@rolodeck_calendar_scheduled_event_ids';
 const LAST_SYNC_STATUS_KEY        = '@rolodeck_calendar_last_sync_status';
 
-const CALENDAR_COLOR = '#4AACA5'; // Rolodeck teal
+const CALENDAR_COLOR = '#8B4513'; // Callout sienna
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
@@ -268,12 +268,12 @@ async function getRoledeckCalendar() {
 
   // accessLevel is an iOS EventKit concept — omit it on Android
   const calendarConfig = {
-    title:        'Rolodeck',
+    title:        'Callout',
     color:        CALENDAR_COLOR,
     entityType:   Calendar.EntityTypes.EVENT,
     sourceId:     source.id,
     source,
-    name:         'rolodeck',
+    name:         'callout',
     ownerAccount,
   };
   if (Platform.OS === 'ios') {
