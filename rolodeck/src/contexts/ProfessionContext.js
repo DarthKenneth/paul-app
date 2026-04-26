@@ -12,13 +12,13 @@
 //
 // ARCHITECTURE:
 //   - ProfessionProvider loads all profession-scoped state on mount:
-//     - @rolodeck_profession: active profession key (string)
-//     - @rolodeck_type_durations_{key}: user-overridden type durations { [typeId]: mins }
-//     - @rolodeck_lists_{key}: user-overridden custom lists { [listKey]: string[] }
-//     - @rolodeck_checklist_{key}: per-item visibility overrides { [itemId]: boolean }
-//     - @rolodeck_checklist_visible_{key}: checklist section show/hide on Add Service
-//     - @rolodeck_type_config_{key}: { hidden: string[], custom: [{id,label,icon,defaultMins}] }
-//     - @rolodeck_checklist_custom_{key}: [{id, label, type}] user-created checklist items
+//     - @callout_profession: active profession key (string)
+//     - @callout_type_durations_{key}: user-overridden type durations { [typeId]: mins }
+//     - @callout_lists_{key}: user-overridden custom lists { [listKey]: string[] }
+//     - @callout_checklist_{key}: per-item visibility overrides { [itemId]: boolean }
+//     - @callout_checklist_visible_{key}: checklist section show/hide on Add Service
+//     - @callout_type_config_{key}: { hidden: string[], custom: [{id,label,icon,defaultMins}] }
+//     - @callout_checklist_custom_{key}: [{id, label, type}] user-created checklist items
 //   - Merges stored overrides with profession preset defaults so callers always get
 //     full effective values — no merging needed at call site
 //   - useProfession() returns:
@@ -47,8 +47,8 @@
 //       - Defaults merged at provider level so consumers receive fully computed values
 //       [updated ARCHITECTURE]
 // v3.0  2026-04-24  Claude  Editable service types and checklist items
-//       - @rolodeck_type_config_{key}: hidden type IDs + custom type objects
-//       - @rolodeck_checklist_custom_{key}: user-created checklist items
+//       - @callout_type_config_{key}: hidden type IDs + custom type objects
+//       - @callout_checklist_custom_{key}: user-created checklist items
 //       - effectiveServiceTypes (non-hidden defaults + custom types — for pickers)
 //       - allServiceTypes (all defaults + custom — for log entry lookups)
 //       - typeDurations now includes custom type entries
@@ -65,13 +65,13 @@ import { PROFESSIONS, DEFAULT_PROFESSION_KEY } from '../data/professions';
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
 
-const PROF_KEY     = '@rolodeck_profession';
-const durKey       = (pk) => `@rolodeck_type_durations_${pk}`;
-const listKey      = (pk) => `@rolodeck_lists_${pk}`;
-const clKey        = (pk) => `@rolodeck_checklist_${pk}`;
-const clVisKey     = (pk) => `@rolodeck_checklist_visible_${pk}`;
-const typeCfgKey   = (pk) => `@rolodeck_type_config_${pk}`;
-const clCustomKey  = (pk) => `@rolodeck_checklist_custom_${pk}`;
+const PROF_KEY     = '@callout_profession';
+const durKey       = (pk) => `@callout_type_durations_${pk}`;
+const listKey      = (pk) => `@callout_lists_${pk}`;
+const clKey        = (pk) => `@callout_checklist_${pk}`;
+const clVisKey     = (pk) => `@callout_checklist_visible_${pk}`;
+const typeCfgKey   = (pk) => `@callout_type_config_${pk}`;
+const clCustomKey  = (pk) => `@callout_checklist_custom_${pk}`;
 
 // ── Context ───────────────────────────────────────────────────────────────────
 

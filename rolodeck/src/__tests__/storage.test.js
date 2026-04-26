@@ -17,7 +17,7 @@
 //       - Updated addServiceEntry corrupted-serviceLog test to use v2 key
 //       - Fixed sort preference default expectation: 'name' → 'firstName'
 //       - Rewrote schema version tests for v2 initStorage/migration behavior
-//       - Fixed orphaned-key test to set @rolodeck_customers (migration trigger)
+//       - Fixed orphaned-key test to set @callout_customers (migration trigger)
 //       - Updated adversarial tests to use v2 per-customer key format
 // =============================================================================
 
@@ -87,41 +87,41 @@ describe('getAllCustomers', () => {
   });
 
   test('returns empty array for corrupted JSON', async () => {
-    store['@rolodeck_customers'] = 'not valid json {{{';
+    store['@callout_customers'] = 'not valid json {{{';
     const result = await getAllCustomers();
     expect(result).toEqual([]);
   });
 
   test('returns empty array for non-array JSON (object)', async () => {
-    store['@rolodeck_customers'] = JSON.stringify({ not: 'an array' });
+    store['@callout_customers'] = JSON.stringify({ not: 'an array' });
     const result = await getAllCustomers();
     expect(result).toEqual([]);
   });
 
   test('returns empty array for non-array JSON (string)', async () => {
-    store['@rolodeck_customers'] = JSON.stringify('just a string');
+    store['@callout_customers'] = JSON.stringify('just a string');
     const result = await getAllCustomers();
     expect(result).toEqual([]);
   });
 
   test('returns empty array for non-array JSON (number)', async () => {
-    store['@rolodeck_customers'] = JSON.stringify(42);
+    store['@callout_customers'] = JSON.stringify(42);
     const result = await getAllCustomers();
     expect(result).toEqual([]);
   });
 
   test('returns empty array for null value', async () => {
-    store['@rolodeck_customers'] = JSON.stringify(null);
+    store['@callout_customers'] = JSON.stringify(null);
     const result = await getAllCustomers();
     expect(result).toEqual([]);
   });
 
   test('ensures serviceLog array exists on every customer', async () => {
-    store['@rolodeck_customer_index'] = JSON.stringify(['1', '2', '3', '4']);
-    store['@rolodeck_customer_1'] = JSON.stringify({ id: '1', name: 'No Log' });
-    store['@rolodeck_customer_2'] = JSON.stringify({ id: '2', name: 'Null Log', serviceLog: null });
-    store['@rolodeck_customer_3'] = JSON.stringify({ id: '3', name: 'String Log', serviceLog: 'not an array' });
-    store['@rolodeck_customer_4'] = JSON.stringify({ id: '4', name: 'Good Log', serviceLog: [{ id: 'e1' }] });
+    store['@callout_customer_index'] = JSON.stringify(['1', '2', '3', '4']);
+    store['@callout_customer_1'] = JSON.stringify({ id: '1', name: 'No Log' });
+    store['@callout_customer_2'] = JSON.stringify({ id: '2', name: 'Null Log', serviceLog: null });
+    store['@callout_customer_3'] = JSON.stringify({ id: '3', name: 'String Log', serviceLog: 'not an array' });
+    store['@callout_customer_4'] = JSON.stringify({ id: '4', name: 'Good Log', serviceLog: [{ id: 'e1' }] });
     const result = await getAllCustomers();
     expect(result).toHaveLength(4);
     result.forEach((c) => {
@@ -133,7 +133,7 @@ describe('getAllCustomers', () => {
   });
 
   test('returns empty array for empty string', async () => {
-    store['@rolodeck_customers'] = '';
+    store['@callout_customers'] = '';
     const result = await getAllCustomers();
     expect(result).toEqual([]);
   });
@@ -312,7 +312,7 @@ describe('addServiceEntry', () => {
   test('handles customer with corrupted serviceLog (non-array)', async () => {
     const c = await addCustomer({ name: 'Test' });
     // Corrupt the serviceLog directly in the v2 per-customer key
-    store[`@rolodeck_customer_${c.id}`] = JSON.stringify({ ...c, serviceLog: 'corrupted' });
+    store[`@callout_customer_${c.id}`] = JSON.stringify({ ...c, serviceLog: 'corrupted' });
 
     // addServiceEntry should recover because loadOneCustomer normalizes serviceLog
     const entry = await addServiceEntry(c.id, { date: new Date().toISOString() });
@@ -430,7 +430,7 @@ describe('clearAllData', () => {
 describe('initStorage', () => {
   test('creates an empty index on fresh install', async () => {
     await initStorage();
-    const raw = store['@rolodeck_customer_index'];
+    const raw = store['@callout_customer_index'];
     expect(raw).not.toBeNull();
     expect(raw).not.toBeUndefined();
     expect(JSON.parse(raw)).toEqual([]);
@@ -447,7 +447,7 @@ describe('initStorage', () => {
   });
 
   test('migrates legacy envelope format (v1) to per-customer keys', async () => {
-    store['@rolodeck_customers'] = JSON.stringify({
+    store['@callout_customers'] = JSON.stringify({
       schemaVersion: 1,
       customers: [
         { id: 'abc', name: 'From Legacy', serviceLog: [], scheduledServices: [] },
@@ -456,7 +456,7 @@ describe('initStorage', () => {
     });
     await initStorage();
     // Legacy key removed
-    expect(store['@rolodeck_customers']).toBeUndefined();
+    expect(store['@callout_customers']).toBeUndefined();
     // Data accessible via v2 API
     const all = await getAllCustomers();
     expect(all).toHaveLength(2);
@@ -469,12 +469,12 @@ describe('initStorage', () => {
   });
 
   test('migrates legacy raw-array format (v0) to per-customer keys', async () => {
-    store['@rolodeck_customers'] = JSON.stringify([
+    store['@callout_customers'] = JSON.stringify([
       { id: '1', name: 'Legacy A', serviceLog: [] },
       { id: '2', name: 'Legacy B' }, // missing serviceLog entirely
     ]);
     await initStorage();
-    expect(store['@rolodeck_customers']).toBeUndefined();
+    expect(store['@callout_customers']).toBeUndefined();
     const all = await getAllCustomers();
     expect(all).toHaveLength(2);
     all.forEach((c) => {
@@ -483,13 +483,13 @@ describe('initStorage', () => {
     });
   });
 
-  test('removes orphaned legacy @rolodeck_schema_version key', async () => {
+  test('removes orphaned legacy @callout_schema_version key', async () => {
     // The multiRemove that cleans up the schema_version key only runs during
     // migration, so we need to also set the legacy customers key to trigger it.
-    store['@rolodeck_schema_version'] = '1';
-    store['@rolodeck_customers'] = JSON.stringify([]);
+    store['@callout_schema_version'] = '1';
+    store['@callout_customers'] = JSON.stringify([]);
     await initStorage();
-    expect(store['@rolodeck_schema_version']).toBeUndefined();
+    expect(store['@callout_schema_version']).toBeUndefined();
   });
 });
 
@@ -541,8 +541,8 @@ describe('adversarial scenarios', () => {
   });
 
   test('handles customer with deeply nested garbage in serviceLog', async () => {
-    store['@rolodeck_customer_index'] = JSON.stringify(['bad']);
-    store['@rolodeck_customer_bad'] = JSON.stringify({
+    store['@callout_customer_index'] = JSON.stringify(['bad']);
+    store['@callout_customer_bad'] = JSON.stringify({
       id: 'bad',
       name: 'Bad Data',
       serviceLog: [
@@ -557,9 +557,9 @@ describe('adversarial scenarios', () => {
 
   test('handles storage with massive data (1MB+ JSON)', async () => {
     const customerIds = Array.from({ length: 500 }, (_, i) => `c-${i}`);
-    store['@rolodeck_customer_index'] = JSON.stringify(customerIds);
+    store['@callout_customer_index'] = JSON.stringify(customerIds);
     customerIds.forEach((id, i) => {
-      store[`@rolodeck_customer_${id}`] = JSON.stringify({
+      store[`@callout_customer_${id}`] = JSON.stringify({
         id,
         name: `Customer ${i} ${'x'.repeat(1000)}`,
         email: `c${i}@example.com`,

@@ -26,7 +26,7 @@
 //     on Android
 //   - Calendar management:
 //       A single "Rolodeck" calendar is created on first use and its ID
-//       persisted to AsyncStorage (@rolodeck_calendar_id)
+//       persisted to AsyncStorage (@callout_calendar_id)
 //       iOS:     inherits the default calendar source (usually iCloud),
 //                so events auto-sync to iCloud Calendar
 //                accessLevel: Calendar.CalendarAccessLevel.OWNER (iOS-only)
@@ -34,9 +34,9 @@
 //                (type 'com.google') so events sync to Google Calendar;
 //                falls back to any writable source if no Google account found;
 //                ownerAccount set to the source account's email
-//   - Due-date event IDs persisted to @rolodeck_calendar_event_ids
+//   - Due-date event IDs persisted to @callout_calendar_event_ids
 //     (JSON map: customerId → eventId) so events are upserted, not duplicated
-//   - Scheduled service event IDs persisted to @rolodeck_calendar_scheduled_event_ids
+//   - Scheduled service event IDs persisted to @callout_calendar_scheduled_event_ids
 //     (JSON map: scheduledEntry.id → eventId)
 //   - Due-date event content:
 //       Title: "{customer name} — Service Due"
@@ -135,11 +135,11 @@ import {
 import { getLastServiceDate, getEffectiveIntervalForCustomer } from './serviceAlerts';
 import { addDaysLocal } from './dateUtils';
 
-const SYNC_ENABLED_KEY            = '@rolodeck_calendar_sync_enabled';
-const CALENDAR_ID_KEY             = '@rolodeck_calendar_id';
-const EVENT_IDS_KEY               = '@rolodeck_calendar_event_ids';
-const SCHEDULED_EVENT_IDS_KEY     = '@rolodeck_calendar_scheduled_event_ids';
-const LAST_SYNC_STATUS_KEY        = '@rolodeck_calendar_last_sync_status';
+const SYNC_ENABLED_KEY            = '@callout_calendar_sync_enabled';
+const CALENDAR_ID_KEY             = '@callout_calendar_id';
+const EVENT_IDS_KEY               = '@callout_calendar_event_ids';
+const SCHEDULED_EVENT_IDS_KEY     = '@callout_calendar_scheduled_event_ids';
+const LAST_SYNC_STATUS_KEY        = '@callout_calendar_last_sync_status';
 
 const CALENDAR_COLOR = '#8B4513'; // Callout sienna
 

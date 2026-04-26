@@ -63,7 +63,7 @@ import { getAllCustomers, restoreCustomers, CURRENT_SCHEMA_VERSION } from '../da
 import { APP_VERSION } from '../appVersion';
 
 const BACKUP_VERSION   = '1';
-const LAST_BACKUP_KEY  = '@rolodeck_last_backup';
+const LAST_BACKUP_KEY  = '@callout_last_backup';
 
 // ── Cloud provider label ──────────────────────────────────────────────────────
 

@@ -29,7 +29,7 @@
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added font preset support
-//       - Font preset key persisted to @rolodeck_font
+//       - Font preset key persisted to @callout_font
 //       - Font family strings merged onto theme object (theme.fontHeading, etc.)
 //       - useTheme() now returns fontKey and setFont
 // v1.2  2026-04-25  Claude  Rustic auto light/dark + Aptos default + isDark
@@ -45,8 +45,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Themes } from './colors';
 import { FontPresets } from './typography';
 
-const THEME_STORAGE_KEY = '@rolodeck_theme';
-const FONT_STORAGE_KEY  = '@rolodeck_font';
+const THEME_STORAGE_KEY = '@callout_theme';
+const FONT_STORAGE_KEY  = '@callout_font';
 
 const ThemeContext = createContext({
   theme:    { ...Themes.rusticLight, ...FontPresets.aptos },
