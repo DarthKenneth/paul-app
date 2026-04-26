@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.4.1] - 2026-04-26
+
+### Fixed
+- Splash screen now shows the Rustic Trade clipboard icon instead of the old green Rolodex graphic. Icon assets regenerated from the updated SVG source.
+
+---
+
 ## [1.4.0] - 2026-04-26
 
 ### Added
