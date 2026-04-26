@@ -450,7 +450,7 @@ function makeStyles(theme) {
     },
     emptyPaneText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textMuted,
     },
     // ── Action row ──
@@ -481,7 +481,7 @@ function makeStyles(theme) {
     },
     addBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.surface,
     },
     sortChip: {
@@ -503,7 +503,7 @@ function makeStyles(theme) {
     },
     sortChipText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.primary,
     },
     // ── Search ──
@@ -526,7 +526,7 @@ function makeStyles(theme) {
     searchInput: {
       flex:            1,
       fontFamily:      theme.fontBody,
-      fontSize:        FontSize.base,
+      fontSize:        theme.fontSize.base,
       color:           theme.text,
       paddingVertical: 12,
     },
@@ -550,7 +550,7 @@ function makeStyles(theme) {
     },
     sectionLabel: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.sm,
+      fontSize:      theme.fontSize.sm,
       color:         theme.textMuted,
       textTransform: 'uppercase',
       letterSpacing:  0.8,
@@ -568,15 +568,15 @@ function makeStyles(theme) {
     },
     emptyTitle: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.textSecondary,
     },
     emptyBody: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textMuted,
       textAlign:  'center',
-      lineHeight: FontSize.base * 1.5,
+      lineHeight: theme.fontSize.base * 1.5,
     },
     // ── Sort modal ──
     modalBackdrop: {
@@ -600,7 +600,7 @@ function makeStyles(theme) {
     },
     modalTitle: {
       fontFamily:        theme.fontBodyMedium,
-      fontSize:          FontSize.xs,
+      fontSize:          theme.fontSize.xs,
       color:             theme.textMuted,
       textTransform:     'uppercase',
       letterSpacing:      0.8,
@@ -623,7 +623,7 @@ function makeStyles(theme) {
     },
     modalOptionText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     modalOptionTextActive: {

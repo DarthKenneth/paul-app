@@ -173,7 +173,7 @@ function makeStyles(theme) {
     },
     title: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.text,
     },
     item: {
@@ -190,7 +190,7 @@ function makeStyles(theme) {
     },
     itemText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     itemTextSelected: {
@@ -206,7 +206,7 @@ function makeStyles(theme) {
     },
     doneBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#fff',
     },
   });

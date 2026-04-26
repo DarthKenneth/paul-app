@@ -187,14 +187,14 @@ function makeStyles(theme) {
     },
     sectionTitle: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing: 0.7,
     },
     resetLink: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
     },
     card: {
@@ -221,13 +221,13 @@ function makeStyles(theme) {
     },
     chipText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.text,
       maxWidth:   140,
     },
     emptyText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       fontStyle:  'italic',
     },
@@ -244,7 +244,7 @@ function makeStyles(theme) {
     addInput: {
       flex:              1,
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:        1,

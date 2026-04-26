@@ -575,15 +575,15 @@ function makeStyles(theme) {
     },
     cardTitle: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.text,
     },
     cardDesc: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.sm,
+      fontSize:     theme.fontSize.sm,
       color:        theme.textMuted,
       marginBottom: 12,
-      lineHeight:   FontSize.sm * 1.5,
+      lineHeight:   theme.fontSize.sm * 1.5,
     },
     metaRow: {
       flexDirection:  'row',
@@ -593,12 +593,12 @@ function makeStyles(theme) {
     },
     metaLabel: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textSecondary,
     },
     metaValue: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       flex:        1,
       textAlign:  'right',
@@ -608,7 +608,7 @@ function makeStyles(theme) {
     },
     lastResultText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
     },
     freshResultRow: {
@@ -620,7 +620,7 @@ function makeStyles(theme) {
     },
     freshResultText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.success,
     },
     noticeRow: {
@@ -635,9 +635,9 @@ function makeStyles(theme) {
     noticeText: {
       flex:       1,
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.warning,
-      lineHeight: FontSize.sm * 1.4,
+      lineHeight: theme.fontSize.sm * 1.4,
     },
     syncBtn: {
       flexDirection:   'row',
@@ -657,7 +657,7 @@ function makeStyles(theme) {
     },
     syncBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.surface,
     },
     btnIcon: {
@@ -683,7 +683,7 @@ function makeStyles(theme) {
     },
     compareSource: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.primary,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
@@ -691,13 +691,13 @@ function makeStyles(theme) {
     },
     compareValue: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
       marginBottom: 2,
     },
     compareDetail: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
     },
     actionRow: {
@@ -713,7 +713,7 @@ function makeStyles(theme) {
     },
     linkBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.surface,
     },
     skipBtn: {
@@ -727,7 +727,7 @@ function makeStyles(theme) {
     },
     skipBtnText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textSecondary,
     },
     btnPressed: {
@@ -736,7 +736,7 @@ function makeStyles(theme) {
     // ── Conflicts ──
     conflictName: {
       fontFamily:   theme.fontBodyMedium,
-      fontSize:     FontSize.base,
+      fontSize:     theme.fontSize.base,
       color:        theme.text,
       marginBottom: 10,
     },
@@ -745,7 +745,7 @@ function makeStyles(theme) {
     },
     conflictFieldLabel: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textMuted,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
@@ -765,7 +765,7 @@ function makeStyles(theme) {
     },
     conflictSource: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.primary,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
@@ -773,9 +773,9 @@ function makeStyles(theme) {
     },
     conflictVal: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.text,
-      lineHeight: FontSize.sm * 1.4,
+      lineHeight: theme.fontSize.sm * 1.4,
     },
     // ── Sync Log ──
     logEntry: {
@@ -785,13 +785,13 @@ function makeStyles(theme) {
     },
     logAt: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.text,
       marginBottom: 2,
     },
     logSummary: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
     },
     // ── Push to Square ──
@@ -808,7 +808,7 @@ function makeStyles(theme) {
     },
     pushAllBtnText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.primary,
     },
     localRow: {
@@ -823,12 +823,12 @@ function makeStyles(theme) {
     },
     localName: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     localDetail: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
       marginTop:  2,
     },
@@ -843,7 +843,7 @@ function makeStyles(theme) {
     },
     pushOneBtnText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.primary,
     },
   });

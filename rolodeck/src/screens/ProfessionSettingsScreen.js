@@ -139,12 +139,12 @@ function makeStyles(theme) {
     },
     profName: {
       fontFamily:   theme.fontHeading,
-      fontSize:     FontSize.xl,
+      fontSize:     theme.fontSize.xl,
       color:        theme.text,
     },
     profTagline: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       marginTop:   2,
     },
@@ -187,12 +187,12 @@ function makeStyles(theme) {
     },
     rowTitle: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     rowDesc: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
       marginTop:   2,
     },

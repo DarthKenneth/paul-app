@@ -125,7 +125,7 @@ function makeStyles(theme) {
     },
     name: {
       fontFamily:   theme.fontBodyBold,
-      fontSize:     FontSize.md,
+      fontSize:     theme.fontSize.md,
       color:        theme.text,
       marginBottom:  3,
     },
@@ -136,7 +136,7 @@ function makeStyles(theme) {
     },
     sub: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     right: {
@@ -153,7 +153,7 @@ function makeStyles(theme) {
     },
     badgeText: {
       fontFamily: theme.fontUiMedium,
-      fontSize:   FontSize.xxs,
+      fontSize:   theme.fontSize.xxs,
     },
   });
 }

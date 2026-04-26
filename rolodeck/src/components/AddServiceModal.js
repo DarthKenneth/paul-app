@@ -236,9 +236,9 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
     textDayFontFamily:          theme.fontBody,
     textMonthFontFamily:        theme.fontUiBold,
     textDayHeaderFontFamily:    theme.fontUiMedium,
-    textDayFontSize:            FontSize.sm,
-    textMonthFontSize:          FontSize.base,
-    textDayHeaderFontSize:      FontSize.xs,
+    textDayFontSize:            theme.fontSize.sm,
+    textMonthFontSize:          theme.fontSize.base,
+    textDayHeaderFontSize:      theme.fontSize.xs,
   }), [theme]);
 
   const handleDayPress = (day) => {
@@ -913,19 +913,19 @@ function makeStyles(theme) {
     },
     title: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.text,
     },
     subtitle: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       marginTop:   2,
     },
     // ── Form: Date row ──
     label: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.6,
@@ -952,7 +952,7 @@ function makeStyles(theme) {
       paddingHorizontal:  8,
       textAlign:         'center',
       fontFamily:        theme.fontBodyMedium,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
     },
@@ -961,13 +961,13 @@ function makeStyles(theme) {
     },
     dateSegmentLabel: {
       fontFamily: theme.fontUi,
-      fontSize:   FontSize.xxs,
+      fontSize:   theme.fontSize.xxs,
       color:      theme.textMuted,
       marginTop:   4,
     },
     dateSep: {
       fontFamily:   theme.fontBodyBold,
-      fontSize:     FontSize.lg,
+      fontSize:     theme.fontSize.lg,
       color:        theme.textMuted,
       marginBottom: 18,
     },
@@ -989,7 +989,7 @@ function makeStyles(theme) {
       paddingHorizontal: 14,
       paddingVertical:   10,
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       minHeight:         72,
@@ -1015,7 +1015,7 @@ function makeStyles(theme) {
     },
     photoBtnText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.primary,
     },
     photoStrip: {
@@ -1066,7 +1066,7 @@ function makeStyles(theme) {
     },
     typeText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textSecondary,
       textAlign:  'center',
     },
@@ -1088,12 +1088,12 @@ function makeStyles(theme) {
     },
     pickerValue: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     pickerPlaceholder: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.placeholder,
     },
     // ── Checklist ──
@@ -1117,7 +1117,7 @@ function makeStyles(theme) {
     },
     checklistLabel: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
       flex:        1,
       paddingRight: 10,
@@ -1131,7 +1131,7 @@ function makeStyles(theme) {
       paddingHorizontal: 8,
       textAlign:       'right',
       fontFamily:      theme.fontBodyMedium,
-      fontSize:        FontSize.base,
+      fontSize:        theme.fontSize.base,
       color:           theme.text,
       backgroundColor: theme.surface,
     },
@@ -1159,7 +1159,7 @@ function makeStyles(theme) {
     },
     saveBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#ffffff',
     },
     // ── Success phase ──
@@ -1178,17 +1178,17 @@ function makeStyles(theme) {
     },
     successTitle: {
       fontFamily:   theme.fontHeading,
-      fontSize:     FontSize.xl,
+      fontSize:     theme.fontSize.xl,
       color:        theme.text,
       marginBottom:  6,
       textAlign:    'center',
     },
     successSub: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.sm,
+      fontSize:     theme.fontSize.sm,
       color:        theme.textMuted,
       textAlign:    'center',
-      lineHeight:   FontSize.sm * 1.5,
+      lineHeight:   theme.fontSize.sm * 1.5,
       marginBottom: 28,
     },
     btnStack: {
@@ -1206,7 +1206,7 @@ function makeStyles(theme) {
     },
     primaryBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#ffffff',
     },
     outlineBtn: {
@@ -1221,22 +1221,22 @@ function makeStyles(theme) {
     },
     outlineBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.primary,
     },
     // ── Invoice phase ──
     invoiceTitle: {
       fontFamily:   theme.fontHeading,
-      fontSize:     FontSize.xl,
+      fontSize:     theme.fontSize.xl,
       color:        theme.text,
       marginBottom:  6,
     },
     invoiceSub: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.sm,
+      fontSize:     theme.fontSize.sm,
       color:        theme.textMuted,
       marginBottom: 20,
-      lineHeight:   FontSize.sm * 1.5,
+      lineHeight:   theme.fontSize.sm * 1.5,
     },
     amountRow: {
       flexDirection:     'row',
@@ -1250,14 +1250,14 @@ function makeStyles(theme) {
     },
     dollarSign: {
       fontFamily:  theme.fontBodyBold,
-      fontSize:    FontSize.xl,
+      fontSize:    theme.fontSize.xl,
       color:       theme.text,
       marginRight:  4,
     },
     amountInput: {
       flex:            1,
       fontFamily:      theme.fontBody,
-      fontSize:        FontSize.xl,
+      fontSize:        theme.fontSize.xl,
       color:           theme.text,
       paddingVertical: 16,
     },
@@ -1279,12 +1279,12 @@ function makeStyles(theme) {
     },
     backBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textSecondary,
     },
     sendBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#ffffff',
     },
     // ── Calendar modal ──
@@ -1308,7 +1308,7 @@ function makeStyles(theme) {
     },
     calTitle: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
   });

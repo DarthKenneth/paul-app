@@ -299,7 +299,7 @@ function makeStyles(theme) {
     },
     sectionTitle: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.7,
@@ -325,12 +325,12 @@ function makeStyles(theme) {
     },
     toggleLabel: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     toggleDesc: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
       marginTop:   2,
     },
@@ -392,7 +392,7 @@ function makeStyles(theme) {
     },
     itemLabel: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     itemLabelMuted: {
@@ -400,11 +400,11 @@ function makeStyles(theme) {
     },
     hint: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.xs,
+      fontSize:          theme.fontSize.xs,
       color:             theme.textMuted,
       paddingTop:        10,
       paddingHorizontal: 4,
-      lineHeight:        FontSize.xs * 1.6,
+      lineHeight:        theme.fontSize.xs * 1.6,
     },
     // ── Add item card ──
     addCard: {
@@ -415,7 +415,7 @@ function makeStyles(theme) {
     },
     labelInput: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:       1,
@@ -430,7 +430,7 @@ function makeStyles(theme) {
     },
     addSubLabel: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.6,
@@ -459,7 +459,7 @@ function makeStyles(theme) {
     },
     typeChipText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textSecondary,
     },
     typeChipTextActive: {
@@ -479,7 +479,7 @@ function makeStyles(theme) {
     },
     addBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#fff',
     },
   });

@@ -269,9 +269,9 @@ export default function ServicesScreen({ navigation }) {
     textDayFontFamily:          theme.fontBody,
     textMonthFontFamily:        theme.fontUiBold,
     textDayHeaderFontFamily:    theme.fontUiMedium,
-    textDayFontSize:            FontSize.sm,
-    textMonthFontSize:          FontSize.base,
-    textDayHeaderFontSize:      FontSize.xs,
+    textDayFontSize:            theme.fontSize.sm,
+    textMonthFontSize:          theme.fontSize.base,
+    textDayHeaderFontSize:      theme.fontSize.xs,
   }), [theme]);
 
   // ── Render helpers ────────────────────────────────────────────────────────────
@@ -613,7 +613,7 @@ function makeStyles(theme) {
     },
     emptyPaneText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textMuted,
     },
     // ── List ──
@@ -644,7 +644,7 @@ function makeStyles(theme) {
     toggleIcon: {},
     toggleLabel: {
       fontFamily: theme.fontUiMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     toggleLabelActive: {
@@ -670,7 +670,7 @@ function makeStyles(theme) {
     },
     dayPanelTitle: {
       fontFamily:      theme.fontUiBold,
-      fontSize:        FontSize.sm,
+      fontSize:        theme.fontSize.sm,
       color:           theme.textSecondary,
       textTransform:   'uppercase',
       letterSpacing:    0.6,
@@ -686,7 +686,7 @@ function makeStyles(theme) {
     },
     dayPanelEmptyText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     // ── Section header ──
@@ -702,13 +702,13 @@ function makeStyles(theme) {
     },
     sectionTitle: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.sm,
+      fontSize:      theme.fontSize.sm,
       textTransform: 'uppercase',
       letterSpacing:  0.6,
     },
     sectionCount: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
     },
     // ── Row ──
     row: {
@@ -738,7 +738,7 @@ function makeStyles(theme) {
     },
     rowName: {
       fontFamily:   theme.fontBodyBold,
-      fontSize:     FontSize.base,
+      fontSize:     theme.fontSize.base,
       color:        theme.text,
       marginBottom:  4,
     },
@@ -752,12 +752,12 @@ function makeStyles(theme) {
     },
     rowLastDate: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     rowStatus: {
       fontFamily: theme.fontUiMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
     },
     separator: {
       height: 6,
@@ -772,15 +772,15 @@ function makeStyles(theme) {
     },
     emptyTitle: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.textSecondary,
     },
     emptyBody: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textMuted,
       textAlign:  'center',
-      lineHeight: FontSize.base * 1.5,
+      lineHeight: theme.fontSize.base * 1.5,
     },
   });
 }

@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.4.0] - 2026-04-26
+
+### Added
+- Text Size picker in Settings → Theme: Small, Normal, Large, XL. Adjusts font sizes app-wide (customer list, service history, detail views, modals, all screens). Preference persisted across launches.
+
+---
+
 ## [1.3.0] - 2026-04-25
 
 ### Changed

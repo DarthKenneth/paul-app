@@ -222,9 +222,9 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
     textDayFontFamily:          theme.fontBody,
     textMonthFontFamily:        theme.fontUiBold,
     textDayHeaderFontFamily:    theme.fontUiMedium,
-    textDayFontSize:            FontSize.sm,
-    textMonthFontSize:          FontSize.base,
-    textDayHeaderFontSize:      FontSize.xs,
+    textDayFontSize:            theme.fontSize.sm,
+    textMonthFontSize:          theme.fontSize.base,
+    textDayHeaderFontSize:      theme.fontSize.xs,
   }), [theme]);
 
   const handleDayPress = (day) => {
@@ -585,18 +585,18 @@ function makeStyles(theme) {
     },
     title: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.text,
     },
     subtitle: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       marginTop:   2,
     },
     label: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.6,
@@ -628,7 +628,7 @@ function makeStyles(theme) {
     },
     typeText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textSecondary,
       textAlign:  'center',
     },
@@ -637,7 +637,7 @@ function makeStyles(theme) {
     },
     typeDur: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
     },
     typeDurActive: {
@@ -665,7 +665,7 @@ function makeStyles(theme) {
       paddingHorizontal:  8,
       textAlign:         'center',
       fontFamily:        theme.fontBodyMedium,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
     },
@@ -674,13 +674,13 @@ function makeStyles(theme) {
     },
     dateSegmentLabel: {
       fontFamily: theme.fontUi,
-      fontSize:   FontSize.xxs,
+      fontSize:   theme.fontSize.xxs,
       color:      theme.textMuted,
       marginTop:   4,
     },
     dateSep: {
       fontFamily:   theme.fontBodyBold,
-      fontSize:     FontSize.lg,
+      fontSize:     theme.fontSize.lg,
       color:        theme.textMuted,
       marginBottom: 18,
     },
@@ -695,7 +695,7 @@ function makeStyles(theme) {
     },
     noSlotsText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       fontStyle:  'italic',
     },
@@ -727,7 +727,7 @@ function makeStyles(theme) {
     },
     slotText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     slotTextAvailable: {
@@ -741,7 +741,7 @@ function makeStyles(theme) {
     },
     slotMeta: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.xs,
+      fontSize:     theme.fontSize.xs,
       color:        theme.textMuted,
       marginTop:     6,
       marginBottom: 14,
@@ -754,7 +754,7 @@ function makeStyles(theme) {
       paddingHorizontal: 14,
       paddingVertical:   10,
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       minHeight:         72,
@@ -775,7 +775,7 @@ function makeStyles(theme) {
     saveBtnIcon: { marginRight: 8 },
     saveBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#ffffff',
     },
     // ── Calendar modal ──
@@ -799,7 +799,7 @@ function makeStyles(theme) {
     },
     calTitle: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
   });

@@ -202,25 +202,25 @@ function makeStyles(theme) {
     },
     typeLabel: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     dateText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     detailLine: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
       marginBottom: 3,
     },
     notes: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textSecondary,
-      lineHeight: FontSize.sm * 1.55,
+      lineHeight: theme.fontSize.sm * 1.55,
     },
     photoStrip: {
       marginTop: 8,

@@ -149,7 +149,7 @@ function useHeaderOptions() {
     },
     headerTitleStyle: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.headerText,
     },
     headerTintColor:  theme.primary,
@@ -295,7 +295,7 @@ export default function TabNavigator({ alertCount, onAlertsRefresh, hideTabs }) 
         tabBarInactiveTintColor: theme.tabIconInactive,
         tabBarLabelStyle: {
           fontFamily: theme.fontUiMedium,
-          fontSize:   FontSize.xxs,
+          fontSize:   theme.fontSize.xxs,
         },
         tabBarIcon: ({ focused, color }) => {
           const icons = TAB_ICONS[route.name];

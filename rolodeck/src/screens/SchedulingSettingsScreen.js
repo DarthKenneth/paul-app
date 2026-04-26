@@ -303,7 +303,7 @@ function makeStyles(theme) {
     },
     sectionTitle: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing: 0.7,
@@ -337,7 +337,7 @@ function makeStyles(theme) {
     },
     dayChipText: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textSecondary,
     },
     dayChipTextActive: {
@@ -361,7 +361,7 @@ function makeStyles(theme) {
     },
     stepLabel: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     stepper: {
@@ -381,7 +381,7 @@ function makeStyles(theme) {
     },
     stepValue: {
       fontFamily:  theme.fontBodyMedium,
-      fontSize:    FontSize.sm,
+      fontSize:    theme.fontSize.sm,
       color:       theme.text,
       minWidth:    76,
       textAlign:   'center',
@@ -393,7 +393,7 @@ function makeStyles(theme) {
     },
     hint: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.xs,
+      fontSize:     theme.fontSize.xs,
       color:        theme.textMuted,
       paddingHorizontal: 16,
       paddingBottom: 12,
@@ -413,7 +413,7 @@ function makeStyles(theme) {
     },
     resetText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textSecondary,
     },
   });

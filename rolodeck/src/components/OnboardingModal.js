@@ -184,7 +184,7 @@ function makeStyles(theme) {
     },
     skipText: {
       fontFamily: theme.fontUi,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
     content: {
@@ -204,14 +204,14 @@ function makeStyles(theme) {
     },
     title: {
       fontFamily:   theme.fontHeading,
-      fontSize:     FontSize.xxl,
+      fontSize:     theme.fontSize.xxl,
       color:        theme.text,
       textAlign:    'center',
       marginBottom: 16,
     },
     body: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textSecondary,
       textAlign:  'center',
       lineHeight: 24,
@@ -248,7 +248,7 @@ function makeStyles(theme) {
     },
     btnText: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#FFFFFF',
     },
   });

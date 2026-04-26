@@ -243,9 +243,9 @@ export default function AddServiceScreen({ route, navigation }) {
     textDayFontFamily:          theme.fontBody,
     textMonthFontFamily:        theme.fontUiBold,
     textDayHeaderFontFamily:    theme.fontUiMedium,
-    textDayFontSize:            FontSize.sm,
-    textMonthFontSize:          FontSize.base,
-    textDayHeaderFontSize:      FontSize.xs,
+    textDayFontSize:            theme.fontSize.sm,
+    textMonthFontSize:          theme.fontSize.base,
+    textDayHeaderFontSize:      theme.fontSize.xs,
   }), [theme]);
 
   // ── Photo handlers ──────────────────────────────────────────────────────────
@@ -771,7 +771,7 @@ function makeStyles(theme) {
     },
     label: {
       fontFamily:    theme.fontBodyMedium,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textMuted,
       marginBottom:   8,
       textTransform: 'uppercase',
@@ -809,7 +809,7 @@ function makeStyles(theme) {
     },
     typeText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textSecondary,
       textAlign:  'center',
     },
@@ -831,12 +831,12 @@ function makeStyles(theme) {
     },
     pickerValue: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     pickerPlaceholder: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.placeholder,
     },
     // ── Checklist ──
@@ -860,7 +860,7 @@ function makeStyles(theme) {
     },
     checklistLabel: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
       flex:        1,
       paddingRight: 10,
@@ -874,7 +874,7 @@ function makeStyles(theme) {
       paddingHorizontal: 8,
       textAlign:       'right',
       fontFamily:      theme.fontBodyMedium,
-      fontSize:        FontSize.base,
+      fontSize:        theme.fontSize.base,
       color:           theme.text,
       backgroundColor: theme.surface,
     },
@@ -893,7 +893,7 @@ function makeStyles(theme) {
     },
     dateBox: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.lg,
+      fontSize:          theme.fontSize.lg,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:        1,
@@ -907,12 +907,12 @@ function makeStyles(theme) {
     },
     dateSegmentLabel: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
     },
     dateSep: {
       fontFamily:  theme.fontBody,
-      fontSize:    FontSize.xl,
+      fontSize:    theme.fontSize.xl,
       color:       theme.border,
       marginTop:    13,
     },
@@ -938,19 +938,19 @@ function makeStyles(theme) {
     },
     daysInput: {
       width:     90,
-      fontSize:  FontSize.base,
+      fontSize:  theme.fontSize.base,
       paddingVertical: 12,
     },
     daysSuffix: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       flex:        1,
     },
     // ── Notes ──
     input: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:        1,
@@ -982,7 +982,7 @@ function makeStyles(theme) {
     },
     photoBtnText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.primary,
     },
     photoStrip: {
@@ -1020,7 +1020,7 @@ function makeStyles(theme) {
     },
     saveBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.md,
+      fontSize:   theme.fontSize.md,
       color:      theme.surface,
     },
     // ── Calendar modal ──
@@ -1052,7 +1052,7 @@ function makeStyles(theme) {
     },
     calTitle: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
   });

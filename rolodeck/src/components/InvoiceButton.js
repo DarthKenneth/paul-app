@@ -165,7 +165,7 @@ function makeStyles(theme) {
     },
     buttonLabel: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.surface,
     },
     overlay: {
@@ -192,16 +192,16 @@ function makeStyles(theme) {
     },
     sheetTitle: {
       fontFamily:   theme.fontHeading,
-      fontSize:     FontSize.xl,
+      fontSize:     theme.fontSize.xl,
       color:        theme.text,
       marginBottom:  6,
     },
     sheetSub: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.sm,
+      fontSize:     theme.fontSize.sm,
       color:        theme.textMuted,
       marginBottom: 20,
-      lineHeight:   FontSize.sm * 1.5,
+      lineHeight:   theme.fontSize.sm * 1.5,
     },
     amountRow: {
       flexDirection:     'row',
@@ -215,14 +215,14 @@ function makeStyles(theme) {
     },
     dollarSign: {
       fontFamily:  theme.fontBodyBold,
-      fontSize:    FontSize.xl,
+      fontSize:    theme.fontSize.xl,
       color:       theme.text,
       marginRight:  4,
     },
     amountInput: {
       flex:            1,
       fontFamily:      theme.fontBody,
-      fontSize:        FontSize.xl,
+      fontSize:        theme.fontSize.xl,
       color:           theme.text,
       paddingVertical: 16,
     },
@@ -244,12 +244,12 @@ function makeStyles(theme) {
     },
     cancelText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textSecondary,
     },
     sendText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.surface,
     },
   });

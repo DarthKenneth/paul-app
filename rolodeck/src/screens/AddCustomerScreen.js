@@ -428,7 +428,7 @@ function makeStyles(theme) {
     },
     label: {
       fontFamily:    theme.fontBodyMedium,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textMuted,
       marginBottom:   6,
       textTransform: 'uppercase',
@@ -436,7 +436,7 @@ function makeStyles(theme) {
     },
     input: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:        1,
@@ -492,12 +492,12 @@ function makeStyles(theme) {
     },
     suggestionMain: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.text,
     },
     suggestionSub: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
       marginTop:   1,
     },
@@ -514,7 +514,7 @@ function makeStyles(theme) {
     },
     saveBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.md,
+      fontSize:   theme.fontSize.md,
       color:      theme.surface,
     },
   });

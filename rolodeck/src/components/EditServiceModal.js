@@ -496,18 +496,18 @@ function makeStyles(theme) {
     },
     title: {
       fontFamily: theme.fontHeading,
-      fontSize:   FontSize.lg,
+      fontSize:   theme.fontSize.lg,
       color:      theme.text,
     },
     subtitle: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
       marginTop:   2,
     },
     label: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.6,
@@ -520,7 +520,7 @@ function makeStyles(theme) {
       paddingHorizontal: 14,
       paddingVertical:   10,
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       minHeight:         96,
@@ -546,13 +546,13 @@ function makeStyles(theme) {
     },
     detailLabel: {
       fontFamily:  theme.fontBody,
-      fontSize:    FontSize.sm,
+      fontSize:    theme.fontSize.sm,
       color:       theme.textMuted,
       marginRight: 12,
     },
     detailValue: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textSecondary,
       textAlign:  'right',
       flex:        1,
@@ -571,9 +571,9 @@ function makeStyles(theme) {
     },
     notesViewText: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
-      lineHeight: FontSize.base * 1.5,
+      lineHeight: theme.fontSize.base * 1.5,
     },
     photoButtons: {
       flexDirection: 'row',
@@ -594,7 +594,7 @@ function makeStyles(theme) {
     },
     photoBtnText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.primary,
     },
     photoStrip: {
@@ -635,7 +635,7 @@ function makeStyles(theme) {
     },
     deleteBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.overdue,
     },
     saveBtn: {
@@ -652,7 +652,7 @@ function makeStyles(theme) {
     },
     saveBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#ffffff',
     },
     btnPressed: {

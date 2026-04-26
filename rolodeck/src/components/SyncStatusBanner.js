@@ -185,7 +185,7 @@ function makeStyles(theme) {
     label: {
       flex:       1,
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
     },
     chevron: {
       marginLeft: 2,

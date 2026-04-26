@@ -1,9 +1,9 @@
 // =============================================================================
 // typography.js - Font family references and type scale constants
-// Version: 1.4
-// Last Updated: 2026-04-25
+// Version: 1.5
+// Last Updated: 2026-04-26
 //
-// PROJECT:      Rolodeck (project v1.2.0)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        colors.js       (palette + theme objects)
 //               typography.js   (this file — font constants)
 //               theme.js        (ThemeContext + ThemeProvider)
@@ -29,6 +29,7 @@
 //     Inter is tight + angular, DM Sans is rounded + relaxed.
 //
 // CHANGE LOG:
+// v1.5  2026-04-26  Claude  Font size scale levels (FontSizeScales, FontSizeScaleNames, FontSizeScaleKeys)
 // v1.4  2026-04-25  Claude  Added Aptos preset as new default font
 //       - Added 'aptos' preset (Aptos_700Bold heading, Aptos_400Regular body)
 //       - Added 'Aptos' to FontPresetNames [updated ARCHITECTURE]
@@ -157,6 +158,26 @@ export const FontSize = {
 export function tabletScale(size, isTablet) {
   return isTablet ? size + 2 : size;
 }
+
+// ── Font size scale ───────────────────────────────────────────────────────────
+// Offset in pts added to every FontSize value in the theme's fontSize object.
+// Components use theme.fontSize.base etc. (never raw FontSize) so this applies globally.
+
+export const FontSizeScales = {
+  sm:     -2,
+  normal:  0,
+  lg:      2,
+  xl:      4,
+};
+
+export const FontSizeScaleNames = {
+  sm:     'Small',
+  normal: 'Normal',
+  lg:     'Large',
+  xl:     'XL',
+};
+
+export const FontSizeScaleKeys = Object.keys(FontSizeScales);
 
 export const FontWeight = {
   regular: '400',

@@ -343,7 +343,7 @@ function makeStyles(theme) {
     },
     sectionTitle: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.7,
@@ -381,7 +381,7 @@ function makeStyles(theme) {
     },
     typeLabel: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     typeLabelMuted: {
@@ -409,7 +409,7 @@ function makeStyles(theme) {
     },
     stepValue: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.text,
       minWidth:   58,
       textAlign:  'center',
@@ -422,11 +422,11 @@ function makeStyles(theme) {
     },
     hint: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.xs,
+      fontSize:          theme.fontSize.xs,
       color:             theme.textMuted,
       paddingTop:        10,
       paddingHorizontal: 4,
-      lineHeight:        FontSize.xs * 1.6,
+      lineHeight:        theme.fontSize.xs * 1.6,
     },
     // ── Add type card ──
     addCard: {
@@ -436,7 +436,7 @@ function makeStyles(theme) {
     },
     nameInput: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:       1,
@@ -448,7 +448,7 @@ function makeStyles(theme) {
     },
     addLabel: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textSecondary,
       textTransform: 'uppercase',
       letterSpacing:  0.6,
@@ -492,7 +492,7 @@ function makeStyles(theme) {
     },
     newStepValue: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
       minWidth:   80,
       textAlign:  'center',
@@ -511,7 +511,7 @@ function makeStyles(theme) {
     },
     addBtnText: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      '#fff',
     },
   });

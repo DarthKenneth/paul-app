@@ -179,9 +179,9 @@ function makeStyles(theme) {
     },
     desc: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.sm,
+      fontSize:     theme.fontSize.sm,
       color:        theme.textMuted,
-      lineHeight:   FontSize.sm * 1.6,
+      lineHeight:   theme.fontSize.sm * 1.6,
       marginBottom: 16,
     },
     card: {
@@ -203,7 +203,7 @@ function makeStyles(theme) {
     },
     rowLabel: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     rowLabelActive: {
@@ -224,7 +224,7 @@ function makeStyles(theme) {
     },
     customInput: {
       fontFamily:        theme.fontBody,
-      fontSize:          FontSize.base,
+      fontSize:          theme.fontSize.base,
       color:             theme.text,
       backgroundColor:   theme.inputBg,
       borderWidth:        1,
@@ -237,7 +237,7 @@ function makeStyles(theme) {
     },
     customInputSuffix: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.textMuted,
     },
   });

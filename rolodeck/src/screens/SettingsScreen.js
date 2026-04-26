@@ -797,15 +797,15 @@ function makeStyles(theme) {
     },
     sectionTitle: {
       fontFamily:   theme.fontHeading,
-      fontSize:     FontSize.lg,
+      fontSize:     theme.fontSize.lg,
       color:        theme.text,
       marginBottom: 12,
     },
     sectionDesc: {
       fontFamily:   theme.fontBody,
-      fontSize:     FontSize.sm,
+      fontSize:     theme.fontSize.sm,
       color:        theme.textMuted,
-      lineHeight:   FontSize.sm * 1.6,
+      lineHeight:   theme.fontSize.sm * 1.6,
       marginBottom: 14,
     },
     // ── Sort ──
@@ -832,7 +832,7 @@ function makeStyles(theme) {
     },
     sortOptionText: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.textSecondary,
     },
     sortOptionTextActive: {
@@ -854,12 +854,12 @@ function makeStyles(theme) {
     },
     rowTitle: {
       fontFamily: theme.fontBodyMedium,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.text,
     },
     rowDesc: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textMuted,
       marginTop:  2,
     },
@@ -886,12 +886,12 @@ function makeStyles(theme) {
     },
     syncBannerTitle: {
       fontFamily: theme.fontBodyBold,
-      fontSize:   FontSize.sm,
+      fontSize:   theme.fontSize.sm,
       color:      theme.warning,
     },
     syncBannerDesc: {
       fontFamily: theme.fontBody,
-      fontSize:   FontSize.xs,
+      fontSize:   theme.fontSize.xs,
       color:      theme.textSecondary,
       marginTop:  2,
     },
@@ -936,7 +936,7 @@ function makeStyles(theme) {
     },
     connectButtonText: {
       fontFamily: theme.fontUiBold,
-      fontSize:   FontSize.base,
+      fontSize:   theme.fontSize.base,
       color:      theme.surface,
     },
     // ── Coming soon ──
@@ -959,7 +959,7 @@ function makeStyles(theme) {
     },
     comingSoonText: {
       fontFamily:    theme.fontUiBold,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.primary,
       textTransform: 'uppercase',
       letterSpacing: 0.8,
@@ -970,7 +970,7 @@ function makeStyles(theme) {
     },
     copyright: {
       fontFamily:    theme.fontBody,
-      fontSize:      FontSize.xs,
+      fontSize:      theme.fontSize.xs,
       color:         theme.textMuted,
       textAlign:     'center',
       marginTop:     10,
