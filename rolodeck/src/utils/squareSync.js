@@ -1,13 +1,13 @@
 // =============================================================================
 // squareSync.js - Square customer sync engine (7-step orchestrator)
-// Version: 1.2
-// Last Updated: 2026-04-14
+// Version: 1.3
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        squareSync.js         (this file — sync orchestrator)
 //               squareCustomers.js    (fetchAllSquareCustomers, createSquareCustomer)
-//               mergeLogic.js         (matchCustomers, mergeSquareIntoRolodeck,
-//                                      mapSquareToRolodeck, mapRolodeckToSquare)
+//               mergeLogic.js         (matchCustomers, mergeSquareIntoCallout,
+//                                      mapSquareToCallout, mapCalloutToSquare)
 //               storage.js            (getAllCustomers, addCustomer, updateCustomer,
 //                                      getSquareSyncMetadata, saveSquareSyncMetadata)
 //               squarePlaceholder.js  (getSquareAccessToken, isSquareConnected)
@@ -21,9 +21,9 @@
 //   - runSync() implements the 7-step algorithm:
 //       1. FETCH  — fetchAllSquareCustomers() (paginated) + getAllCustomers()
 //       2. MATCH  — matchCustomers() from mergeLogic.js
-//       3. MERGE  — mergeSquareIntoRolodeck() for confident matches; updateCustomer()
+//       3. MERGE  — mergeSquareIntoCallout() for confident matches; updateCustomer()
 //       4. CONFIRM— low-conf pairs saved to sync metadata for user review
-//       5. CREATE — mapSquareToRolodeck() + addCustomer() for unmatched Square records
+//       5. CREATE — mapSquareToCallout() + addCustomer() for unmatched Square records
 //       6. [PUSH] — pushLocalCustomers() is user-triggered, not part of runSync
 //       7. SAVE   — sync metadata written (lastSyncAt, syncLog, pendingLowConf)
 //   - Partial failure: successful records saved even if individual records fail;
@@ -36,9 +36,9 @@
 // v1.0  2026-04-12  Claude  Initial implementation
 //       - runSync() with full 7-step algorithm
 //       - resolveLowConf() — link or skip a pending low-confidence match
-//       - resolveConflict() — accept square or rolodeck value for one field
+//       - resolveConflict() — accept square or callout value for one field
 //       - pushLocalCustomers() — push local-only customers to Square
-//       - getLocalOnlyCustomers() — list Rolodeck customers without squareCustomerId
+//       - getLocalOnlyCustomers() — list Callout customers without squareCustomerId
 // v1.1  2026-04-14  Claude  Rollback-safe merge step
 //       - Step 3 now computes all merges in memory first, then persists all
 //         successes in parallel (no partial-write state if one record fails)
@@ -48,15 +48,21 @@
 //       - assertOnline() imported from squarePlaceholder.js; called before
 //         Step 1 so a "no internet" message appears immediately rather than
 //         after the 10-second fetch timeout
+// v1.3  2026-04-25  Claude  Rename rolodeck → callout throughout
+//       - rolodeckActive → calloutActive; rolodeckCustomerId → calloutCustomerId
+//       - All mergeLogic imports use new names (mergeSquareIntoCallout,
+//         mapSquareToCallout, mapCalloutToSquare)
+//       - resolveConflict winner: 'rolodeck' → 'callout'
+//       - pendingLowConf objects use calloutCustomerId property
 // =============================================================================
 
 import { getSquareAccessToken, isSquareConnected, assertOnline } from './squarePlaceholder';
 import { fetchAllSquareCustomers, createSquareCustomer } from './squareCustomers';
 import {
   matchCustomers,
-  mergeSquareIntoRolodeck,
-  mapSquareToRolodeck,
-  mapRolodeckToSquare,
+  mergeSquareIntoCallout,
+  mapSquareToCallout,
+  mapCalloutToSquare,
 } from './mergeLogic';
 import {
   getAllCustomers,
@@ -89,14 +95,14 @@ export async function runSync() {
   if (!connected) throw new Error('NOT_CONNECTED');
 
   // Step 1: Fetch
-  const [squareCustomers, allRolodeck] = await Promise.all([
+  const [squareCustomers, allCallout] = await Promise.all([
     fetchAllSquareCustomers(),
     getAllCustomers(),
   ]);
-  const rolodeckActive = allRolodeck.filter((c) => !c.archived);
+  const calloutActive = allCallout.filter((c) => !c.archived);
 
   // Step 2: Match
-  const { matched, lowConf, newInSquare } = matchCustomers(squareCustomers, rolodeckActive);
+  const { matched, lowConf, newInSquare } = matchCustomers(squareCustomers, calloutActive);
 
   let mergedCount    = 0;
   let conflictCount  = 0;
@@ -104,10 +110,10 @@ export async function runSync() {
 
   // Step 3: Merge matched records — compute all merges in memory first,
   // then persist successes in parallel so no partial-write state exists.
-  const mergeResults = matched.map(({ square, rolodeck }) => {
+  const mergeResults = matched.map(({ square, callout }) => {
     try {
-      const { merged, conflicts } = mergeSquareIntoRolodeck(rolodeck, square);
-      return { id: rolodeck.id, merged, conflictCount: Object.keys(conflicts).length };
+      const { merged, conflicts } = mergeSquareIntoCallout(callout, square);
+      return { id: callout.id, merged, conflictCount: Object.keys(conflicts).length };
     } catch (e) {
       errors.push({ id: square.id, message: e.message });
       return null;
@@ -127,16 +133,16 @@ export async function runSync() {
   );
 
   // Step 4: Queue low-confidence matches for user review
-  const pendingLowConf = lowConf.map(({ square, rolodeck }) => ({
-    squareCustomer:      square,
-    rolodeckCustomerId:  rolodeck.id,
+  const pendingLowConf = lowConf.map(({ square, callout }) => ({
+    squareCustomer:   square,
+    calloutCustomerId: callout.id,
   }));
 
-  // Step 5: Create new Rolodeck records for unmatched Square customers
+  // Step 5: Create new Callout records for unmatched Square customers
   let createdCount = 0;
   for (const sq of newInSquare) {
     try {
-      await addCustomer(mapSquareToRolodeck(sq));
+      await addCustomer(mapSquareToCallout(sq));
       createdCount++;
     } catch (e) {
       errors.push({ id: sq.id, message: e.message });
@@ -181,17 +187,17 @@ export async function runSync() {
 /**
  * Resolve a pending low-confidence match.
  *
- * @param {object} squareCustomer      — the Square customer object from the pair
- * @param {string} rolodeckCustomerId  — the Rolodeck customer ID from the pair
- * @param {'link'|'skip'} action       — 'link' merges the records; 'skip' discards
+ * @param {object} squareCustomer     — the Square customer object from the pair
+ * @param {string} calloutCustomerId  — the Callout customer ID from the pair
+ * @param {'link'|'skip'} action      — 'link' merges the records; 'skip' discards
  */
-export async function resolveLowConf(squareCustomer, rolodeckCustomerId, action) {
+export async function resolveLowConf(squareCustomer, calloutCustomerId, action) {
   if (action === 'link') {
-    const rolodeck = await getCustomerById(rolodeckCustomerId);
-    if (!rolodeck) throw new Error('Rolodeck customer not found');
+    const callout = await getCustomerById(calloutCustomerId);
+    if (!callout) throw new Error('Callout customer not found');
 
-    const { merged } = mergeSquareIntoRolodeck(rolodeck, squareCustomer);
-    await updateCustomer(rolodeckCustomerId, merged);
+    const { merged } = mergeSquareIntoCallout(callout, squareCustomer);
+    await updateCustomer(calloutCustomerId, merged);
   }
 
   // Remove from pending list regardless of action
@@ -200,7 +206,7 @@ export async function resolveLowConf(squareCustomer, rolodeckCustomerId, action)
     (p) =>
       !(
         p.squareCustomer?.id === squareCustomer.id &&
-        p.rolodeckCustomerId === rolodeckCustomerId
+        p.calloutCustomerId === calloutCustomerId
       ),
   );
   await saveSquareSyncMetadata({ ...meta, pendingLowConf: pending });
@@ -211,9 +217,9 @@ export async function resolveLowConf(squareCustomer, rolodeckCustomerId, action)
 /**
  * Accept a winner for one conflicting field on a customer.
  *
- * @param {string} customerId — Rolodeck customer ID
+ * @param {string} customerId — Callout customer ID
  * @param {string} fieldName  — name of the conflicting field (e.g. 'email', 'phone')
- * @param {'square'|'rolodeck'} winner
+ * @param {'square'|'callout'} winner
  */
 export async function resolveConflict(customerId, fieldName, winner) {
   const customer = await getCustomerById(customerId);
@@ -227,7 +233,7 @@ export async function resolveConflict(customerId, fieldName, winner) {
   if (winner === 'square') {
     updates[fieldName] = field.square;
   }
-  // winner === 'rolodeck' — keep existing value, no field update needed
+  // winner === 'callout' — keep existing value, no field update needed
 
   // Remove resolved field from conflict data
   const newConflictData = { ...conflictData };
@@ -243,10 +249,10 @@ export async function resolveConflict(customerId, fieldName, winner) {
 // ── pushLocalCustomers ────────────────────────────────────────────────────────
 
 /**
- * Push a selection of local-only Rolodeck customers to Square.
+ * Push a selection of local-only Callout customers to Square.
  * On success, stores the returned Square ID on the customer record.
  *
- * @param {string[]} customerIds — array of Rolodeck customer IDs to push
+ * @param {string[]} customerIds — array of Callout customer IDs to push
  * @returns {Promise<{ pushed: number, errors: Array }>}
  */
 export async function pushLocalCustomers(customerIds) {
@@ -260,7 +266,7 @@ export async function pushLocalCustomers(customerIds) {
 
   for (const customer of toPush) {
     try {
-      const squareBody   = mapRolodeckToSquare(customer);
+      const squareBody   = mapCalloutToSquare(customer);
       const squareCust   = await createSquareCustomer(squareBody);
       const squareId     = squareCust?.id;
 
@@ -288,10 +294,10 @@ export async function pushLocalCustomers(customerIds) {
 // ── getLocalOnlyCustomers ─────────────────────────────────────────────────────
 
 /**
- * Return non-archived Rolodeck customers that have no Square ID.
+ * Return non-archived Callout customers that have no Square ID.
  * Used by SquareSyncScreen to populate the Push to Square section.
  *
- * @returns {Promise<Array>} array of Rolodeck customer objects
+ * @returns {Promise<Array>} array of Callout customer objects
  */
 export async function getLocalOnlyCustomers() {
   const customers = await getAllCustomers();

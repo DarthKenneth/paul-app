@@ -1,9 +1,9 @@
 // =============================================================================
 // SquareSyncScreen.js - Square customer sync management screen
-// Version: 1.1
-// Last Updated: 2026-04-14
+// Version: 1.2
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.22)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        SquareSyncScreen.js   (this file — sync management UI)
 //               squareSync.js         (runSync, resolveLowConf, resolveConflict,
 //                                      pushLocalCustomers, getLocalOnlyCustomers)
@@ -18,7 +18,7 @@
 //   - ScrollView with 5 clearly delineated sections (cards):
 //       1. Sync Status header — last sync time, Sync Now button, progress
 //       2. Pending Review — LOW_CONF pairs; [Link] [Keep Separate] per pair
-//       3. Conflicts — per-customer conflict cards; [Use Square] [Use Rolodeck]
+//       3. Conflicts — per-customer conflict cards; [Use Square] [Use Callout]
 //                      per conflicting field
 //       4. Sync Log — summary of last sync + scrollable history
 //       5. Push to Square — local-only customer list; [Push] per record +
@@ -34,13 +34,18 @@
 // v1.0  2026-04-12  Claude  Initial implementation
 //       - Section 1: Sync Status header with Sync Now button + progress
 //       - Section 2: Pending Review (LOW_CONF) with Link / Keep Separate actions
-//       - Section 3: Conflicts with per-field Use Square / Use Rolodeck actions
+//       - Section 3: Conflicts with per-field Use Square / Use Callout actions
 //       - Section 4: Sync Log history
 //       - Section 5: Push to Square — individual + Push All
 // v1.1  2026-04-14  Claude  Performance: LowConfRoloSide uses getCustomerById
 //                           instead of getAllCustomers().find() so each pending-
 //                           review row loads one record, not the full customer list
 //                           [updated ARCHITECTURE]
+// v1.2  2026-04-25  Claude  Rename rolodeck → callout throughout
+//       - rolodeckCustomerId: roloId destructuring → calloutCustomerId: calloutId
+//       - handleConflict 'rolodeck' winner string → 'callout'
+//       - vals.rolodeck → vals.callout
+//       - LowConfRoloSide prop roloId → calloutId
 // =============================================================================
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -166,9 +171,9 @@ export default function SquareSyncScreen() {
 
   // ── Low-conf resolution ─────────────────────────────────────────────────────
 
-  const handleLowConf = async (sq, roloId, action) => {
+  const handleLowConf = async (sq, calloutId, action) => {
     try {
-      await resolveLowConf(sq, roloId, action);
+      await resolveLowConf(sq, calloutId, action);
       await loadData();
     } catch (e) {
       Alert.alert('Error', e.message);
@@ -333,10 +338,10 @@ export default function SquareSyncScreen() {
               These customers matched by name only. Confirm or reject each link.
             </Text>
 
-            {pendingLowConf.map(({ squareCustomer: sq, rolodeckCustomerId: roloId }, idx) => {
+            {pendingLowConf.map(({ squareCustomer: sq, calloutCustomerId: calloutId }, idx) => {
               const sqName  = [sq.given_name, sq.family_name].filter(Boolean).join(' ');
               return (
-                <View key={`${sq.id}-${roloId}`}>
+                <View key={`${sq.id}-${calloutId}`}>
                   {idx > 0 && <View style={styles.divider} />}
                   <View style={styles.compareGrid}>
                     <View style={styles.compareCol}>
@@ -348,12 +353,12 @@ export default function SquareSyncScreen() {
                     <View style={styles.compareArrow}>
                       <Ionicons name="swap-horizontal-outline" size={18} color={theme.textMuted} />
                     </View>
-                    <LowConfRoloSide roloId={roloId} styles={styles} theme={theme} />
+                    <LowConfRoloSide calloutId={calloutId} styles={styles} theme={theme} />
                   </View>
                   <View style={styles.actionRow}>
                     <Pressable
                       style={({ pressed }) => [styles.linkBtn, pressed && styles.btnPressed]}
-                      onPress={() => handleLowConf(sq, roloId, 'link')}
+                      onPress={() => handleLowConf(sq, calloutId, 'link')}
                       accessibilityRole="button"
                       accessibilityLabel="Link these customers"
                     >
@@ -361,7 +366,7 @@ export default function SquareSyncScreen() {
                     </Pressable>
                     <Pressable
                       style={({ pressed }) => [styles.skipBtn, pressed && styles.btnPressed]}
-                      onPress={() => handleLowConf(sq, roloId, 'skip')}
+                      onPress={() => handleLowConf(sq, calloutId, 'skip')}
                       accessibilityRole="button"
                       accessibilityLabel="Keep separate"
                     >
@@ -406,12 +411,12 @@ export default function SquareSyncScreen() {
                       </Pressable>
                       <Pressable
                         style={({ pressed }) => [styles.conflictOpt, pressed && styles.btnPressed]}
-                        onPress={() => handleConflict(customer.id, field, 'rolodeck')}
+                        onPress={() => handleConflict(customer.id, field, 'callout')}
                         accessibilityRole="button"
                         accessibilityLabel={`Use Callout value for ${field}`}
                       >
                         <Text style={styles.conflictSource}>Callout</Text>
-                        <Text style={styles.conflictVal} numberOfLines={2}>{vals.rolodeck}</Text>
+                        <Text style={styles.conflictVal} numberOfLines={2}>{vals.callout}</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -518,16 +523,16 @@ export default function SquareSyncScreen() {
 // ── LowConfRoloSide ───────────────────────────────────────────────────────────
 // Separate component to avoid loading customer in the list-level map closure
 
-function LowConfRoloSide({ roloId, styles, theme }) {
+function LowConfRoloSide({ calloutId, styles, theme }) {
   const [rolo, setRolo] = React.useState(null);
 
   React.useEffect(() => {
     let active = true;
-    getCustomerById(roloId).then((c) => {
+    getCustomerById(calloutId).then((c) => {
       if (active) setRolo(c || null);
     }).catch(() => {});
     return () => { active = false; };
-  }, [roloId]);
+  }, [calloutId]);
 
   return (
     <View style={styles.compareCol}>

@@ -1,9 +1,9 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 2.0.4
-// Last Updated: 2026-04-24
+// Version: 2.0.5
+// Last Updated: 2026-04-25
 //
-// PROJECT:      Rolodeck (project v0.28)
+// PROJECT:      Callout (project v1.3.0)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
@@ -75,10 +75,11 @@
 //                     checklist?: object (checklist item id → bool|string) }
 //   ScheduledEntry: { id, date (ISO string), type ('service'|'install'), notes, createdAt (ISO string) }
 //   SquareSyncMeta: { lastSyncAt (ISO|null), syncLog: [SyncLogEntry],
-//                     pendingLowConf: [{ squareCustomer, rolodeckCustomerId }] }
+//                     pendingLowConf: [{ squareCustomer, calloutCustomerId }] }
 //   SyncLogEntry:   { at, merged, created, lowConf, conflicts, errors }
 //
 // CHANGE LOG:
+// v2.0.5 2026-04-25  Claude  Update project block; fix schema comment rolodeckCustomerId → calloutCustomerId
 // v2.0.4 2026-04-24  Claude  addServiceEntry now forwards photos — was silently dropped
 //                            [updated SCHEMA to include entryValues and checklist]
 // v2.0.3 2026-04-24  Claude  addServiceEntry forwards entryValues and checklist from data
