@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.4.2] - 2026-04-26
+
+### Fixed
+- Splash screen definitively fixed: moved to a dedicated `store-assets/splash.png` asset (separate from the app icon path). iOS caches launch screens by asset name; the new path forces a fresh load, replacing the old green Rolodex graphic with the Rustic Trade clipboard design.
+
+---
+
 ## [1.4.1] - 2026-04-26
 
 ### Fixed

@@ -1,12 +1,13 @@
 // =============================================================================
 // generate-icons.js - Generates all required app icon PNGs from icon.svg
-// Version: 1.3
-// Last Updated: 2026-04-25
+// Version: 1.4
+// Last Updated: 2026-04-26
 //
-// PROJECT:      Rolodeck (project v0.22.8)
+// PROJECT:      Rolodeck (project v1.4)
 // FILES:        scripts/generate-icons.js       (this file — icon pipeline)
 //               store-assets/icon.svg            (light icon master source)
 //               store-assets/icon-dark.svg       (dark icon master source)
+//               store-assets/splash.png          (splash screen — dedicated path)
 //               store-assets/icons/              (output directory)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
@@ -25,9 +26,12 @@
 //     no alpha channel on the primary icon
 //   - icon-dark.png (1024) is flattened with dark brand bg — used as iOS
 //     dark + tinted variants in app.json
+//   - splash.png (1024) is output to store-assets/ (NOT icons/) so app.json
+//     can reference a path distinct from icon.png — iOS caches launch screens
+//     by asset name; a separate path guarantees the new image is loaded
 //   - adaptive-icon-fg.png: icon centered with padding to respect the Android
 //     adaptive icon 72dp safe zone (icon occupies center 72/108 = 66.7%)
-//   - adaptive-icon-bg.png: solid #C6ECEA fill, same dimensions
+//   - adaptive-icon-bg.png: solid #FDF0E0 fill, same dimensions
 //   - adaptive-icon-monochrome.png: white silhouette on transparent bg —
 //     used as Android 13+ Material You themed icon (monochromeImage)
 //   - Outputs file list summary to stdout on completion
@@ -38,14 +42,19 @@
 //         - Added SVG_DARK_SRC and BRAND_BG_DARK constants
 //         - Added icon-dark.png entry with per-entry src/flattenBg overrides
 //         - Updated render loop to use per-icon src and flattenBg if present
-// v1.3  2026-04-25  Claude  Rustic Trade brand colors
-//         - BRAND_BG: #C6ECEA → #FDF0E0 (Rustic Trade parchment)
-//         - BRAND_BG_DARK: #0E2422 → #2A1506 (Rustic Trade dark brown)
 // v1.2  2026-04-17  Claude  Android monochrome + Expo upgrade housekeeping
 //         - Added generateMonochrome() — renders SVG, makes all opaque pixels
 //           white, preserves alpha; outputs adaptive-icon-monochrome.png
 //         - Removed stale reference to withDarkIcon.js plugin (removed long ago)
 //         - Updated PROJECT block to current version [updated ARCHITECTURE]
+// v1.3  2026-04-25  Claude  Rustic Trade brand colors
+//         - BRAND_BG: #C6ECEA → #FDF0E0 (Rustic Trade parchment)
+//         - BRAND_BG_DARK: #0E2422 → #2A1506 (Rustic Trade dark brown)
+// v1.4  2026-04-26  Claude  Dedicated splash screen asset
+//         - Added splash.png to ICONS, output to store-assets/ (not icons/)
+//         - app.json splash.image now points to ./store-assets/splash.png so
+//           iOS sees a fresh asset path and cannot serve the cached old launch
+//           screen [updated ARCHITECTURE, FILES]
 // =============================================================================
 
 'use strict';
@@ -81,6 +90,8 @@ const BRAND_BG_DARK = { r:  42, g:  21, b:   6, alpha: 1 }; // #2A1506  Rustic T
 const ICONS = [
   // iOS — light (any/default)
   { name: 'icon.png',         size: 1024, flatten: true,  note: 'Expo app icon / App Store listing (no alpha)' },
+  // Splash screen — separate path from icon.png to bust iOS launch screen cache
+  { name: '../splash.png',    size: 1024, flatten: true,  note: 'Splash screen (store-assets/splash.png — dedicated path)' },
   // iOS — dark + tinted (iOS 18 / iOS 26)
   { name: 'icon-dark.png',    size: 1024, flatten: true,  src: SVG_DARK_SRC, flattenBg: BRAND_BG_DARK, note: 'Dark + tinted mode icon for iOS 18+ (no alpha)' },
   { name: 'icon-60@2x.png',   size: 120,                  note: 'iPhone home @2x' },
@@ -205,7 +216,7 @@ async function main() {
   // ── Done ──────────────────────────────────────────────────────────────────
 
   console.log('\n  ─────────────────────────────────────────');
-  console.log(`  ${ICONS.length + 3} files written to store-assets/icons/`);
+  console.log(`  ${ICONS.length + 3} files written (store-assets/splash.png + store-assets/icons/)`);
   console.log(`  Source: store-assets/icon.svg\n`);
 }
 

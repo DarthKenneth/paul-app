@@ -3,14 +3,14 @@
     "name": "Callout",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "1.4.1",
+    "version": "1.4.2",
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "orientation": "default",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./store-assets/icons/icon.png",
+      "image": "./store-assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#FDF0E0"
     },
