@@ -8,6 +8,14 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.3.0] - 2026-04-25
+
+### Changed
+- App icon updated to the Rustic Trade clipboard design — warm sienna clipboard with ruled lines and an amber accent dot on a parchment background (dark mode: burnt-orange on dark brown).
+- Adaptive icon background and splash screen background updated from teal (#C6ECEA) to Rustic Trade parchment (#FDF0E0).
+
+---
+
 ## [1.2.0] - 2026-04-25
 
 ### Changed
