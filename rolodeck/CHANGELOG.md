@@ -8,6 +8,20 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.4.4] - 2026-04-27
+
+### Fixed
+- Removed `READ_MEDIA_IMAGES` from Android permissions manifest. expo-image-picker uses the system photo picker on API 33+, which doesn't require this permission. Fixes Google Play policy violation blocking store listing updates.
+
+---
+
+## [1.4.3] - 2026-04-27
+
+### Changed
+- App rebranded from "Rolodeck" to "Callout CRM" across all store listings (App Store, Google Play) and app display name.
+
+---
+
 ## [1.4.2] - 2026-04-26
 
 ### Fixed

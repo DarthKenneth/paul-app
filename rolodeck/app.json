@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Callout",
+    "name": "Callout CRM",
     "slug": "rolodeck",
     "scheme": "rolodeck",
-    "version": "1.4.2",
+    "version": "1.4.4",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -66,7 +66,6 @@
         "WRITE_CALENDAR",
         "android.permission.READ_CALENDAR",
         "android.permission.WRITE_CALENDAR",
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.CAMERA"
       ]
     },
