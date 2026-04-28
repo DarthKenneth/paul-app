@@ -1,9 +1,9 @@
 // =============================================================================
 // photoUtils.js - Helpers for persisting local service-note photo files
-// Version: 1.1
-// Last Updated: 2026-04-24
+// Version: 1.3
+// Last Updated: 2026-04-28
 //
-// PROJECT:      Rolodeck (project v0.28.4)
+// PROJECT:      Rolodeck (project v1.5)
 // FILES:        photoUtils.js        (this file)
 //               AddServiceModal.js   (calls savePhotoLocally)
 //               AddServiceScreen.js  (calls savePhotoLocally)
@@ -22,21 +22,66 @@
 // CHANGE LOG:
 // v1.0    2026-04-17  Claude  Initial implementation
 // v1.1    2026-04-24  Claude  Added deletePhotosFromDisk for orphan cleanup
+// v1.2    2026-04-28  Claude  Fix runtime crash on SDK 55 — switch import to
+//                              'expo-file-system/legacy'. The namespace import
+//                              from 'expo-file-system' now throws on every
+//                              legacy method call (getInfoAsync, makeDirectoryAsync,
+//                              copyAsync, deleteAsync). All photo save/delete
+//                              flows were broken in production until this fix.
+// v1.3    2026-04-28  Claude  Hardening + perf — savePhotoLocally
+//       - null/undefined uri (was crashing on uri.split — image-picker can
+//         return a result with no usable assets if the user backgrounds the
+//         picker mid-selection)
+//       - paths with a "." in a directory name (e.g. /Users/some.user/photo)
+//         where the previous extension-extraction split on "." across the
+//         whole URI and could yield a filename containing "/", which would
+//         escape PHOTO_DIR. Extension extraction now operates on the basename
+//         (segment after the last "/") and rejects anything with non-alphanum.
+//       - module-level ensurePhotoDir() caches the dir-creation roundtrip so
+//         bulk photo adds skip getInfoAsync after the first save
 // =============================================================================
 
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 const PHOTO_DIR = FileSystem.documentDirectory + 'service-photos/';
 
+// One-shot ensure: directory creation is idempotent with intermediates:true,
+// but skipping the round-trip after the first save is a measurable win when
+// users add several photos in quick succession.
+let _photoDirEnsured = null;
+function ensurePhotoDir() {
+  if (_photoDirEnsured) return _photoDirEnsured;
+  _photoDirEnsured = (async () => {
+    const info = await FileSystem.getInfoAsync(PHOTO_DIR);
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(PHOTO_DIR, { intermediates: true });
+    }
+  })().catch((err) => {
+    // Reset so a transient error doesn't permanently mark the dir as ensured.
+    _photoDirEnsured = null;
+    throw err;
+  });
+  return _photoDirEnsured;
+}
+
 export async function savePhotoLocally(uri) {
-  const dirInfo = await FileSystem.getInfoAsync(PHOTO_DIR);
-  if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(PHOTO_DIR, { intermediates: true });
+  if (typeof uri !== 'string' || uri.length === 0) {
+    throw new Error('No photo to save (empty or invalid URI).');
   }
-  const raw = uri.split('?')[0];
-  const ext = raw.includes('.') ? raw.split('.').pop().slice(0, 5) : 'jpg';
+
+  await ensurePhotoDir();
+
+  // Extract extension from the basename only — splitting across the full URI
+  // could pick up a "." from a parent directory and produce a filename with
+  // a "/" in the extension, which would escape PHOTO_DIR.
+  const noQuery   = uri.split('?')[0];
+  const basename  = noQuery.substring(noQuery.lastIndexOf('/') + 1);
+  const dotIdx    = basename.lastIndexOf('.');
+  const rawExt    = dotIdx >= 0 ? basename.slice(dotIdx + 1, dotIdx + 6) : '';
+  const ext       = /^[A-Za-z0-9]+$/.test(rawExt) ? rawExt.toLowerCase() : 'jpg';
+
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const dest = PHOTO_DIR + filename;
+  const dest     = PHOTO_DIR + filename;
   await FileSystem.copyAsync({ from: uri, to: dest });
   return dest;
 }

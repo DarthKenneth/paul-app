@@ -97,7 +97,7 @@ export function ThemeProvider({ children }) {
       if (storedTheme && (Themes[storedTheme] || storedTheme === 'rustic')) setThemeKey(storedTheme);
       if (storedFont && FontPresets[storedFont]) setFontKey(storedFont);
       if (storedFontSize && FontSizeScales[storedFontSize] !== undefined) setFontSizeKey(storedFontSize);
-    });
+    }).catch(() => { /* defaults already set in useState */ });
     return () => { active = false; };
   }, []);
 

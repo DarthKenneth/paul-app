@@ -122,6 +122,7 @@ import {
   getServiceIntervalCustomDays,
 } from '../data/storage';
 import { syncCustomerDueDate } from '../utils/calendarSync';
+import { reportError } from '../utils/errorReporting';
 import { useTheme } from '../styles/theme';
 import { useProfession } from '../contexts/ProfessionContext';
 import ListPickerModal from '../components/ListPickerModal';
@@ -372,7 +373,7 @@ export default function AddServiceScreen({ route, navigation }) {
 
       getCustomerById(customerId)
         .then((customer) => syncCustomerDueDate(customer))
-        .catch(() => {});
+        .catch((err) => reportError(err, { feature: 'calendar', action: 'sync-after-service' }));
 
       if (typeof onAlertsRefresh === 'function') {
         onAlertsRefresh();

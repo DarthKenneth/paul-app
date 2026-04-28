@@ -102,6 +102,7 @@ import {
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 import { useSplitLayout, SPLIT_LIST_WIDTH, useContentContainerStyle } from '../utils/responsive';
+import { reportError } from '../utils/errorReporting';
 
 const SORT_OPTIONS = [
   { key: 'firstName', label: 'First Name' },
@@ -171,7 +172,7 @@ export default function CustomersScreen({ navigation, route }) {
       let active = true;
       setLoading(true);
       loadCustomers()
-        .catch(() => {})
+        .catch((err) => reportError(err, { feature: 'customers', action: 'load-initial' }))
         .finally(() => { if (active) setLoading(false); });
       return () => { active = false; };
     }, [loadCustomers]),
@@ -180,14 +181,14 @@ export default function CustomersScreen({ navigation, route }) {
   // Split-pane: customer was deleted or archived — clear selection, refresh list + badge
   const handlePaneBack = useCallback(() => {
     setSelectedCustomerId(null);
-    loadCustomers().catch(() => {});
+    loadCustomers().catch((err) => reportError(err, { feature: 'customers', action: 'load' }));
     route.params?.onAlertsRefresh?.();
   }, [loadCustomers, route.params?.onAlertsRefresh]);
 
   // Split-pane: service added/removed — refresh badge + list cards (last service date)
   const handlePaneAlertsRefresh = useCallback(() => {
     route.params?.onAlertsRefresh?.();
-    loadCustomers().catch(() => {});
+    loadCustomers().catch((err) => reportError(err, { feature: 'customers', action: 'load' }));
   }, [route.params?.onAlertsRefresh, loadCustomers]);
 
   const handleSortSelect = async (key) => {

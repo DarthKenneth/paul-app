@@ -66,7 +66,11 @@ export default function SchedulingSettingsScreen() {
   const [settings, setSettings] = useState(null);
 
   useEffect(() => {
-    getScheduleSettings().then(setSettings);
+    let active = true;
+    getScheduleSettings()
+      .then((s) => { if (active) setSettings(s); })
+      .catch(() => { /* keeps settings === null; UI shows default placeholder */ });
+    return () => { active = false; };
   }, []);
 
   const update = async (patch) => {

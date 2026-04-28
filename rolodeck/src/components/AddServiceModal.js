@@ -121,6 +121,7 @@ import {
 } from '../data/storage';
 import { syncCustomerDueDate } from '../utils/calendarSync';
 import { sendSquareInvoice } from '../utils/squarePlaceholder';
+import { reportAndShow, reportError } from '../utils/errorReporting';
 import { useTheme } from '../styles/theme';
 import { useProfession } from '../contexts/ProfessionContext';
 import ListPickerModal from './ListPickerModal';
@@ -200,7 +201,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
           setIntervalMode(mode);
           setCustomDays(String(days));
         })
-        .catch(() => {});
+        .catch((err) => reportError(err, { feature: 'add-service-modal', action: 'load-interval' }));
     }
   }, [visible]);
 
@@ -366,7 +367,13 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
         `Invoice for $${dollars.toFixed(2)} sent to ${customer.email}.`,
       );
     } catch (err) {
-      Alert.alert('Not Available', err.message);
+      reportAndShow(err, {
+        title:    'Invoice Failed',
+        fallback: 'Could not send the invoice. Please make sure your Square account is connected and try again.',
+        feature:  'square-invoice',
+        action:   'send-from-modal',
+        extra:    { customerId: customer?.id, dollars },
+      });
     } finally {
       setInvoiceSending(false);
     }

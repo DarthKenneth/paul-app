@@ -102,6 +102,7 @@ import { toLocalDateKey, localDateKeyFromISO, addDaysLocal } from '../utils/date
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 import { useSplitLayout, SPLIT_LIST_WIDTH, useContentContainerStyle } from '../utils/responsive';
+import { reportError } from '../utils/errorReporting';
 
 // Color key per section — maps to theme properties
 const SECTION_COLOR_KEY = {
@@ -181,7 +182,7 @@ export default function ServicesScreen({ navigation }) {
           setAllCustomers(active_);
           setTotalCustomers(active_.length);
         })
-        .catch(() => {});
+        .catch((err) => reportError(err, { feature: 'services', action: 'load' }));
       return () => { active = false; };
     }, []),
   );

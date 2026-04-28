@@ -1,6 +1,6 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 2.1
+// Version: 2.2
 // Last Updated: 2026-04-28
 //
 // PROJECT:      Rolodeck (project v1.5)
@@ -39,6 +39,12 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v2.2  2026-04-28  Claude  Sentry capture on silent fire-and-forget failures
+//       - Imported reportError from src/utils/errorReporting
+//       - initStorage / runSync auto-sync / autoBackup / getOnboardingComplete:
+//         the previous .catch(() => {}) handlers swallowed real bugs (the SDK 55
+//         backup regression went undetected because the auto-backup catch was
+//         empty). Now each failure reports to Sentry with a feature/action tag.
 // v2.1  2026-04-28  Claude  Silent auto-backup on app open (once per 24h)
 //       - Imported autoBackup from src/utils/backup.js
 //       - Called autoBackup() fire-and-forget after initStorage in mount useEffect
@@ -130,6 +136,7 @@ import {
 } from './src/data/storage';
 import { isSquareConnected } from './src/utils/squarePlaceholder';
 import { autoBackup } from './src/utils/backup';
+import { reportError } from './src/utils/errorReporting';
 import { runSync } from './src/utils/squareSync';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
@@ -292,19 +299,24 @@ function AppInner() {
     // the customer index) completes before getAllCustomers reads the index.
     // initStorage is fast on existing V2 installs (~1 AsyncStorage read).
     initStorage()
-      .catch(() => {})
+      .catch((err) => reportError(err, { feature: 'storage', action: 'init' }))
       .then(async () => {
         refreshAlerts();
         // Fire-and-forget Square auto-sync if enabled and connected
         try {
           const [autoSync, connected] = await Promise.all([getSquareAutoSync(), isSquareConnected()]);
-          if (autoSync && connected) runSync().catch(() => {});
-        } catch { /* non-critical — sync will work when user opens SquareSyncScreen */ }
-        autoBackup().catch(() => {});
+          if (autoSync && connected) {
+            runSync().catch((err) => reportError(err, { feature: 'square-sync', action: 'auto-sync' }));
+          }
+        } catch (err) {
+          // non-critical — sync will work when user opens SquareSyncScreen
+          reportError(err, { feature: 'square-sync', action: 'auto-sync-precheck' });
+        }
+        autoBackup().catch((err) => reportError(err, { feature: 'backup', action: 'auto' }));
       });
-    getOnboardingComplete().then((done) => {
-      if (!done) setShowOnboarding(true);
-    });
+    getOnboardingComplete()
+      .then((done) => { if (!done) setShowOnboarding(true); })
+      .catch((err) => reportError(err, { feature: 'onboarding', action: 'check-complete' }));
 
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {

@@ -72,6 +72,7 @@ import {
   pushLocalCustomers,
   getLocalOnlyCustomers,
 } from '../utils/squareSync';
+import { reportAndShow, reportError } from '../utils/errorReporting';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,12 @@ export default function SquareSyncScreen() {
       setConflicts(all.filter((c) => c.squareSyncStatus === 'conflict'));
       setLocalOnly(local);
     } catch (e) {
-      Alert.alert('Load Error', e.message);
+      reportAndShow(e, {
+        title:    'Load Error',
+        fallback: 'Could not load Square sync data. Please try again.',
+        feature:  'square-sync',
+        action:   'load',
+      });
     }
   }, []);
 
@@ -152,17 +158,24 @@ export default function SquareSyncScreen() {
       setSyncResult(result);
       await loadData();
       if (result.errors.length > 0) {
+        result.errors.forEach((err) => reportError(err, {
+          feature: 'square-sync', action: 'sync-partial',
+        }));
         Alert.alert(
           'Sync Completed with Errors',
-          `${result.merged} merged, ${result.created} created, ${result.errors.length} failed.\n\n` +
-          result.errors.slice(0, 3).map((e) => e.message).join('\n'),
+          `${result.merged} merged, ${result.created} created, ${result.errors.length} failed. Please try again later — failed records have been logged.`,
         );
       }
     } catch (e) {
-      if (e.message === 'NOT_CONNECTED') {
+      if (e && e.message === 'NOT_CONNECTED') {
         Alert.alert('Not Connected', 'Connect your Square account in Settings first.');
       } else {
-        Alert.alert('Sync Failed', e.message);
+        reportAndShow(e, {
+          title:    'Sync Failed',
+          fallback: 'Could not sync with Square. Please try again.',
+          feature:  'square-sync',
+          action:   'sync',
+        });
       }
     } finally {
       setSyncing(false);
@@ -176,7 +189,12 @@ export default function SquareSyncScreen() {
       await resolveLowConf(sq, calloutId, action);
       await loadData();
     } catch (e) {
-      Alert.alert('Error', e.message);
+      reportAndShow(e, {
+        title:    'Could Not Resolve',
+        fallback: 'That match could not be resolved. Please try again.',
+        feature:  'square-sync',
+        action:   'resolve-low-conf',
+      });
     }
   };
 
@@ -187,7 +205,13 @@ export default function SquareSyncScreen() {
       await resolveConflict(customerId, fieldName, winner);
       await loadData();
     } catch (e) {
-      Alert.alert('Error', e.message);
+      reportAndShow(e, {
+        title:    'Could Not Resolve',
+        fallback: 'That conflict could not be resolved. Please try again.',
+        feature:  'square-sync',
+        action:   'resolve-conflict',
+        extra:    { customerId, fieldName, winner },
+      });
     }
   };
 
@@ -207,10 +231,19 @@ export default function SquareSyncScreen() {
               const { pushed, errors } = await pushLocalCustomers([customerId]);
               await loadData();
               if (errors.length > 0) {
-                Alert.alert('Push Failed', errors[0].message);
+                errors.forEach((err) => reportError(err, {
+                  feature: 'square-sync', action: 'push-one', customerId,
+                }));
+                Alert.alert('Push Failed', 'That customer could not be pushed to Square. Please try again later.');
               }
             } catch (e) {
-              Alert.alert('Push Failed', e.message);
+              reportAndShow(e, {
+                title:    'Push Failed',
+                fallback: 'That customer could not be pushed to Square. Please try again later.',
+                feature:  'square-sync',
+                action:   'push-one',
+                extra:    { customerId },
+              });
             } finally {
               setPushing((prev) => {
                 const next = new Set(prev);
@@ -239,12 +272,22 @@ export default function SquareSyncScreen() {
               const ids = localOnly.map((c) => c.id);
               const { pushed, errors } = await pushLocalCustomers(ids);
               await loadData();
+              if (errors.length > 0) {
+                errors.forEach((err) => reportError(err, {
+                  feature: 'square-sync', action: 'push-all',
+                }));
+              }
               const msg = errors.length > 0
-                ? `${pushed} pushed. ${errors.length} failed:\n${errors.slice(0, 3).map((e) => e.message).join('\n')}`
+                ? `${pushed} pushed. ${errors.length} failed — please try again later.`
                 : `${pushed} customer${pushed !== 1 ? 's' : ''} pushed to Square.`;
               Alert.alert('Push Complete', msg);
             } catch (e) {
-              Alert.alert('Push Failed', e.message);
+              reportAndShow(e, {
+                title:    'Push Failed',
+                fallback: 'Could not push customers to Square. Please try again later.',
+                feature:  'square-sync',
+                action:   'push-all',
+              });
             } finally {
               setPushingAll(false);
             }
@@ -530,7 +573,9 @@ function LowConfRoloSide({ calloutId, styles, theme }) {
     let active = true;
     getCustomerById(calloutId).then((c) => {
       if (active) setRolo(c || null);
-    }).catch(() => {});
+    }).catch((err) => reportError(err, {
+      feature: 'square-sync', action: 'load-customer-for-compare', customerId: calloutId,
+    }));
     return () => { active = false; };
   }, [calloutId]);
 

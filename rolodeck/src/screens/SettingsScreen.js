@@ -250,6 +250,7 @@ import {
   disconnectSquare,
 } from '../utils/squarePlaceholder';
 import { cloudProviderLabel, exportBackup, importBackup, getLastBackupDate } from '../utils/backup';
+import { reportAndShow } from '../utils/errorReporting';
 import {
   getCalendarSyncEnabled,
   enableCalendarSync,
@@ -463,7 +464,12 @@ export default function SettingsScreen({ navigation }) {
       const d = await getLastBackupDate();
       setLastBackupDate(d);
     } catch (err) {
-      Alert.alert('Backup Failed', err.message || 'Could not create backup.');
+      reportAndShow(err, {
+        title:    'Backup Failed',
+        fallback: 'Could not create the backup file. Please try again.',
+        feature:  'backup',
+        action:   'export',
+      });
     } finally {
       setBackupBusy(false);
     }
@@ -487,7 +493,12 @@ export default function SettingsScreen({ navigation }) {
                 Alert.alert('Restored', `${result.customerCount} customer${result.customerCount === 1 ? '' : 's'} restored successfully.`);
               }
             } catch (err) {
-              Alert.alert('Restore Failed', err.message || 'Could not restore backup.');
+              reportAndShow(err, {
+                title:    'Restore Failed',
+                fallback: 'Could not read the selected backup file. It may be corrupt or from a newer version of the app.',
+                feature:  'backup',
+                action:   'import',
+              });
             } finally {
               setRestoreBusy(false);
             }

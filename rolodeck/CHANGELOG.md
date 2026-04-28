@@ -8,13 +8,45 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.5.3] - 2026-04-28
+
+### Fixed
+- **`exportBackup` no longer leaks files** — when sharing was unavailable on the device, the export wrote a backup file to documentDirectory and *then* threw, leaving stranded `callcard-backup-YYYY-MM-DD.json` files the user couldn't access. The availability check now runs before the write.
+- **`importBackup` no longer crashes on picker shape variance** — when `expo-document-picker` returned `canceled: false` with an empty/missing `assets` array, the previous code crashed with "Cannot read property 'uri' of undefined." Now surfaces a curated "Could not read the selected file" error.
+- **`getLastBackupDate` no longer returns Invalid Date** — a corrupt timestamp string used to render in the Settings screen as the literal text "Invalid Date." Now returns null on garbage input.
+- **`autoBackup` no longer suppressed forever by clock skew** — a backup timestamp that ended up in the future (NTP correction, DST glitch) used to indefinitely block the next auto-backup. Future timestamps and corrupt timestamps now both eligible-now.
+- **`savePhotoLocally` no longer crashes on null/undefined URIs** — image-picker can return a result with no usable assets if the user backgrounds the picker mid-selection. Now throws a curated error instead of "Cannot read property 'split' of undefined."
+- **`savePhotoLocally` no longer escapes its photo directory** — paths containing a "." in a parent directory name (e.g. `/Users/some.user/photo`) used to produce a filename containing "/" and write outside `service-photos/`. Extension extraction now operates only on the basename and rejects non-alphanumeric characters.
+
+### Added
+- **Future backup-version refusal** — `importBackup` now refuses any file whose `backupVersion` envelope is newer than this build understands, with a "please update Callcard" message instead of silently corrupting state.
+- **50 MB import file size cap** — `importBackup` checks size via `getInfoAsync` before reading and falls back to a string-length cap after read, preventing OOM on a malicious or corrupt picker selection.
+- **Stress test suite** (`src/__tests__/stress.test.js`, 35 tests) — exhaustive adversarial coverage: empty/null URIs, "." in parent directories, concurrent saves, oversized files, future backup versions, picker shape variance, sharing unavailable, clock skew, corrupt timestamps, error-context nesting, non-Error inputs, broken AsyncStorage, the 401-substring boundary regression, and a roundtrip-with-unicode regression check.
+
+### Changed
+- **`reportError` accepts both nesting patterns** — callers can pass `extra: {}` explicitly or spread keys flat; both end up flat in Sentry. Previously an explicit `extra:` field nested as `extra.extra` because `reportAndShow` and `reportError` had different contracts.
+- **`reportError` coerces non-Error inputs** — strings/objects/null become real `Error` objects before Sentry capture so stack tags stay useful.
+- **`reportAndShow` is now Alert-failure-tolerant** — `Alert.alert` is wrapped in try/catch to honor the "never crashes the caller" contract.
+- **`friendlyMessage` 401 boundary** — a literal user ID like "User 4012345" no longer false-positives as a session-expired error.
+
+### Infrastructure
+- `photoUtils.savePhotoLocally` caches its directory-creation roundtrip after the first save, so bulk photo adds skip `getInfoAsync` for every photo after the first.
+
+---
+
 ## [1.5.2] - 2026-04-28
 
 ### Fixed
-- Backup & Restore crash on tap ("Cannot read property UTF8 of undefined") — caused by expo-file-system v55 API change.
+- **Backup & Restore crash** ("Cannot read property UTF8 of undefined") — root cause was the expo-file-system v55 namespace API change. The legacy methods now throw at runtime, not just deprecation-warn. Migrated `backup.js` and `photoUtils.js` to import from `expo-file-system/legacy`. Service photo save/delete were also broken in production by the same regression — both now work again.
+- **Curated error messages** — replaced 9 places that displayed raw internal error text in user-facing alerts (e.g. Square sync, invoice send, backup). User-friendly copy now shown; the original error is still captured for diagnostics.
 
 ### Added
-- Auto-backup: app silently saves a local backup once every 24 hours on open, picked up automatically by iOS iCloud Backup and Android Auto Backup.
+- **Auto-backup** — app silently saves a local backup once every 24 hours on open, picked up automatically by iOS iCloud Backup and Android Auto Backup. No share sheet, no user action required.
+- **Centralized error reporting** (`src/utils/errorReporting.js`) — every user-facing catch block now reports to Sentry with feature/action tags so failures can be grouped and triaged. Maps known error patterns (network, timeout, permission, auth, file, storage) to friendly copy.
+- **Smoke test suite for native modules** — three new test files (29 new tests). Backup roundtrip + autoBackup behavior; errorReporting unit tests; static guards that fail CI if any source file imports `expo-file-system` without `/legacy`, uses raw `err.message` in alerts, or uses the deprecated `ImagePicker.MediaTypeOptions` enum.
+
+### Infrastructure
+- Sentry capture wired into previously-silent fire-and-forget paths in `App.js` (initStorage, Square auto-sync, autoBackup, onboarding) and across customer/service load handlers — so the next regression of this kind shows up in Sentry rather than as silent broken behavior.
 
 ---
 

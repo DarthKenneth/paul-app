@@ -42,6 +42,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../styles/theme';
 import { FontSize } from '../styles/typography';
 import { sendSquareInvoice } from '../utils/squarePlaceholder';
+import { reportAndShow } from '../utils/errorReporting';
 
 export default function InvoiceButton({ customer }) {
   const { theme } = useTheme();
@@ -70,7 +71,13 @@ export default function InvoiceButton({ customer }) {
         `Invoice for $${dollars.toFixed(2)} sent to ${customer.email}.`,
       );
     } catch (err) {
-      Alert.alert('Not Available', err.message);
+      reportAndShow(err, {
+        title:    'Invoice Failed',
+        fallback: 'Could not send the invoice. Please make sure your Square account is connected and try again.',
+        feature:  'square-invoice',
+        action:   'send',
+        extra:    { customerId: customer?.id, dollars },
+      });
     } finally {
       setSending(false);
     }

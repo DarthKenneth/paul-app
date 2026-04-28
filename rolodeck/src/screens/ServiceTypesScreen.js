@@ -92,7 +92,11 @@ export default function ServiceTypesScreen() {
   const [newMins, setNewMins]   = useState(30);
 
   useEffect(() => {
-    getScheduleSettings().then(setSchedSettings);
+    let active = true;
+    getScheduleSettings()
+      .then((s) => { if (active) setSchedSettings(s); })
+      .catch(() => { /* schedule settings remain null; default duration shown */ });
+    return () => { active = false; };
   }, []);
 
   const hiddenSet = useMemo(
