@@ -8,6 +8,13 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.5.1] - 2026-04-28
+
+### Changed
+- Backup & Restore section is now live in Settings — replaces the Coming Soon placeholder with working Back Up Now and Restore rows.
+
+---
+
 ## [1.5.0] - 2026-04-28
 
 ### Changed

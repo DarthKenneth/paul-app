@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.2
-// Last Updated: 2026-04-25
+// Version: 2.3
+// Last Updated: 2026-04-28
 //
-// PROJECT:      Rolodeck (project v0.30.0)
+// PROJECT:      Rolodeck (project v1.5)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -31,7 +31,7 @@
 //
 // ARCHITECTURE:
 //   - Layout (top to bottom): Default Sort Order → Default Service Interval →
-//     Appearance card → Square Account → Backup & Restore (coming soon) → copyright
+//     Appearance card → Square Account → Backup & Restore → copyright
 //   - Service Interval row shows current value as subtitle (e.g. "1 Year",
 //     "Custom (45 days)"); chevron navigates to ServiceIntervalScreen
 //   - Appearance card groups three rows in one surface: Theme (nav to ThemeScreen),
@@ -111,6 +111,14 @@
 // v2.0.2 2026-04-17  Claude  handleCalSyncRetry: add catch block safety net + null-coalesce
 //                             on getCalendarSyncStatus result
 // v2.0.1 2026-04-17  Claude  Retry sync now calls syncAll (due dates + scheduled services)
+// v2.3  2026-04-28  Claude  Backup & Restore section — live (replacing coming-soon)
+//       - Added exportBackup, importBackup, getLastBackupDate imports from backup.js
+//       - Added lastBackupDate, backupBusy, restoreBusy state
+//       - Loads lastBackupDate in mount useEffect
+//       - handleBackup: calls exportBackup(), refreshes lastBackupDate, shows error alert
+//       - handleRestore: Alert confirm → importBackup(), success/error alerts
+//       - Replaced Coming Soon card with two pressable rows (Back Up Now, Restore)
+//         each with subtitle and activity indicator while busy [updated ARCHITECTURE]
 // v2.2  2026-04-25  Claude  Square Account section — live (replacing coming-soon)
 //       - Imported isSquareConnected, connectSquare, disconnectSquare from
 //         squarePlaceholder.js
@@ -241,7 +249,7 @@ import {
   connectSquare,
   disconnectSquare,
 } from '../utils/squarePlaceholder';
-import { cloudProviderLabel } from '../utils/backup';
+import { cloudProviderLabel, exportBackup, importBackup, getLastBackupDate } from '../utils/backup';
 import {
   getCalendarSyncEnabled,
   enableCalendarSync,
@@ -302,6 +310,9 @@ export default function SettingsScreen({ navigation }) {
   const [squareConnecting, setSquareConnecting] = useState(false);
   const [squareAutoSync, setSquareAutoSync]     = useState(false);
   const [squareSyncMeta, setSquareSyncMeta]     = useState(null);
+  const [lastBackupDate, setLastBackupDate]     = useState(null);
+  const [backupBusy, setBackupBusy]             = useState(false);
+  const [restoreBusy, setRestoreBusy]           = useState(false);
   const toggleAnim    = useRef(new Animated.Value(0)).current;
   const calSyncAnim   = useRef(new Animated.Value(0)).current;
   const autoSyncAnim  = useRef(new Animated.Value(0)).current;
@@ -323,6 +334,7 @@ export default function SettingsScreen({ navigation }) {
       if (active) { setSquareAutoSync(v); autoSyncAnim.setValue(v ? 1 : 0); }
     });
     getSquareSyncMetadata().then((m) => { if (active) setSquareSyncMeta(m); });
+    getLastBackupDate().then((d) => { if (active) setLastBackupDate(d); });
     return () => { active = false; };
   }, []);
 
@@ -441,6 +453,48 @@ export default function SettingsScreen({ navigation }) {
     setSquareAutoSync(next);
     Animated.spring(autoSyncAnim, { toValue: next ? 1 : 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
     await saveSquareAutoSync(next);
+  };
+
+  const handleBackup = async () => {
+    if (backupBusy || restoreBusy) return;
+    setBackupBusy(true);
+    try {
+      await exportBackup();
+      const d = await getLastBackupDate();
+      setLastBackupDate(d);
+    } catch (err) {
+      Alert.alert('Backup Failed', err.message || 'Could not create backup.');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleRestore = () => {
+    if (backupBusy || restoreBusy) return;
+    Alert.alert(
+      'Restore Backup',
+      'This will replace all your current customer data with the selected backup file. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Restore',
+          style: 'destructive',
+          onPress: async () => {
+            setRestoreBusy(true);
+            try {
+              const result = await importBackup();
+              if (result) {
+                Alert.alert('Restored', `${result.customerCount} customer${result.customerCount === 1 ? '' : 's'} restored successfully.`);
+              }
+            } catch (err) {
+              Alert.alert('Restore Failed', err.message || 'Could not restore backup.');
+            } finally {
+              setRestoreBusy(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const toggleBg = toggleAnim.interpolate({
@@ -749,19 +803,59 @@ export default function SettingsScreen({ navigation }) {
           )}
         </View>
 
-        {/* ── Backup & Restore (coming soon) ── */}
-        <View style={[styles.section, styles.comingSoonSection]}>
+        {/* ── Backup & Restore ── */}
+        <View style={styles.section}>
           <View style={styles.comingSoonHeader}>
-            <Ionicons name="cloud-upload-outline" size={22} color={theme.textMuted} />
+            <Ionicons name="cloud-upload-outline" size={22} color={theme.textSecondary} />
             <Text style={styles.sectionTitle}>Backup &amp; Restore</Text>
           </View>
-          <View style={styles.comingSoonBadge}>
-            <Text style={styles.comingSoonText}>Coming Soon</Text>
-          </View>
           <Text style={styles.sectionDesc}>
-            Back up your customer database to {cloudProviderLabel()} and restore
-            it anytime — even after reinstalling the app.
+            Save your customer data to {cloudProviderLabel()} and restore it anytime.
           </Text>
+
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={handleBackup}
+            disabled={backupBusy || restoreBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Back up customer data"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="cloud-upload-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Back Up Now</Text>
+                <Text style={styles.rowDesc}>
+                  {lastBackupDate
+                    ? `Last backed up ${formatSyncTime(lastBackupDate.toISOString())}`
+                    : 'Never backed up'}
+                </Text>
+              </View>
+            </View>
+            {backupBusy
+              ? <ActivityIndicator size="small" color={theme.primary} />
+              : <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />}
+          </Pressable>
+
+          <View style={styles.rowDivider} />
+
+          <Pressable
+            style={styles.appearanceRow}
+            onPress={handleRestore}
+            disabled={backupBusy || restoreBusy}
+            accessibilityRole="button"
+            accessibilityLabel="Restore customer data from backup"
+          >
+            <View style={styles.rowLeft}>
+              <Ionicons name="cloud-download-outline" size={20} color={theme.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>Restore</Text>
+                <Text style={styles.rowDesc}>Replace all data with a backup file</Text>
+              </View>
+            </View>
+            {restoreBusy
+              ? <ActivityIndicator size="small" color={theme.primary} />
+              : <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />}
+          </Pressable>
         </View>
 
         {/* ── Copyright + version ── */}
