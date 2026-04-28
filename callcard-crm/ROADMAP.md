@@ -480,7 +480,7 @@ The mockup data is the authoritative source for the preset contents — port it 
 ### Sentry setup
 
 1. Account at [sentry.io](https://sentry.io) → new project → React Native → "Rolodeck"
-2. Copy DSN into `rolodeck/.env`:
+2. Copy DSN into `callcard-crm/.env`:
    ```
    EXPO_PUBLIC_SENTRY_DSN=https://your-dsn-here
    ```

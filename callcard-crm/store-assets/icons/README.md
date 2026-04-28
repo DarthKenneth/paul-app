@@ -10,7 +10,7 @@ edit `icon.svg` or `icon-dark.svg` then re-run the generator.
 ## Generate all icons
 
 ```bash
-# From the rolodeck/ project root:
+# From the callcard-crm/ project root:
 npm install      # installs sharp (devDependency)
 npm run icons    # runs scripts/generate-icons.js
 ```

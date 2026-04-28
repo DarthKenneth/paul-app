@@ -1,21 +1,22 @@
 # =============================================================================
 # ci.yml - Run tests on every push to main and on PRs
-# Version: 1.0
-# Last Updated: 2026-04-09
+# Version: 1.1
+# Last Updated: 2026-04-28
 #
-# PROJECT:      Rolodeck (project v1.12)
+# PROJECT:      Rolodeck (project v1.5)
 # FILES:        .github/workflows/ci.yml     (this file — PR/push validation)
 #               .github/workflows/release.yml (production release pipeline)
-#               rolodeck/eas.json             (EAS build + submit config)
+#               callcard-crm/eas.json         (EAS build + submit config)
 #
 # ARCHITECTURE:
 #   - Triggers on push to main and on pull_request targeting main
-#   - Runs from the rolodeck/ subdirectory (that's where package.json lives)
+#   - Runs from the callcard-crm/ subdirectory (that's where package.json lives)
 #   - npm ci (clean install from lockfile) then npm test
 #   - Fails fast — if tests fail the build is blocked
 #
 # CHANGE LOG:
 # v1.0  2026-04-09  Claude  Initial scaffold
+# v1.1  2026-04-28  Claude  Subdirectory rename rolodeck/ → callcard-crm/
 # =============================================================================
 
 name: CI
@@ -32,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: rolodeck
+        working-directory: callcard-crm
 
     steps:
       - uses: actions/checkout@v4
@@ -41,7 +42,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: rolodeck/package-lock.json
+          cache-dependency-path: callcard-crm/package-lock.json
 
       - name: Install dependencies
         run: npm ci

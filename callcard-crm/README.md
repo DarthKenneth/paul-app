@@ -59,7 +59,7 @@ Scan the QR code with **Expo Go**, or press `i` for iOS simulator / `a` for Andr
 ## Project Structure
 
 ```
-rolodeck/
+callcard-crm/
 ├── App.js                  ← root entry: font loading + navigation
 ├── app.json                ← Expo config
 ├── package.json
