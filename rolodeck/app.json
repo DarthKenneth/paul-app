@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Callout CRM",
+    "name": "Callcard CRM",
     "slug": "rolodeck",
-    "scheme": "rolodeck",
-    "version": "1.4.4",
+    "scheme": "callcard",
+    "version": "1.5.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -26,14 +26,14 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "Callout uses your calendar to sync service due dates for your customers."
+          "calendarPermission": "Callcard uses your calendar to sync service due dates for your customers."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Callout uses your photo library to attach photos to service notes.",
-          "cameraPermission": "Callout uses your camera to take photos for service notes."
+          "photosPermission": "Callcard uses your photo library to attach photos to service notes.",
+          "cameraPermission": "Callcard uses your camera to take photos for service notes."
         }
       ],
       "expo-font",

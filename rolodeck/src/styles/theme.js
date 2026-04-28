@@ -32,12 +32,12 @@
 // CHANGE LOG:
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added font preset support
-//       - Font preset key persisted to @callout_font
+//       - Font preset key persisted to @callcard_font
 //       - Font family strings merged onto theme object (theme.fontHeading, etc.)
 //       - useTheme() now returns fontKey and setFont
 // v1.3  2026-04-26  Claude  Font size scale support
 //       - Added FONT_SIZE_SCALE_KEY, fontSizeKey state (default 'normal')
-//       - Loads/persists fontSizeKey from @callout_font_size
+//       - Loads/persists fontSizeKey from @callcard_font_size
 //       - setFontSizeScale(key) exposed via context
 //       - theme.fontSize: pre-scaled FontSize values using FontSizeScales offset
 //       - Context default + ThemeContext.Provider value updated [updated ARCHITECTURE]
@@ -54,9 +54,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Themes } from './colors';
 import { FontPresets, FontSize, FontSizeScales } from './typography';
 
-const THEME_STORAGE_KEY     = '@callout_theme';
-const FONT_STORAGE_KEY      = '@callout_font';
-const FONT_SIZE_SCALE_KEY   = '@callout_font_size';
+const THEME_STORAGE_KEY     = '@callcard_theme';
+const FONT_STORAGE_KEY      = '@callcard_font';
+const FONT_SIZE_SCALE_KEY   = '@callcard_font_size';
 
 const DEFAULT_FONT_SIZE = buildFontSize('normal');
 

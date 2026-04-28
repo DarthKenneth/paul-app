@@ -63,7 +63,7 @@ import { getAllCustomers, restoreCustomers, CURRENT_SCHEMA_VERSION } from '../da
 import { APP_VERSION } from '../appVersion';
 
 const BACKUP_VERSION   = '1';
-const LAST_BACKUP_KEY  = '@callout_last_backup';
+const LAST_BACKUP_KEY  = '@callcard_last_backup';
 
 // ── Cloud provider label ──────────────────────────────────────────────────────
 
@@ -110,7 +110,7 @@ export async function exportBackup() {
   };
 
   const dateStr  = new Date().toISOString().split('T')[0];
-  const filename = `callout-backup-${dateStr}.json`;
+  const filename = `callcard-backup-${dateStr}.json`;
   const fileUri  = FileSystem.documentDirectory + filename;
 
   await FileSystem.writeAsStringAsync(
@@ -126,7 +126,7 @@ export async function exportBackup() {
 
   await Sharing.shareAsync(fileUri, {
     mimeType:    'application/json',
-    dialogTitle: 'Save Callout Backup',
+    dialogTitle: 'Save Callcard Backup',
     UTI:         'public.json', // iOS uniform type identifier
   });
 

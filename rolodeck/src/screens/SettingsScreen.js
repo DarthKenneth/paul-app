@@ -373,8 +373,8 @@ export default function SettingsScreen({ navigation }) {
           Alert.alert(
             'Calendar Access Required',
             Platform.OS === 'ios'
-              ? 'Callout needs access to your calendar to sync service due dates. Enable it in Settings > Privacy & Security > Calendars.'
-              : 'Callout needs access to your calendar to sync service due dates. Enable it in Settings > Apps > Callout > Permissions > Calendar.',
+              ? 'Callcard needs access to your calendar to sync service due dates. Enable it in Settings > Privacy & Security > Calendars.'
+              : 'Callcard needs access to your calendar to sync service due dates. Enable it in Settings > Apps > Callcard > Permissions > Calendar.',
           );
         }
         setCalSyncStatus(await getCalendarSyncStatus());

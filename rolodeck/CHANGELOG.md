@@ -8,6 +8,14 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.5.0] - 2026-04-28
+
+### Changed
+- App renamed to **Callcard CRM** throughout — display name, permission dialogs, calendar, backup files, and all AsyncStorage keys updated.
+- App deep link scheme updated from `rolodeck://` to `callcard://`.
+
+---
+
 ## [1.4.4] - 2026-04-27
 
 ### Fixed

@@ -46,7 +46,7 @@ import { FontSize } from '../styles/typography';
 const SLIDES = [
   {
     icon:  'albums-outline',
-    title: 'Welcome to Callout',
+    title: 'Welcome to Callcard',
     body:  'Your customer rolodex for service professionals — built for the field, not the office.',
   },
   {

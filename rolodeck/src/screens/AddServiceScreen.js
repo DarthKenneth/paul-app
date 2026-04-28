@@ -255,7 +255,7 @@ export default function AddServiceScreen({ route, navigation }) {
     if (status !== 'granted') {
       Alert.alert(
         'Camera Access Required',
-        'Allow Callout to use your camera in Settings.',
+        'Allow Callcard to use your camera in Settings.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: () => Linking.openSettings() },
@@ -279,7 +279,7 @@ export default function AddServiceScreen({ route, navigation }) {
     if (status !== 'granted') {
       Alert.alert(
         'Photo Library Access Required',
-        'Allow Callout to access your photos in Settings.',
+        'Allow Callcard to access your photos in Settings.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: () => Linking.openSettings() },

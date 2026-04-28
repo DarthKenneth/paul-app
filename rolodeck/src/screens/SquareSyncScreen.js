@@ -387,7 +387,7 @@ export default function SquareSyncScreen() {
               <Text style={styles.cardTitle}>Conflicts ({conflicts.length})</Text>
             </View>
             <Text style={styles.cardDesc}>
-              Both Square and Callout have different values. Choose which wins.
+              Both Square and Callcard have different values. Choose which wins.
             </Text>
 
             {conflicts.map((customer, idx) => (
@@ -413,9 +413,9 @@ export default function SquareSyncScreen() {
                         style={({ pressed }) => [styles.conflictOpt, pressed && styles.btnPressed]}
                         onPress={() => handleConflict(customer.id, field, 'callout')}
                         accessibilityRole="button"
-                        accessibilityLabel={`Use Callout value for ${field}`}
+                        accessibilityLabel={`Use Callcard value for ${field}`}
                       >
-                        <Text style={styles.conflictSource}>Callout</Text>
+                        <Text style={styles.conflictSource}>Callcard</Text>
                         <Text style={styles.conflictVal} numberOfLines={2}>{vals.callout}</Text>
                       </Pressable>
                     </View>
@@ -455,12 +455,12 @@ export default function SquareSyncScreen() {
 
           {localOnly.length === 0 ? (
             <Text style={styles.cardDesc}>
-              All Callout customers are linked to Square.
+              All Callcard customers are linked to Square.
             </Text>
           ) : (
             <>
               <Text style={styles.cardDesc}>
-                {localOnly.length} customer{localOnly.length !== 1 ? 's' : ''} exist only in Callout.
+                {localOnly.length} customer{localOnly.length !== 1 ? 's' : ''} exist only in Callcard.
               </Text>
 
               <Pressable
@@ -536,7 +536,7 @@ function LowConfRoloSide({ calloutId, styles, theme }) {
 
   return (
     <View style={styles.compareCol}>
-      <Text style={styles.compareSource}>Callout</Text>
+      <Text style={styles.compareSource}>Callcard</Text>
       <Text style={styles.compareValue}>{rolo?.name || '—'}</Text>
       <Text style={styles.compareDetail}>{rolo?.email || ''}</Text>
       <Text style={styles.compareDetail}>{rolo?.phone || ''}</Text>

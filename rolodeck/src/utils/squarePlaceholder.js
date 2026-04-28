@@ -113,7 +113,7 @@ const SQUARE_CONFIG = {
 
   // Custom scheme the relay redirects to; used by openAuthSessionAsync to
   // detect when the browser flow is complete and close the in-app browser.
-  appScheme: 'rolodeck://square/callback',
+  appScheme: 'callcard://square/callback',
 
   scopes: [
     'INVOICES_WRITE',
@@ -129,7 +129,7 @@ const SQUARE_CONFIG = {
 };
 
 const REQUEST_TIMEOUT    = 10000;
-const SECURE_TOKEN_KEY   = 'callout_square_token'; // SecureStore key (no @ prefix)
+const SECURE_TOKEN_KEY   = 'callcard_square_token'; // SecureStore key (no @ prefix)
 
 // ── Offline check ─────────────────────────────────────────────────────────────
 //
@@ -384,7 +384,7 @@ export async function sendSquareInvoice(customer, amountCents) {
     );
   }
 
-  const idempotencyKey = `callout-${customer.id}-${Date.now()}`;
+  const idempotencyKey = `callcard-${customer.id}-${Date.now()}`;
 
   const orderData = await squareApi('POST', '/v2/orders', {
     idempotency_key: `${idempotencyKey}-order`,

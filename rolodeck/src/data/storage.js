@@ -34,19 +34,19 @@
 //
 // ARCHITECTURE:
 //   Storage layout (v2 per-customer keys):
-//     @callout_customer_index        JSON string[] of customer IDs (ordered list)
-//     @callout_customer_{id}         JSON Customer object per customer
-//     @callout_sort_pref             string sort key
-//     @callout_show_archived         'true'|'false'
-//     @callout_onboarding_complete   'true'|'false'
-//     @callout_service_interval_mode string
-//     @callout_service_interval_custom_days string
-//     @callout_square_sync_meta      JSON SquareSyncMeta
-//     @callout_square_auto_sync      'true'|'false'
+//     @callcard_customer_index        JSON string[] of customer IDs (ordered list)
+//     @callcard_customer_{id}         JSON Customer object per customer
+//     @callcard_sort_pref             string sort key
+//     @callcard_show_archived         'true'|'false'
+//     @callcard_onboarding_complete   'true'|'false'
+//     @callcard_service_interval_mode string
+//     @callcard_service_interval_custom_days string
+//     @callcard_square_sync_meta      JSON SquareSyncMeta
+//     @callcard_square_auto_sync      'true'|'false'
 //
 //   Migration (v1 → v2):
-//     On initStorage(), detects the legacy @callout_customers envelope key.
-//     Reads all customers from it, writes each to @callout_customer_{id},
+//     On initStorage(), detects the legacy @callcard_customers envelope key.
+//     Reads all customers from it, writes each to @callcard_customer_{id},
 //     writes the index, then deletes the old key. Safe to run multiple times
 //     (legacy key absent means migration already ran).
 //
@@ -100,7 +100,7 @@
 //       - Added MIGRATIONS dict + runMigrations() chain runner; migration 1
 //         is the legacy raw-array → envelope wrap (no-op on customer shape)
 //       - Legacy raw-array detected as schemaVersion 0 and auto-migrated on
-//         load with write-back; orphaned @callout_schema_version key removed
+//         load with write-back; orphaned @callcard_schema_version key removed
 //       - Future-version downgrade protection: if stored schemaVersion >
 //         CURRENT_SCHEMA_VERSION, data is returned read-only and not clobbered
 //       - getSchemaVersion() now reads from the envelope (returns null for
@@ -131,8 +131,8 @@
 // v2.0.1  2026-04-17  Claude  Updated ServiceEntry schema comment to document
 //                             optional photos field (string[] of local file URIs)
 // v2.0  2026-04-14  Claude  Per-customer keys + cache + write mutex + hardening
-//       - BREAKING: migrated from single @callout_customers envelope key to
-//         per-customer @callout_customer_{id} keys with @callout_customer_index
+//       - BREAKING: migrated from single @callcard_customers envelope key to
+//         per-customer @callcard_customer_{id} keys with @callcard_customer_index
 //         (schema version 2; migration runs automatically on initStorage())
 //       - In-memory cache (Map<id, Customer>), invalidated on every write,
 //         eliminates redundant AsyncStorage parses within a session
@@ -154,16 +154,16 @@ import * as Crypto from 'expo-crypto';
 
 // ── Storage keys ───────────────────────────────────────────────────────────────
 
-const CUSTOMER_INDEX_KEY               = '@callout_customer_index';
-const CUSTOMER_KEY_PREFIX              = '@callout_customer_';
-const LEGACY_CUSTOMERS_KEY             = '@callout_customers';      // v1 envelope — migrated away
-const SORT_PREF_KEY                    = '@callout_sort_pref';
-const SHOW_ARCHIVED_KEY                = '@callout_show_archived';
-const ONBOARDING_DONE_KEY              = '@callout_onboarding_complete';
-const SERVICE_INTERVAL_MODE_KEY        = '@callout_service_interval_mode';
-const SERVICE_INTERVAL_CUSTOM_DAYS_KEY = '@callout_service_interval_custom_days';
-const SQUARE_SYNC_META_KEY             = '@callout_square_sync_meta';
-const SQUARE_AUTO_SYNC_KEY             = '@callout_square_auto_sync';
+const CUSTOMER_INDEX_KEY               = '@callcard_customer_index';
+const CUSTOMER_KEY_PREFIX              = '@callcard_customer_';
+const LEGACY_CUSTOMERS_KEY             = '@callcard_customers';      // v1 envelope — migrated away
+const SORT_PREF_KEY                    = '@callcard_sort_pref';
+const SHOW_ARCHIVED_KEY                = '@callcard_show_archived';
+const ONBOARDING_DONE_KEY              = '@callcard_onboarding_complete';
+const SERVICE_INTERVAL_MODE_KEY        = '@callcard_service_interval_mode';
+const SERVICE_INTERVAL_CUSTOM_DAYS_KEY = '@callcard_service_interval_custom_days';
+const SQUARE_SYNC_META_KEY             = '@callcard_square_sync_meta';
+const SQUARE_AUTO_SYNC_KEY             = '@callcard_square_auto_sync';
 
 export const CURRENT_SCHEMA_VERSION = 2;
 
@@ -265,9 +265,9 @@ async function deleteOneCustomer(id) {
 // ── initStorage ────────────────────────────────────────────────────────────────
 //
 // Call once on app startup. Handles two cases:
-//   - V1 migration: legacy @callout_customers envelope key exists → split
+//   - V1 migration: legacy @callcard_customers envelope key exists → split
 //     each customer into its own key, write index, delete old key.
-//   - Fresh install: ensure @callout_customer_index exists (empty array).
+//   - Fresh install: ensure @callcard_customer_index exists (empty array).
 // Safe to call multiple times; the legacy key check is idempotent.
 
 export async function initStorage() {
@@ -296,7 +296,7 @@ export async function initStorage() {
       await saveIndex(ids);
       await AsyncStorage.multiRemove([
         LEGACY_CUSTOMERS_KEY,
-        '@callout_schema_version', // orphaned pre-envelope key
+        '@callcard_schema_version', // orphaned pre-envelope key
       ]).catch(() => {});
 
       invalidateCache();

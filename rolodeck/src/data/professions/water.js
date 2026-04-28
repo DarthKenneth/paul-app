@@ -18,7 +18,7 @@
 //   - install: true marks the type that gets rust-colored save button and
 //     "Initial {label}" on the oldest log entry
 //   - customLists provide default items; user overrides stored per-profession
-//     in @callout_lists_water
+//     in @callcard_lists_water
 //   - checklist items have type 'check' (boolean) or 'measure' (numeric value)
 //   - equipmentFields: per-customer site/equipment info stored on customer.equipment
 //   - entryFields: per-visit dropdowns shown on the Add Service form;
