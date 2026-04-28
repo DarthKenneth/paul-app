@@ -1,7 +1,7 @@
 // =============================================================================
 // backup.js - Cloud backup and restore for customer data
-// Version: 1.2
-// Last Updated: 2026-04-14
+// Version: 1.3
+// Last Updated: 2026-04-28
 //
 // PROJECT:      Rolodeck (project v0.22)
 // FILES:        backup.js             (this file — export/import logic)
@@ -23,6 +23,9 @@
 //     included in device iCloud Backup automatically (if the user has it enabled)
 //     — the explicit export is an additional on-demand safety option
 //   - No third-party cloud accounts or API keys required
+//   - autoBackup() runs silently once per 24h (called from App.js on mount);
+//     writes to documentDirectory so iOS iCloud Backup + Android Auto Backup
+//     pick it up automatically — no share sheet, no user interaction required
 //   - importBackup() validates individual customer shapes and filters out any
 //     entries that are missing a valid id, so a corrupted record in one backup
 //     cannot block a full restore
@@ -46,6 +49,13 @@
 // v1.1  2026-04-10  Claude  APP_VERSION now imported from shared src/appVersion.js
 //                            (was hardcoded '1.6' — stale by 10+ versions — which
 //                            meant backup files had lying metadata)
+// v1.3  2026-04-28  Claude  Fix EncodingType crash + add autoBackup
+//       - Replaced 'utf8' with literal 'utf8' — EncodingType
+//         is not exported from the expo-file-system v55 star-import
+//       - Added AUTO_BACKUP_INTERVAL_MS (24h), AUTO_BACKUP_KEY, AUTO_BACKUP_FILE
+//       - Added autoBackup(): silently writes backup JSON to documentDirectory once
+//         per 24h; no share sheet — file is picked up by iOS iCloud Backup and
+//         Android Auto Backup automatically [updated ARCHITECTURE]
 // v1.2  2026-04-14  Claude  Schema version in export + per-record shape validation
 //       - exportBackup() now embeds storageSchemaVersion: CURRENT_SCHEMA_VERSION
 //         so restoring code can detect schema mismatches [updated BACKUP FILE FORMAT]
@@ -62,8 +72,11 @@ import { Platform } from 'react-native';
 import { getAllCustomers, restoreCustomers, CURRENT_SCHEMA_VERSION } from '../data/storage';
 import { APP_VERSION } from '../appVersion';
 
-const BACKUP_VERSION   = '1';
-const LAST_BACKUP_KEY  = '@callcard_last_backup';
+const BACKUP_VERSION          = '1';
+const LAST_BACKUP_KEY         = '@callcard_last_backup';
+const AUTO_BACKUP_KEY         = '@callcard_last_auto_backup';
+const AUTO_BACKUP_FILE        = 'callcard-auto-backup.json';
+const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ── Cloud provider label ──────────────────────────────────────────────────────
 
@@ -116,7 +129,7 @@ export async function exportBackup() {
   await FileSystem.writeAsStringAsync(
     fileUri,
     JSON.stringify(payload, null, 2),
-    { encoding: FileSystem.EncodingType.UTF8 },
+    { encoding: 'utf8' },
   );
 
   const sharingAvailable = await Sharing.isAvailableAsync();
@@ -160,7 +173,7 @@ export async function importBackup() {
   let raw;
   try {
     raw = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.UTF8,
+      encoding: 'utf8',
     });
   } catch {
     throw new Error('Could not read the selected file.');
@@ -198,4 +211,37 @@ export async function importBackup() {
     exportedAt:    payload.exportedAt  || null,
     customerCount: validCustomers.length,
   };
+}
+
+// ── Auto-backup ───────────────────────────────────────────────────────────────
+
+/**
+ * Silently write a backup to documentDirectory at most once every 24 hours.
+ * Called from App.js on mount — no share sheet, no UI.
+ * The file is automatically included in iOS iCloud Backup and Android Auto Backup.
+ *
+ * @returns {Promise<void>}
+ */
+export async function autoBackup() {
+  const lastIso = await AsyncStorage.getItem(AUTO_BACKUP_KEY);
+  if (lastIso) {
+    const elapsed = Date.now() - new Date(lastIso).getTime();
+    if (elapsed < AUTO_BACKUP_INTERVAL_MS) return;
+  }
+
+  const customers = await getAllCustomers();
+  if (!customers.length) return;
+
+  const payload = {
+    backupVersion:        BACKUP_VERSION,
+    storageSchemaVersion: CURRENT_SCHEMA_VERSION,
+    appVersion:           APP_VERSION,
+    exportedAt:           new Date().toISOString(),
+    platform:             Platform.OS,
+    customers,
+  };
+
+  const fileUri = FileSystem.documentDirectory + AUTO_BACKUP_FILE;
+  await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(payload), { encoding: 'utf8' });
+  await AsyncStorage.setItem(AUTO_BACKUP_KEY, new Date().toISOString());
 }

@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 2.0
-// Last Updated: 2026-04-25
+// Version: 2.1
+// Last Updated: 2026-04-28
 //
-// PROJECT:      Rolodeck (project v1.2.0)
+// PROJECT:      Rolodeck (project v1.5)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -39,6 +39,9 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v2.1  2026-04-28  Claude  Silent auto-backup on app open (once per 24h)
+//       - Imported autoBackup from src/utils/backup.js
+//       - Called autoBackup() fire-and-forget after initStorage in mount useEffect
 // v2.0  2026-04-25  Claude  Rustic Trade default theme + Aptos default font
 //       - Load Aptos_400Regular, Aptos_600SemiBold, Aptos_700Bold from assets/fonts/
 //       - Updated SPLASH_PRIMARY / SPLASH_BG to Rustic Trade light colors
@@ -126,6 +129,7 @@ import {
   getSquareAutoSync,
 } from './src/data/storage';
 import { isSquareConnected } from './src/utils/squarePlaceholder';
+import { autoBackup } from './src/utils/backup';
 import { runSync } from './src/utils/squareSync';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
@@ -296,6 +300,7 @@ function AppInner() {
           const [autoSync, connected] = await Promise.all([getSquareAutoSync(), isSquareConnected()]);
           if (autoSync && connected) runSync().catch(() => {});
         } catch { /* non-critical — sync will work when user opens SquareSyncScreen */ }
+        autoBackup().catch(() => {});
       });
     getOnboardingComplete().then((done) => {
       if (!done) setShowOnboarding(true);

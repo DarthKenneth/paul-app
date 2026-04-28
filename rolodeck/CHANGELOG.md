@@ -8,6 +8,16 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.5.2] - 2026-04-28
+
+### Fixed
+- Backup & Restore crash on tap ("Cannot read property UTF8 of undefined") — caused by expo-file-system v55 API change.
+
+### Added
+- Auto-backup: app silently saves a local backup once every 24 hours on open, picked up automatically by iOS iCloud Backup and Android Auto Backup.
+
+---
+
 ## [1.5.1] - 2026-04-28
 
 ### Changed
