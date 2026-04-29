@@ -1,6 +1,6 @@
 // =============================================================================
 // CustomerDetailPane.js - Embeddable customer detail body (no nav header)
-// Version: 1.2
+// Version: 1.3
 // Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v1.1.0)
@@ -49,7 +49,9 @@ import {
   Platform,
   SafeAreaView,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
+import { CLOUD_SYNC_PULLED } from '../utils/cloudSync';
 import { Ionicons } from '@expo/vector-icons';
 import ServiceLogEntry     from './ServiceLogEntry';
 import ScheduleServiceModal from './ScheduleServiceModal';
@@ -146,33 +148,51 @@ export default function CustomerDetailPane({
   const debounceRef = useRef(null);
   const abortRef    = useRef(null);
 
-  // Reload whenever customerId changes (handles split-view tap switching)
+  // Reload whenever customerId changes (handles split-view tap switching).
+  // Extracted as a callback so the cloud-sync-pulled listener can also call it.
+  const reloadFromStorage = useCallback(async (signal) => {
+    try {
+      const c = await getCustomerById(customerId);
+      if (signal && signal.aborted) return;
+      if (!c) { onBack?.(); return; }
+      setCustomer(c);
+      // Only reset the form if the user isn't actively editing — clobbering
+      // their typed-but-unsaved fields with cloud data is the worst possible
+      // outcome of cross-device sync.
+      setForm((prev) => prev && (signal?.editing) ? prev : ({
+        name:      c.name,
+        email:     c.email,
+        phone:     c.phone,
+        address:   c.address,
+        city:      c.city    || '',
+        state:     c.state   || '',
+        zipCode:   c.zipCode,
+        equipment: { ...(c.equipment || {}) },
+      }));
+    } catch {
+      Alert.alert('Error', 'Failed to load customer data.');
+    }
+  }, [customerId, onBack]);
+
   useEffect(() => {
-    let active = true;
+    const signal = { aborted: false };
     setCustomer(null);
     setEditing(false);
-    (async () => {
-      try {
-        const c = await getCustomerById(customerId);
-        if (!active) return;
-        if (!c) { onBack?.(); return; }
-        setCustomer(c);
-        setForm({
-          name:      c.name,
-          email:     c.email,
-          phone:     c.phone,
-          address:   c.address,
-          city:      c.city    || '',
-          state:     c.state   || '',
-          zipCode:   c.zipCode,
-          equipment: { ...(c.equipment || {}) },
-        });
-      } catch {
-        if (active) Alert.alert('Error', 'Failed to load customer data.');
-      }
-    })();
-    return () => { active = false; };
-  }, [customerId]); // eslint-disable-line react-hooks/exhaustive-deps
+    reloadFromStorage(signal);
+    return () => { signal.aborted = true; };
+  }, [customerId, reloadFromStorage]);
+
+  // Cloud-sync-pulled listener: a remote merge has touched local storage.
+  // Re-read the visible customer so the pane reflects the latest state.
+  // If the user is editing, we keep the form; only the read-only `customer`
+  // object is refreshed so subsequent reads see new data.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(CLOUD_SYNC_PULLED, () => {
+      const signal = { aborted: false, editing };
+      reloadFromStorage(signal);
+    });
+    return () => sub.remove();
+  }, [reloadFromStorage, editing]);
 
   // ── Address autocomplete ───────────────────────────────────────────────────
 
@@ -218,7 +238,14 @@ export default function CustomerDetailPane({
     if (saving) return;
     setSaving(true);
     try {
-      await updateCustomer(customerId, form);
+      // Trim string fields on save so leading/trailing whitespace from copy-paste
+      // doesn't survive into storage. AddCustomerScreen already does this; the
+      // edit path was inconsistent.
+      const trimmed = {};
+      for (const [k, v] of Object.entries(form)) {
+        trimmed[k] = typeof v === 'string' ? v.trim() : v;
+      }
+      await updateCustomer(customerId, trimmed);
       syncUp().catch(() => {});
       setEditing(false);
       const c = await getCustomerById(customerId);
@@ -338,7 +365,7 @@ export default function CustomerDetailPane({
   // ── Derived state ──────────────────────────────────────────────────────────
 
   const sortedLog = useMemo(
-    () => (customer ? [...customer.serviceLog].sort((a, b) => new Date(b.date) - new Date(a.date)) : []),
+    () => (customer ? [...(customer.serviceLog || [])].sort((a, b) => new Date(b.date) - new Date(a.date)) : []),
     [customer],
   );
 

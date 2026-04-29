@@ -76,9 +76,10 @@ jest.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 const mockCustomers = { current: [] };
 jest.mock('../data/storage', () => ({
-  CURRENT_SCHEMA_VERSION: 2,
+  CURRENT_SCHEMA_VERSION: 3,
   getAllCustomers:  jest.fn(async () => mockCustomers.current),
   restoreCustomers: jest.fn(async (list) => { mockCustomers.current = list; }),
+  getLastLocalMutation: jest.fn(async () => null),
 }));
 
 jest.mock('../appVersion', () => ({ APP_VERSION: '1.5.2' }));

@@ -1,6 +1,6 @@
 // =============================================================================
 // mergeLogic.js - Square ↔ Callout customer match and merge algorithm (pure)
-// Version: 1.1
+// Version: 1.2
 // Last Updated: 2026-04-25
 //
 // PROJECT:      Callout (project v1.3.0)
@@ -101,9 +101,12 @@ export function matchCustomers(squareList, calloutList) {
   for (const sq of squareList) {
     let result = null;
 
-    // Priority 1: squareCustomerId field (already linked)
+    // Priority 1: squareCustomerId field (already linked). Filter out callouts
+    // already matched in this run so a duplicate Square ID (rare but possible
+    // across paginated fetches or race conditions) cannot double-claim one
+    // local record.
     const byId = calloutList.find(
-      (r) => r.squareCustomerId && r.squareCustomerId === sq.id,
+      (r) => r.squareCustomerId && r.squareCustomerId === sq.id && !matchedCalloutIds.has(r.id),
     );
     if (byId) {
       result = { square: sq, callout: byId, matchType: 'id' };
@@ -224,13 +227,17 @@ export function mergeSquareIntoCallout(callout, square) {
     conflicts.zipCode = { square: sqZip, callout: callout.zipCode };
   }
 
-  // notes — append Square note if not already present
+  // notes — append the Square note if we have not already appended this
+  // exact block. Substring containment is fragile: e.g. existing "Bobby"
+  // would falsely match an incoming "Bob" and the new note would be dropped.
+  // Compare against the literal append fragment instead.
   if (sqNote) {
     const existingNotes = callout.notes || '';
+    const appendBlock = `[From Square] ${sqNote}`;
     if (!existingNotes) {
       merged.notes = sqNote;
-    } else if (!existingNotes.includes(sqNote)) {
-      merged.notes = `${existingNotes}\n\n[From Square] ${sqNote}`;
+    } else if (!existingNotes.includes(appendBlock)) {
+      merged.notes = `${existingNotes}\n\n${appendBlock}`;
     }
   }
 

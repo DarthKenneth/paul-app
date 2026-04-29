@@ -1,9 +1,9 @@
 // =============================================================================
 // squarePlaceholder.js - Square OAuth (PKCE), token storage, invoice sending
-// Version: 4.1.3
-// Last Updated: 2026-04-25
+// Version: 4.2
+// Last Updated: 2026-04-29
 //
-// PROJECT:      Callout (project v1.3.0)
+// PROJECT:      Callcard CRM (project v2.0.0)
 // FILES:        squarePlaceholder.js  (this file — OAuth + invoice engine)
 //               squareCustomers.js    (Customers API wrapper)
 //               squareSync.js         (sync orchestrator)
@@ -35,6 +35,19 @@
 //     periodically for deprecation notices (this line is the only place to update)
 //
 // CHANGE LOG:
+// v4.2  2026-04-29  Claude  OAuth hardening (project v2.0.0)
+//       - connectSquare validates the `state` parameter on return. The state was
+//         generated and sent but never compared on the way back — CSRF defense
+//         was decorative only.
+//       - exchangeCodeForToken now stores refresh_token alongside access_token
+//         (Square returns one and v4.x silently dropped it, forcing a full
+//         re-OAuth every 30 days)
+//       - tryRefreshIfExpiring() auto-refreshes within a 60-second skew buffer
+//         using the refresh_token; getSquareAccessToken transparently uses it
+//       - isSquareConnected is now a pure read — no side effects, no implicit
+//         disconnect on stale state. Side-effect refresh moved to getSquareAccessToken.
+//       - Refresh failure only clears tokens on 400/401 (real auth failure);
+//         5xx leaves the refresh_token in place for the next try
 // v1.0  2026-04-03  Claude  Initial PKCE OAuth + invoice scaffold
 // v2.0  2026-04-09  Claude  Full PKCE implementation
 //       - generateCodeVerifier() + generateCodeChallenge() (RFC 7636)
@@ -163,6 +176,11 @@ export const SQUARE_API_BASE = _base;
 // checked locally without an API round-trip. Square access tokens currently
 // last 30 days; expiresAt is set from the token exchange response when available.
 
+// 60-second skew so requests don't hit Square with a token that just expired
+// in transit, and so background sync timers don't burn the last few seconds
+// of validity.
+const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+
 async function readTokenEnvelope() {
   try {
     const raw = await SecureStore.getItemAsync(SECURE_TOKEN_KEY);
@@ -177,32 +195,81 @@ async function readTokenEnvelope() {
 
 export async function getSquareAccessToken() {
   const envelope = await readTokenEnvelope();
-  return envelope ? envelope.token : null;
+  if (!envelope) return null;
+  if (await tryRefreshIfExpiring(envelope)) {
+    const fresh = await readTokenEnvelope();
+    return fresh ? fresh.token : null;
+  }
+  return envelope.token;
 }
 
 /**
- * Returns true if a non-expired Square token is stored.
- * Expired tokens return false and should be cleared with disconnectSquare().
+ * Returns true if a non-expired Square token is stored. Pure read — does
+ * not attempt to refresh or mutate state. Use getSquareAccessToken() at the
+ * call site if you actually need to make a request.
  */
 export async function isSquareConnected() {
   const envelope = await readTokenEnvelope();
   if (!envelope) return false;
-
   if (envelope.expiresAt) {
     const expiresAt = new Date(envelope.expiresAt).getTime();
-    if (Date.now() >= expiresAt) {
-      // Token expired — clear it and treat as disconnected
-      await disconnectSquare();
-      return false;
-    }
+    if (!Number.isFinite(expiresAt)) return true; // unknown expiry — treat as live
+    // Past hard expiry AND no refresh_token → definitely disconnected.
+    if (Date.now() >= expiresAt && !envelope.refreshToken) return false;
   }
-
   return true;
 }
 
-async function saveSquareAccessToken(token, expiresAt = null) {
-  const envelope = JSON.stringify({ token: token.trim(), expiresAt });
+async function saveSquareAccessToken(token, expiresAt = null, refreshToken = null) {
+  const envelope = JSON.stringify({
+    token: token.trim(),
+    expiresAt,
+    refreshToken: refreshToken || null,
+  });
   await SecureStore.setItemAsync(SECURE_TOKEN_KEY, envelope);
+}
+
+/**
+ * If the token is within TOKEN_EXPIRY_BUFFER_MS of expiry AND we have a
+ * refresh_token, exchange it for a fresh access token. Returns true if a
+ * refresh happened (caller should re-read the envelope).
+ */
+async function tryRefreshIfExpiring(envelope) {
+  if (!envelope?.expiresAt || !envelope?.refreshToken) return false;
+  const expiresAt = new Date(envelope.expiresAt).getTime();
+  if (!Number.isFinite(expiresAt)) return false;
+  if (Date.now() < expiresAt - TOKEN_EXPIRY_BUFFER_MS) return false;
+
+  try {
+    const res = await fetch(`${SQUARE_CONFIG.authBase}/oauth2/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':   'application/json',
+        'Square-Version': SQUARE_CONFIG.apiVersion,
+      },
+      body: JSON.stringify({
+        client_id:     SQUARE_CONFIG.clientId,
+        grant_type:    'refresh_token',
+        refresh_token: envelope.refreshToken,
+      }),
+    });
+    if (!res.ok) {
+      // Confirmed auth failure → drop the stored token so the UI reflects
+      // disconnected state. 5xx leaves the token in place for the next try.
+      if (res.status === 400 || res.status === 401) await clearSquareAccessToken();
+      return false;
+    }
+    const data = await res.json();
+    if (!data.access_token) return false;
+    await saveSquareAccessToken(
+      data.access_token,
+      data.expires_at || null,
+      data.refresh_token || envelope.refreshToken,
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function clearSquareAccessToken() {
@@ -261,9 +328,9 @@ async function buildAuthUrl(codeChallenge) {
  */
 export async function connectSquare() {
   await assertOnline();
-  const verifier   = await generateCodeVerifier();
-  const challenge  = await generateCodeChallenge(verifier);
-  const { url }    = await buildAuthUrl(challenge);
+  const verifier  = await generateCodeVerifier();
+  const challenge = await generateCodeChallenge(verifier);
+  const { url, state: expectedState } = await buildAuthUrl(challenge);
 
   const result = await WebBrowser.openAuthSessionAsync(url, SQUARE_CONFIG.appScheme);
 
@@ -272,12 +339,19 @@ export async function connectSquare() {
   const parsed = new URL(result.url);
   const code   = parsed.searchParams.get('code');
   const error  = parsed.searchParams.get('error');
+  const returnedState = parsed.searchParams.get('state');
 
   if (error) throw new Error(`Square authorization failed: ${error}`);
   if (!code) throw new Error('No authorization code received from Square.');
+  // CSRF defense: the state value is generated locally and must round-trip
+  // through Square unchanged. A mismatch indicates the redirect URL did not
+  // come from the flow we initiated, so refuse the code.
+  if (!returnedState || returnedState !== expectedState) {
+    throw new Error('Square authorization rejected: state mismatch.');
+  }
 
-  const { token, expiresAt } = await exchangeCodeForToken(code, verifier);
-  await saveSquareAccessToken(token, expiresAt);
+  const { token, expiresAt, refreshToken } = await exchangeCodeForToken(code, verifier);
+  await saveSquareAccessToken(token, expiresAt, refreshToken);
   return token;
 }
 
@@ -310,10 +384,11 @@ async function exchangeCodeForToken(code, codeVerifier) {
       throw new Error('Square did not return an access token.');
     }
 
-    // Square returns expires_at as an ISO string when available
+    // Square returns expires_at as an ISO string and refresh_token for renewal.
     return {
-      token:     data.access_token,
-      expiresAt: data.expires_at || null,
+      token:        data.access_token,
+      expiresAt:    data.expires_at || null,
+      refreshToken: data.refresh_token || null,
     };
   } finally {
     clearTimeout(timer);

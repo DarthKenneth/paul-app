@@ -1,6 +1,6 @@
 // =============================================================================
 // CustomersScreen.js - Customer list with search, sort filter, and add button
-// Version: 1.7
+// Version: 1.8
 // Last Updated: 2026-04-24
 //
 // PROJECT:      Rolodeck (project v0.29.0)
@@ -73,7 +73,7 @@
 //       - Sort chip accessibilityState selected added to each option
 // =============================================================================
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -84,8 +84,10 @@ import {
   StyleSheet,
   SafeAreaView,
   ActivityIndicator,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { CLOUD_SYNC_PULLED } from '../utils/cloudSync';
 import { Ionicons } from '@expo/vector-icons';
 import CustomerCard from '../components/CustomerCard';
 import CustomerDetailPane from '../components/CustomerDetailPane';
@@ -145,6 +147,11 @@ export default function CustomersScreen({ navigation, route }) {
   const [customers, setCustomers]           = useState([]);
   const [loading, setLoading]               = useState(true);
   const [query, setQuery]                   = useState('');
+  // debouncedQuery lags `query` by 150ms so each keystroke doesn't recompute
+  // the entire sections list (re-running .filter / .sort / Map.set across
+  // every customer). The TextInput stays responsive on the input value but
+  // the heavy memo only fires when the user pauses typing.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [sortMode, setSortMode]             = useState('firstName');
   const [sortModal, setSortModal]           = useState(false);
   const [showArchived, setShowArchived]     = useState(false);
@@ -178,6 +185,22 @@ export default function CustomersScreen({ navigation, route }) {
     }, [loadCustomers]),
   );
 
+  // Cloud-sync-pulled: a remote merge applied while we were mounted. Reload
+  // silently so the list reflects the just-arrived data without the loading
+  // spinner blink.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(CLOUD_SYNC_PULLED, () => {
+      loadCustomers().catch((err) => reportError(err, { feature: 'customers', action: 'reload-after-sync' }));
+    });
+    return () => sub.remove();
+  }, [loadCustomers]);
+
+  // Debounce the search query → filter recomputation
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQuery(query), 150);
+    return () => clearTimeout(handle);
+  }, [query]);
+
   // Split-pane: customer was deleted or archived — clear selection, refresh list + badge
   const handlePaneBack = useCallback(() => {
     setSelectedCustomerId(null);
@@ -200,8 +223,8 @@ export default function CustomersScreen({ navigation, route }) {
   const sections = useMemo(() => {
     const matched = customers.filter((c) => {
       if (!showArchived && c.archived) return false;
-      if (!query.trim()) return true;
-      const q = query.toLowerCase();
+      if (!debouncedQuery.trim()) return true;
+      const q = debouncedQuery.toLowerCase();
       return (
         c.name?.toLowerCase().includes(q)    ||
         c.email?.toLowerCase().includes(q)   ||

@@ -1,9 +1,9 @@
 // =============================================================================
 // serviceAlerts.js - Service due-date calculations and filter utilities
-// Version: 1.3
-// Last Updated: 2026-04-18
+// Version: 1.4
+// Last Updated: 2026-04-29
 //
-// PROJECT:      Rolodeck (project v0.24.2)
+// PROJECT:      Callcard CRM (project v2.0.0)
 // FILES:        serviceAlerts.js     (this file — pure alert/filter logic)
 //               storage.js           (Customer data source)
 //               ServicesScreen.js    (groupCustomersByDueWindow, getServiceStatus)
@@ -33,6 +33,13 @@
 //     sorted by urgency within each bucket; empty sections omitted
 //
 // CHANGE LOG:
+// v1.4  2026-04-29  Claude  Date-math hardening (project v2.0.0)
+//       - getLatestServiceEntry validates Date.parse on every entry; entries
+//         with invalid dates are skipped instead of pinning "latest" to NaN
+//       - daysSinceLastService now computes whole-day diffs from local-calendar
+//         midnight instead of raw ms-floor; off-by-one at midnight boundaries
+//         used to disagree with the calendar-day-based due-date logic
+//       - getLastServiceDate validates Date.parse before returning
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Added groupCustomersByDueWindow() for ServicesScreen
 //                           section-based layout [updated ARCHITECTURE]
@@ -68,15 +75,20 @@ export function getLatestServiceEntry(customer) {
     return null;
   }
   return customer.serviceLog.reduce((latest, e) => {
+    const t = Date.parse(e?.date);
+    if (!Number.isFinite(t)) return latest; // skip invalid dates instead of pinning to NaN
     if (!latest) return e;
-    return new Date(e.date) > new Date(latest.date) ? e : latest;
+    const lt = Date.parse(latest.date);
+    return t > lt ? e : latest;
   }, null);
 }
 
 /** Returns the Date of the most recent service log entry, or null. */
 export function getLastServiceDate(customer) {
   const latest = getLatestServiceEntry(customer);
-  return latest ? new Date(latest.date) : null;
+  if (!latest) return null;
+  const t = Date.parse(latest.date);
+  return Number.isFinite(t) ? new Date(t) : null;
 }
 
 /**
@@ -92,11 +104,20 @@ export function getEffectiveIntervalForCustomer(customer, globalIntervalDays) {
   return globalIntervalDays;
 }
 
-/** Returns whole days since last service, or Infinity if no record. */
+/**
+ * Returns whole days since last service, or Infinity if no record. Computed
+ * from local-calendar-day differences — raw ms-floor was off-by-one at
+ * midnight boundaries and disagreed with the calendar-day-based due date.
+ */
 export function daysSinceLastService(customer) {
   const last = getLastServiceDate(customer);
   if (!last) return Infinity;
-  return Math.floor((Date.now() - last.getTime()) / MS_PER_DAY);
+  const ms = midnightLocal(new Date()) - midnightLocal(last);
+  return Math.max(0, Math.round(ms / MS_PER_DAY));
+}
+
+function midnightLocal(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
 /** Returns whole days until service is due. Negative means overdue. */

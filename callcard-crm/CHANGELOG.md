@@ -8,6 +8,63 @@ CREATED:      2026-04-03
 
 ---
 
+## [2.0.0] - 2026-04-29
+
+### Added
+- **Schema V3 with `updatedAt` / `deletedAt` per record.** Foundation for real cross-device sync. V2 → V3 migration runs automatically on first launch and stamps every existing customer + service log entry + scheduled service entry with `updatedAt = now`. New `@callcard_schema_version` key tracks the on-disk version explicitly so future migrations short-circuit cleanly. (`storage.js`)
+- **Per-record cloud-sync merge** (`applyCloudMerge`). Replaces the v1.5.x blob-replace approach: cloud snapshots are now merged record-by-record by comparing `updatedAt`, and the newer side wins. Local-only records are preserved (the next push uploads them). Tombstones with `deletedAt` propagate so deletes replicate cross-device.
+- **Soft-delete + tombstone GC.** `deleteCustomer` now sets `deletedAt` and keeps the record in storage so the deletion can sync. `getAllCustomers` / `getCustomerById` filter tombstones so the UI sees the customer disappear immediately. `purgeOldTombstones` hard-removes records deleted more than 30 days ago after every successful sync round.
+- **Last-local-mutation tracking** (`@callcard_last_local_mutation`). `withWriteLock` updates this timestamp on every successful storage write. `syncFull` uses it to skip the post-pull push leg when nothing has changed locally — the offline-edit-then-clobber data-loss scenario from v1.5.x is no longer possible.
+- **`CLOUD_SYNC_PULLED` event.** `cloudSync.syncDown` emits a DeviceEventEmitter event when a remote merge actually applies changes. CustomersScreen, ServicesScreen, and CustomerDetailPane all subscribe and reload silently — the previous v1.5.4 build pulled data on foreground but didn't tell the UI, so users had to switch tabs to see anything change.
+- **Single-flight gate in `cloudSync.js`.** Concurrent syncDown / syncUp calls de-dupe to one in-flight operation. Multiple rapid mutations (e.g. seed-data, batch service entry) no longer race to upload partial corpora.
+- **Foreground sync rate-limit (30s).** `App.js` no longer triggers a full Drive round-trip every Control Center pull or lock-unlock cycle. Battery + Drive quota friendly.
+
+### Fixed
+- **Cloud sync no longer destroys offline edits.** The v1.5.x logic tracked "last successful sync" and assumed any cloud snapshot newer than that was authoritative — an offline edit between two syncs would be silently overwritten by another device's earlier push. Per-record merge plus separate last-local-mutation tracking eliminates the data-loss path. (`cloudSync.js`)
+- **Schema version validated on syncDown.** Cloud payloads with `schemaVersion > CURRENT_SCHEMA_VERSION` are refused; older versions still merge cleanly via `normalizeCustomer` defaults. Previously a future-version device could push v2-shaped customers, a v1 device would pull, normalize-drop the new fields, push back, and destroy v2-only fields for everyone on the account. (`cloudSync.js`)
+- **iCloud writes are atomic.** Snapshot is written to a sibling `.tmp` file then `moveAsync`-renamed into place. Half-written reads from another device mid-sync are no longer possible. (`iCloudSync.js`)
+- **iCloud `isAvailable` actually checks reachability.** The native module now requires both an iCloud identity token AND a resolvable ubiquity container; previously a user signed into iCloud but with iCloud Drive disabled would test "available" then fail the next upload. Container ID is also passed explicitly instead of `nil`. (`modules/icloud-container/ios/IcloudContainerModule.swift`)
+- **Google Drive auth no longer dead-on-arrival.** v1.5.4 hard-coded the legacy `auth.expo.io` proxy URL, which was removed in Expo SDK 50; with `expo-auth-session 6.x` on SDK 55 it would never have authenticated in production. Switched to `AuthSession.makeRedirectUri({ scheme: 'callcard', path: 'gdrive' })`. **The Google Cloud Console OAuth client must be re-created as type "Android" with the package name `com.ardingate.rolodeck`** — see `.env.example` for the updated setup walkthrough. (`googleDriveSync.js`)
+- **Google Drive `refresh_token` is now actually returned.** Added `access_type=offline` + `prompt=consent` on the AuthRequest so Google reliably emits a refresh_token. Without these, sign-in worked once and then silently lost the refresh token after the next consent flow. (`googleDriveSync.js`)
+- **Google Drive `expires_at` math no longer NaN-poisoned.** `tokenRes.issuedAt` is often undefined in `expo-auth-session 6.x`; `NaN + 3600 = NaN` made the token always-expired and refresh fired every call until quota burn. Now `Math.floor(Date.now()/1000) + expiresIn`. (`googleDriveSync.js`)
+- **Google Drive uploads now check `res.ok`.** v1.5.x silently treated 401/403/quota errors as success and advanced `LAST_SYNC_KEY` past data that never reached Drive. Failures now throw with the HTTP status. (`googleDriveSync.js`)
+- **Google Drive 401 surfaces as disconnect.** Confirmed auth failures (400/401) clear local tokens via `clearTokens()` so the Settings UI flips to the Connect button instead of silently lying about being connected. 5xx (transient backend outage) leaves the token in place to retry. (`googleDriveSync.js`)
+- **Google Drive multipart boundary is now per-request.** Static `callcard_boundary_xyz` could in principle collide with content embedded in customer notes; switched to a UUID-style per-call boundary. (`googleDriveSync.js`)
+- **Google Drive sign-out clears the local sync timestamp.** Stale `@callcard_cloud_synced_at` no longer blocks a legit pull after re-connecting on a different account. (`cloudSync.js`)
+- **Square OAuth `state` parameter validated.** v1.x sent the random `state` value but never compared it on return — CSRF defense was decorative only. `connectSquare` now throws if `state` is missing or doesn't match what was issued. (`squarePlaceholder.js`)
+- **Square `refresh_token` stored and used.** v1.x silently dropped Square's `refresh_token` on token exchange, forcing a full re-OAuth every 30 days. Now stored in the token envelope and exchanged automatically when the access token is within 60 seconds of expiry. (`squarePlaceholder.js`)
+- **Square `isSquareConnected` is now a pure read.** No more side-effect disconnect when called from multiple components on mount; refresh logic moved into `getSquareAccessToken` where it's actually needed. (`squarePlaceholder.js`)
+- **Calendar all-day `endDate = startDate + 1 day`.** Some Android OEMs were dropping all-day events with `start === end`; iOS EventKit could interpret them as the prior day in non-UTC zones. (`calendarSync.js`)
+- **`syncAllCustomers` doesn't lose mid-loop failures.** Per-customer sync now runs with `writeStatus: false`; the batch owns one final status record so a "customer 50 failed" error isn't clobbered by "customer 51 ok". (`calendarSync.js`)
+- **`serviceAlerts.daysSinceLastService` computes from local-calendar midnight.** Raw ms-floor was off-by-one at midnight boundaries and could disagree with the calendar-day-based due-date logic. (`serviceAlerts.js`)
+- **`getLatestServiceEntry` validates `Date.parse` per entry.** Entries with garbage dates are skipped instead of pinning "latest" to NaN forever. (`serviceAlerts.js`)
+- **`mergeLogic.matchCustomers` priority-1 dedup.** A duplicate Square ID across paginated fetches can no longer double-claim one local record. (`mergeLogic.js`)
+- **`mergeLogic` notes dedup uses full-string compare.** Substring `.includes` was matching `"Bob"` inside `"Bobby"` and silently dropping legitimate new notes. (`mergeLogic.js`)
+- **`errorReporting.friendlyMessage` regex tightened.** "Expired token/session/credential" alternation no longer false-positives on unrelated "expired metadata" strings. (`errorReporting.js`)
+- **`errorReporting` recognizes iOS-specific offline messages.** "Internet connection appears to be offline" / "network connection was lost" now map to the offline copy. (`errorReporting.js`)
+- **`autoBackup` skips disk write when nothing changed.** Compares the current `LAST_LOCAL_MUTATION` to the snapshot at the time of the last successful backup; if equal, the 24h timestamp is bumped without rewriting the file — no more pointless iCloud Backup deltas every day for a static dataset. (`backup.js`)
+- **`restoreCustomers` no longer drops empty-name records.** Cloud sync uses the same path; a partially-filled record on device A used to vaporize when device B pulled. (`storage.js`)
+- **`CustomerDetailPane.handleSave` trims string fields.** Whitespace from copy-paste no longer survives into storage. AddCustomerScreen already trimmed; the edit path was inconsistent. (`CustomerDetailPane.js`)
+- **`CustomerDetailPane` `serviceLog` null-coalesce.** Defensive default prevents a crash if a cloud-pulled customer arrives without a `serviceLog` array. (`CustomerDetailPane.js`)
+- **Sort default is now `firstName`.** SettingsScreen used to initialize state to `'name'` (not in the SORT_OPTIONS list), causing a brief flash of "no option selected" before storage load completed. (`SettingsScreen.js`)
+- **`ServicesScreen` SectionList keyExtractor disambiguates scheduled vs due rows.** Prefix `sched-` / `cust-` so the unlikely-but-possible UUID collision between a scheduled-service entry id and a customer id can't happen. (`ServicesScreen.js`)
+- **`CustomersScreen` search debounced 150ms.** Each keystroke no longer recomputes the entire sections memo across all customers. (`CustomersScreen.js`)
+- **`ScheduleServiceModal.handleSave` is `async` + `try/finally`.** A throw from `onSave` no longer leaves the Save button stuck disabled. (`ScheduleServiceModal.js`)
+- **SettingsScreen re-checks cloud availability on focus.** Signing into iCloud (or revoking a Drive token from another device) mid-session now updates the row without an app restart. (`SettingsScreen.js`)
+- **Seed-data button fires `syncUp` once at the end.** A foreground sync immediately after seeding no longer pulls empty cloud state and clobbers the seeded set. (`SettingsScreen.js`)
+
+### Infrastructure
+- **`expo-auth-session` and `icloud-container` now in the lockfile.** v1.5.4 declared them in `package.json` but never ran `npm install`; a clean clone or EAS build would fail to bundle.
+- **`.gitignore` updated to track local-module iOS sources.** Anchor the `/ios/` and `/android/` ignores to the project root so `modules/*/ios/` (the Swift/podspec for the iCloud module) is committed, while `store-assets/{ios,android}/` markdown — formerly orphaned — is now also tracked. Same change shipped in v1.5.4 but documented again here for context.
+- **+14 new tests** covering V2→V3 migration, per-record sync merge (newer wins, tombstone propagates, local-only preserved, schema mismatch refused), tombstone GC, and `LAST_LOCAL_MUTATION` advancement. Total suite now 238 tests, all passing.
+
+### Action items for the user
+- **Re-create the Google OAuth client** in Google Cloud Console as type "Android" (or "iOS"), with package `com.ardingate.rolodeck` and SHA-1 from your EAS build credentials. The Web-application client created for v1.5.4 will not authenticate.
+- **Add `EXPO_PUBLIC_SQUARE_CLIENT_ID` to `eas.json`** (or as an EAS secret). Production builds currently ship with the `'YOUR_SQUARE_APP_ID'` placeholder.
+- **Run `eas build --profile preview --platform ios`** to validate the iCloud entitlement plugin against a real build before releasing.
+
+---
+
 ## [1.5.4] - 2026-04-29
 
 ### Fixed

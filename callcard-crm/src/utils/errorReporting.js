@@ -1,6 +1,6 @@
 // =============================================================================
 // errorReporting.js - Centralized error capture and user-facing copy
-// Version: 1.1
+// Version: 1.2
 // Last Updated: 2026-04-28
 //
 // PROJECT:      Rolodeck (project v1.5)
@@ -103,8 +103,10 @@ function safeStringify(value) {
 export function friendlyMessage(err, fallback) {
   const raw = (err && typeof err.message === 'string') ? err.message : '';
 
-  // Network / connectivity
-  if (/network request failed|fetch failed|networkerror/i.test(raw)) {
+  // Network / connectivity. Includes iOS NSURLError variants that the base
+  // pattern misses ("internet connection appears to be offline", "network
+  // connection was lost").
+  if (/network request failed|fetch failed|networkerror|connection appears to be offline|connection was lost|offline/i.test(raw)) {
     return 'No internet connection. Please check your network and try again.';
   }
   if (/timed out|timeout|aborted/i.test(raw)) {
@@ -118,8 +120,10 @@ export function friendlyMessage(err, fallback) {
 
   // Auth / token. The 401 alternative requires a non-digit boundary so a
   // longer numeric value containing the substring (e.g. user id 4012345)
-  // doesn't false-positive as a session-expired error.
-  if (/(?:^|\D)401(?:\D|$)|unauthor|invalid[_ ]token|expired/i.test(raw)) {
+  // doesn't false-positive as a session-expired error. The "expired" alt
+  // requires a token/session/credential noun so unrelated "expired metadata"
+  // strings don't trigger session-expired copy.
+  if (/(?:^|\D)401(?:\D|$)|unauthor|invalid[_ ]token|expired (?:token|session|credential|grant|access)/i.test(raw)) {
     return 'Your session has expired. Please reconnect and try again.';
   }
 

@@ -1,9 +1,9 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 2.2.1
+// Version: 2.3
 // Last Updated: 2026-04-29
 //
-// PROJECT:      Rolodeck (project v1.5)
+// PROJECT:      Callcard CRM (project v2.0.0)
 // FILES:        App.js                  (this file — root entry)
 //               src/styles/theme.js     (ThemeProvider)
 //               src/components/TabNavigator.js   (navigation structure)
@@ -29,6 +29,14 @@
 //     skipping; flag persisted to AsyncStorage via setOnboardingComplete()
 //
 // CHANGE LOG:
+// v2.3   2026-04-29  Claude  Cloud-sync orchestration hardening (project v2.0.0)
+//        - Added DeviceEventEmitter listener for CLOUD_SYNC_PULLED — triggers
+//          refreshAlerts so the badge count updates when remote data arrives.
+//          Subscribed screens (CustomersScreen, ServicesScreen, CustomerDetailPane)
+//          also reload from this event so the UI is no longer stale after
+//          syncDown overwrites local state.
+//        - maybeSyncFull() rate-limits foreground sync to once per 30s. Previously
+//          every Control Center pull / lock-unlock triggered a full Drive round-trip.
 // v1.0  2026-04-03  Claude  Initial scaffold
 // v1.1  2026-04-03  Claude  Harden + futureproof
 //       - Added initStorage() call on mount (schema version tracking)
@@ -92,7 +100,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, Pressable, ActivityIndicator, AppState, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, AppState, StyleSheet, DeviceEventEmitter } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -141,7 +149,7 @@ import { isSquareConnected } from './src/utils/squarePlaceholder';
 import { autoBackup } from './src/utils/backup';
 import { reportError } from './src/utils/errorReporting';
 import { runSync } from './src/utils/squareSync';
-import { syncFull, syncUp } from './src/utils/cloudSync';
+import { syncFull, syncUp, CLOUD_SYNC_PULLED } from './src/utils/cloudSync';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
 // ── Sentry init ────────────────────────────────────────────────────────────────
@@ -297,10 +305,22 @@ function AppInner() {
     setShowOnboarding(false);
   }, []);
 
+  // Last successful (or attempted) syncFull timestamp — used to rate-limit
+  // foreground sync. Without this, every Control Center pull / lock-unlock
+  // cycle hits Drive again, burning quota and battery.
+  const lastSyncAttemptRef = useRef(0);
+  const FOREGROUND_SYNC_DEBOUNCE_MS = 30 * 1000;
+
+  const maybeSyncFull = useCallback((reason) => {
+    const now = Date.now();
+    if (now - lastSyncAttemptRef.current < FOREGROUND_SYNC_DEBOUNCE_MS) return;
+    lastSyncAttemptRef.current = now;
+    syncFull().catch((err) => reportError(err, { feature: 'cloud-sync', action: reason }));
+  }, []);
+
   useEffect(() => {
-    // Run refreshAlerts AFTER initStorage so the V1→V2 migration (which writes
-    // the customer index) completes before getAllCustomers reads the index.
-    // initStorage is fast on existing V2 installs (~1 AsyncStorage read).
+    // Run refreshAlerts AFTER initStorage so the V2→V3 migration (which adds
+    // updatedAt/deletedAt) completes before getAllCustomers reads the index.
     initStorage()
       .catch((err) => reportError(err, { feature: 'storage', action: 'init' }))
       .then(async () => {
@@ -317,27 +337,37 @@ function AppInner() {
         }
         autoBackup().catch((err) => reportError(err, { feature: 'backup', action: 'auto' }));
         // Cloud sync: pull on launch (push happens after data mutations via syncUp)
-        syncFull().catch((err) => reportError(err, { feature: 'cloud-sync', action: 'launch' }));
+        maybeSyncFull('launch');
       });
     getOnboardingComplete()
       .then((done) => { if (!done) setShowOnboarding(true); })
       .catch((err) => reportError(err, { feature: 'onboarding', action: 'check-complete' }));
 
-    const subscription = AppState.addEventListener('change', (nextState) => {
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         refreshAlerts();
-        // Re-sync whenever the app comes back to foreground
-        syncFull().catch((err) => reportError(err, { feature: 'cloud-sync', action: 'foreground' }));
+        // Re-sync on foreground (debounced — see lastSyncAttemptRef)
+        maybeSyncFull('foreground');
       }
       if (nextState === 'background') {
-        // Push latest data before the app is suspended
+        // Push latest data before the app is suspended. syncUp goes through
+        // the cloudSync gate so it doesn't race with an in-flight syncDown.
         syncUp().catch((err) => reportError(err, { feature: 'cloud-sync', action: 'background' }));
       }
       appState.current = nextState;
     });
 
-    return () => subscription.remove();
-  }, [refreshAlerts]);
+    // Listen for cloud-sync-pulled events so screens can refresh after a
+    // remote merge. The event also flips the badge counter.
+    const pulledSub = DeviceEventEmitter.addListener(CLOUD_SYNC_PULLED, () => {
+      refreshAlerts();
+    });
+
+    return () => {
+      appStateSub.remove();
+      pulledSub.remove();
+    };
+  }, [refreshAlerts, maybeSyncFull]);
 
   // isDark comes from ThemeContext (handles rustic auto-dark + midnight + ember)
 

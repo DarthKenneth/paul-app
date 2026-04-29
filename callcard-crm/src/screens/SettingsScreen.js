@@ -1,6 +1,6 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.5.1
+// Version: 2.6
 // Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v1.5.3)
@@ -327,7 +327,7 @@ export default function SettingsScreen({ navigation }) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const widthCap = useContentContainerStyle();
 
-  const [sortPref, setSortPref]               = useState('name');
+  const [sortPref, setSortPref]               = useState('firstName');
   const [showArchived, setShowArchived]       = useState(false);
   const [calendarSync, setCalendarSync]       = useState(false);
   const [calSyncStatus, setCalSyncStatus]     = useState(null); // { status, message, at } | null
@@ -370,13 +370,20 @@ export default function SettingsScreen({ navigation }) {
     return () => { active = false; };
   }, []);
 
-  // Refresh interval display when returning from ServiceIntervalScreen
+  // Refresh interval display + cloud-sync availability on focus. The cloud
+  // availability check on initial mount only — if the user signs into iCloud
+  // mid-session (or revokes a Drive token from another device) the Settings
+  // row used to be stuck on the wrong state until a fresh app launch.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       Promise.all([getServiceIntervalMode(), getServiceIntervalCustomDays()]).then(
         ([m, d]) => { if (active) { setIntervalMode(m); setIntervalCustomDays(d); } },
       );
+      isCloudSyncAvailable().then((ok) => { if (active) setCloudAvailable(ok); });
+      AsyncStorage.getItem('@callcard_cloud_synced_at').then((ts) => {
+        if (active) setCloudLastSync(ts);
+      });
       return () => { active = false; };
     }, []),
   );
@@ -506,6 +513,9 @@ export default function SettingsScreen({ navigation }) {
                   await addServiceEntry(customer.id, { date, type: 'service', notes: '' });
                 }
               }
+              // Push the seeded set in one shot so a foreground sync immediately
+              // after seeding doesn't pull empty cloud state and clobber it.
+              syncUp().catch(() => {});
               Alert.alert('Done', `${SEED_CUSTOMERS.length} sample customers added.`);
             } catch (err) {
               Alert.alert('Seed Failed', err?.message || 'Something went wrong.');

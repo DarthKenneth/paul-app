@@ -1,6 +1,6 @@
 // =============================================================================
 // ServicesScreen.js - Upcoming and overdue service list, grouped by due window
-// Version: 2.6
+// Version: 2.7
 // Last Updated: 2026-04-24
 //
 // PROJECT:      Rolodeck (project v0.29.0)
@@ -72,7 +72,7 @@
 // v2.1    2026-04-06  Claude  Calendar view toggle
 // =============================================================================
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -81,8 +81,10 @@ import {
   Pressable,
   StyleSheet,
   SafeAreaView,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { CLOUD_SYNC_PULLED } from '../utils/cloudSync';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import CustomerDetailPane from '../components/CustomerDetailPane';
@@ -144,48 +146,59 @@ export default function ServicesScreen({ navigation }) {
   const [intervalDays, setIntervalDays]   = useState(365);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
 
+  const loadServices = useCallback(async () => {
+    const [all, mode, customDays] = await Promise.all([
+      getAllCustomers(),
+      getServiceIntervalMode(),
+      getServiceIntervalCustomDays(),
+    ]);
+    const days    = modeToIntervalDays(mode, customDays);
+    const active_ = all.filter((c) => !c.archived);
+
+    const scheduledItems = [];
+    for (const c of active_) {
+      for (const entry of (c.scheduledServices || [])) {
+        scheduledItems.push({
+          id:            entry.id,
+          customerId:    c.id,
+          customerName:  c.name || 'Unnamed',
+          scheduledDate: entry.date,
+          notes:         entry.notes,
+          type:          entry.type || 'service',
+        });
+      }
+    }
+    scheduledItems.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
+
+    const baseSections = groupCustomersByDueWindow(active_, days);
+    const allSections  = scheduledItems.length > 0
+      ? [{ key: 'scheduled', title: 'Scheduled', data: scheduledItems }, ...baseSections]
+      : baseSections;
+
+    setIntervalDays(days);
+    setSections(allSections);
+    setAllCustomers(active_);
+    setTotalCustomers(active_.length);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      Promise.all([
-        getAllCustomers(),
-        getServiceIntervalMode(),
-        getServiceIntervalCustomDays(),
-      ])
-        .then(([all, mode, customDays]) => {
-          if (!active) return;
-          const days    = modeToIntervalDays(mode, customDays);
-          const active_ = all.filter((c) => !c.archived);
-
-          const scheduledItems = [];
-          for (const c of active_) {
-            for (const entry of (c.scheduledServices || [])) {
-              scheduledItems.push({
-                id:            entry.id,
-                customerId:    c.id,
-                customerName:  c.name || 'Unnamed',
-                scheduledDate: entry.date,
-                notes:         entry.notes,
-                type:          entry.type || 'service',
-              });
-            }
-          }
-          scheduledItems.sort((a, b) => new Date(a.scheduledDate) - new Date(b.scheduledDate));
-
-          const baseSections = groupCustomersByDueWindow(active_, days);
-          const allSections  = scheduledItems.length > 0
-            ? [{ key: 'scheduled', title: 'Scheduled', data: scheduledItems }, ...baseSections]
-            : baseSections;
-
-          setIntervalDays(days);
-          setSections(allSections);
-          setAllCustomers(active_);
-          setTotalCustomers(active_.length);
-        })
-        .catch((err) => reportError(err, { feature: 'services', action: 'load' }));
+      loadServices()
+        .then(() => { /* setState guarded inside */ })
+        .catch((err) => { if (active) reportError(err, { feature: 'services', action: 'load' }); });
       return () => { active = false; };
-    }, []),
+    }, [loadServices]),
   );
+
+  // Reload after a remote merge so calendar dots and section data reflect
+  // the just-arrived state without waiting for tab focus.
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(CLOUD_SYNC_PULLED, () => {
+      loadServices().catch((err) => reportError(err, { feature: 'services', action: 'reload-after-sync' }));
+    });
+    return () => sub.remove();
+  }, [loadServices]);
 
   const handleRowPress = (customerId) => {
     if (isSplit) {
@@ -568,7 +581,10 @@ export default function ServicesScreen({ navigation }) {
       <View style={isSplit ? styles.splitListPanel : styles.flex}>
         <SectionList
           sections={sections}
-          keyExtractor={(item) => item.id}
+          // Scheduled rows use the scheduled-service entry id; due-window rows
+          // use the customer id. With UUID-style ids the chance of collision is
+          // tiny but the namespace prefix removes the risk entirely.
+          keyExtractor={(item) => (item.scheduledDate ? `sched-${item.id}` : `cust-${item.id}`)}
           renderSectionHeader={renderSectionHeader}
           renderItem={renderItem}
           contentContainerStyle={[styles.listContent, !isSplit && widthCap]}

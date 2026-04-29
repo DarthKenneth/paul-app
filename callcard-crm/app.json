@@ -3,7 +3,7 @@
     "name": "Callcard CRM",
     "slug": "rolodeck",
     "scheme": "callcard",
-    "version": "1.5.4",
+    "version": "2.0.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },

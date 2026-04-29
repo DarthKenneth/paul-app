@@ -1,6 +1,6 @@
 // =============================================================================
 // ScheduleServiceModal.js - Bottom-sheet modal for scheduling a future service
-// Version: 2.5
+// Version: 2.6
 // Last Updated: 2026-04-24
 //
 // PROJECT:      Rolodeck (project v0.28)
@@ -240,7 +240,7 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
     setCalVisible(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (saving) return;
 
     if (!customer?.id) {
@@ -273,11 +273,20 @@ export default function ScheduleServiceModal({ visible, customer, onSave, onClos
     }
 
     setSaving(true);
-    onSave(customer.id, {
-      date:  selectedSlot.startTime.toISOString(),
-      notes: notes.trim(),
-      type:  appointmentType,
-    });
+    // Wrap in try/finally so a throw from onSave (or a failure to close the
+    // modal promptly) doesn't leave the Save button stuck disabled.
+    try {
+      const result = onSave(customer.id, {
+        date:  selectedSlot.startTime.toISOString(),
+        notes: notes.trim(),
+        type:  appointmentType,
+      });
+      // If onSave returned a promise, wait for it so saving stays true while
+      // the parent's handler runs.
+      if (result && typeof result.then === 'function') await result;
+    } finally {
+      setSaving(false);
+    }
   };
 
   const isWorkDayDate = parsedDate ? isWorkDay(parsedDate, schedSettings.workDays) : false;

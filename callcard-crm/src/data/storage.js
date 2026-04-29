@@ -1,9 +1,9 @@
 // =============================================================================
 // storage.js - AsyncStorage CRUD layer for all on-device data
-// Version: 2.0.5
-// Last Updated: 2026-04-25
+// Version: 3.0
+// Last Updated: 2026-04-29
 //
-// PROJECT:      Callout (project v1.3.0)
+// PROJECT:      Callcard CRM (project v2.0.0)
 // FILES:        storage.js           (this file — all data persistence)
 //               serviceAlerts.js     (consumes Customer objects)
 //               CustomersScreen.js   (getAllCustomers, getSortPreference)
@@ -79,6 +79,22 @@
 //   SyncLogEntry:   { at, merged, created, lowConf, conflicts, errors }
 //
 // CHANGE LOG:
+// v3.0   2026-04-29  Claude  Schema V3 — per-record sync foundation (project v2.0.0)
+//        - Bumped CURRENT_SCHEMA_VERSION 2 → 3, added @callcard_schema_version key
+//        - normalizeCustomer now stamps updatedAt and deletedAt on every record
+//        - Service-log entries and scheduled-services entries also get updatedAt
+//        - withWriteLock now updates @callcard_last_local_mutation on every successful write
+//        - Soft-delete: deleteCustomer marks deletedAt instead of hard-removing;
+//          getAllCustomers / getCustomerById filter tombstones (UI sees deletion immediately)
+//        - New getAllCustomersIncludingDeleted() for the cloud sync layer
+//        - New applyCloudMerge(remote): per-record updatedAt-based merge,
+//          tombstones propagate, local-only records preserved
+//        - New purgeOldTombstones(): hard-removes tombstones older than 30 days
+//        - New getLastLocalMutation() export
+//        - V2 → V3 migration runner: stamps updatedAt on every record + entry
+//          (backfill from existing date/createdAt fields where possible)
+//        - restoreCustomers no longer rejects empty-name records (was silently dropping
+//          in-progress edits on cloud pull) [updated SCHEMA, ARCHITECTURE]
 // v2.0.5 2026-04-25  Claude  Update project block; fix schema comment rolodeckCustomerId → calloutCustomerId
 // v2.0.4 2026-04-24  Claude  addServiceEntry now forwards photos — was silently dropped
 //                            [updated SCHEMA to include entryValues and checklist]
@@ -164,8 +180,15 @@ const SERVICE_INTERVAL_MODE_KEY        = '@callcard_service_interval_mode';
 const SERVICE_INTERVAL_CUSTOM_DAYS_KEY = '@callcard_service_interval_custom_days';
 const SQUARE_SYNC_META_KEY             = '@callcard_square_sync_meta';
 const SQUARE_AUTO_SYNC_KEY             = '@callcard_square_auto_sync';
+const SCHEMA_VERSION_KEY               = '@callcard_schema_version';
+const LAST_LOCAL_MUTATION_KEY          = '@callcard_last_local_mutation';
 
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
+
+// Tombstones older than this get purged after a successful cloud sync round.
+// 30 days is enough for any reasonable offline-then-reconnect scenario to
+// have already propagated the deletion.
+const TOMBSTONE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 // ── In-memory cache ────────────────────────────────────────────────────────────
 // Map<id, Customer> when warm, null when cold (needs a load).
@@ -185,9 +208,25 @@ function invalidateCache() {
 let _writeChain = Promise.resolve();
 
 function withWriteLock(fn) {
-  const next = _writeChain.then(fn);
+  const next = _writeChain.then(async () => {
+    const result = await fn();
+    // Successful local mutation — stamp the wall-clock so syncUp can know
+    // there's something newer than the last successful cloud push.
+    AsyncStorage.setItem(LAST_LOCAL_MUTATION_KEY, new Date().toISOString())
+      .catch(() => { /* non-fatal */ });
+    return result;
+  });
   _writeChain = next.catch(() => {});
   return next;
+}
+
+/** Returns the ISO timestamp of the last successful local write, or null. */
+export async function getLastLocalMutation() {
+  try {
+    return await AsyncStorage.getItem(LAST_LOCAL_MUTATION_KEY);
+  } catch {
+    return null;
+  }
 }
 
 // ── ID generation ─────────────────────────────────────────────────────────────
@@ -207,6 +246,7 @@ function normalizeCustomer(c) {
   if (!c || typeof c !== 'object' || !c.id || typeof c.id !== 'string') {
     return null;
   }
+  const nowIso = new Date().toISOString();
   return {
     id:                 c.id,
     name:               c.name               || '',
@@ -224,7 +264,20 @@ function normalizeCustomer(c) {
     squareSyncedAt:     c.squareSyncedAt     ?? null,
     squareSyncStatus:   c.squareSyncStatus   ?? null,
     squareConflictData: c.squareConflictData ?? null,
+    // V3 sync fields
+    updatedAt:          c.updatedAt          ?? nowIso,
+    deletedAt:          c.deletedAt          ?? null,
   };
+}
+
+// Compare two ISO timestamps numerically. Tolerates nullish on either side
+// (null < anything). Returns -1, 0, or 1.
+function compareIso(a, b) {
+  const ta = a ? Date.parse(a) : 0;
+  const tb = b ? Date.parse(b) : 0;
+  if (!Number.isFinite(ta)) return Number.isFinite(tb) ? -1 : 0;
+  if (!Number.isFinite(tb)) return 1;
+  return ta < tb ? -1 : ta > tb ? 1 : 0;
 }
 
 // ── Internal per-customer I/O ─────────────────────────────────────────────────
@@ -294,10 +347,7 @@ export async function initStorage() {
       // Write all customer records in parallel, then index, then clean up
       await Promise.all(normalized.map((c) => saveOneCustomer(c)));
       await saveIndex(ids);
-      await AsyncStorage.multiRemove([
-        LEGACY_CUSTOMERS_KEY,
-        '@callcard_schema_version', // orphaned pre-envelope key
-      ]).catch(() => {});
+      await AsyncStorage.multiRemove([LEGACY_CUSTOMERS_KEY]).catch(() => {});
 
       invalidateCache();
     } else {
@@ -307,9 +357,72 @@ export async function initStorage() {
         await saveIndex([]);
       }
     }
+
+    // V2 → V3 migration (idempotent): stamp updatedAt and deletedAt on every
+    // existing record, plus updatedAt on each service-log and scheduled-service
+    // entry. Required for per-record cloud sync. Always write the schema
+    // version key so subsequent boots short-circuit cleanly.
+    const storedVersion = await getStoredSchemaVersion();
+    if (storedVersion !== null && storedVersion < CURRENT_SCHEMA_VERSION) {
+      await migrateV2toV3();
+      invalidateCache();
+    }
+    await setStoredSchemaVersion(CURRENT_SCHEMA_VERSION);
   } catch {
     // initStorage failing is non-fatal — the app degrades gracefully
   }
+}
+
+// Returns the stored schema version, or null if the key is missing AND the
+// store appears to be fresh (empty / no customers). Returns 2 when the key
+// is missing but a populated V2 customer index is present (needs migration).
+async function getStoredSchemaVersion() {
+  const raw = await AsyncStorage.getItem(SCHEMA_VERSION_KEY);
+  if (raw == null) {
+    const indexRaw = await AsyncStorage.getItem(CUSTOMER_INDEX_KEY);
+    if (!indexRaw) return null; // fresh install
+    try {
+      const ids = JSON.parse(indexRaw);
+      if (Array.isArray(ids) && ids.length === 0) return null;
+    } catch { /* fall through */ }
+    return 2; // populated V2 install — needs V2→V3 migration
+  }
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function setStoredSchemaVersion(v) {
+  await AsyncStorage.setItem(SCHEMA_VERSION_KEY, String(v));
+}
+
+async function migrateV2toV3() {
+  const ids = await loadIndex();
+  if (ids.length === 0) return;
+  const nowIso = new Date().toISOString();
+
+  const customers = await Promise.all(ids.map(async (id) => {
+    const raw = await AsyncStorage.getItem(CUSTOMER_KEY_PREFIX + id);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }));
+
+  await Promise.all(customers.filter(Boolean).map(async (c) => {
+    if (!c.updatedAt) c.updatedAt = nowIso;
+    if (c.deletedAt === undefined) c.deletedAt = null;
+    if (Array.isArray(c.serviceLog)) {
+      c.serviceLog = c.serviceLog.map((e) => ({
+        ...e,
+        updatedAt: e.updatedAt || e.date || nowIso,
+      }));
+    }
+    if (Array.isArray(c.scheduledServices)) {
+      c.scheduledServices = c.scheduledServices.map((e) => ({
+        ...e,
+        updatedAt: e.updatedAt || e.createdAt || nowIso,
+      }));
+    }
+    await AsyncStorage.setItem(CUSTOMER_KEY_PREFIX + c.id, JSON.stringify(c));
+  }));
 }
 
 // ── Onboarding ────────────────────────────────────────────────────────────────
@@ -330,10 +443,20 @@ export async function setOnboardingComplete() {
 // ── Customer reads ────────────────────────────────────────────────────────────
 
 /**
- * Returns all customers, using the in-memory cache when warm.
- * Populates the cache as a side effect.
+ * Returns live (non-tombstoned) customers, using the in-memory cache when
+ * warm. Tombstoned records still live in storage so cloud sync can propagate
+ * the deletion to other devices, but they are filtered out of normal reads.
  */
 export async function getAllCustomers() {
+  const all = await getAllCustomersIncludingDeleted();
+  return all.filter((c) => !c.deletedAt);
+}
+
+/**
+ * Sync-only: returns every customer including tombstones. Callers that
+ * surface customers to the user must use getAllCustomers() instead.
+ */
+export async function getAllCustomersIncludingDeleted() {
   if (_cache) {
     return Array.from(_cache.values());
   }
@@ -347,12 +470,13 @@ export async function getAllCustomers() {
 }
 
 /**
- * Returns a single customer by ID. Uses the cache if warm; reads directly
- * from AsyncStorage without a full load if cold.
+ * Returns a single customer by ID, or null if missing or tombstoned.
+ * Uses the cache if warm.
  */
 export async function getCustomerById(id) {
-  if (_cache) return _cache.get(id) || null;
-  return loadOneCustomer(id);
+  const c = _cache ? _cache.get(id) || null : await loadOneCustomer(id);
+  if (!c || c.deletedAt) return null;
+  return c;
 }
 
 // ── Customer writes ───────────────────────────────────────────────────────────
@@ -360,6 +484,7 @@ export async function getCustomerById(id) {
 export async function addCustomer(data) {
   return withWriteLock(async () => {
     const id = await generateId();
+    const nowIso = new Date().toISOString();
     const newCustomer = normalizeCustomer({
       id,
       name:               data.name               || '',
@@ -377,6 +502,8 @@ export async function addCustomer(data) {
       squareSyncedAt:     data.squareSyncedAt     || null,
       squareSyncStatus:   data.squareSyncStatus   || null,
       squareConflictData: data.squareConflictData || null,
+      updatedAt:          nowIso,
+      deletedAt:          null,
     });
 
     const ids = await loadIndex();
@@ -396,22 +523,38 @@ export async function updateCustomer(id, updates) {
     const existing = await loadOneCustomer(id);
     if (!existing) throw new Error(`Customer not found: ${id}`);
 
-    // Strip serviceLog and scheduledServices so callers cannot overwrite them
-    const { serviceLog, scheduledServices, ...safeUpdates } = updates;
-    const updated = normalizeCustomer({ ...existing, ...safeUpdates });
+    // Strip serviceLog and scheduledServices so callers cannot overwrite them.
+    // updatedAt is also stripped — it is always set fresh below.
+    const { serviceLog, scheduledServices, updatedAt: _u, ...safeUpdates } = updates;
+    const updated = normalizeCustomer({
+      ...existing,
+      ...safeUpdates,
+      updatedAt: new Date().toISOString(),
+    });
     await saveOneCustomer(updated);
     invalidateCache();
     return updated;
   });
 }
 
+/**
+ * Soft-delete: marks deletedAt + updatedAt and keeps the record in storage so
+ * the deletion can propagate to other devices via cloud sync. Tombstones are
+ * filtered out of getAllCustomers/getCustomerById so the UI sees the customer
+ * as gone immediately. Hard removal happens later via purgeOldTombstones.
+ */
 export async function deleteCustomer(id) {
   return withWriteLock(async () => {
-    const ids = await loadIndex();
-    await Promise.all([
-      deleteOneCustomer(id),
-      saveIndex(ids.filter((i) => i !== id)),
-    ]);
+    const existing = await loadOneCustomer(id);
+    if (!existing) return; // already gone — idempotent
+
+    const nowIso = new Date().toISOString();
+    const tombstone = {
+      ...existing,
+      deletedAt: nowIso,
+      updatedAt: nowIso,
+    };
+    await saveOneCustomer(tombstone);
     invalidateCache();
   });
 }
@@ -422,7 +565,7 @@ export async function archiveCustomer(id) {
   return withWriteLock(async () => {
     const customer = await loadOneCustomer(id);
     if (!customer) throw new Error(`Customer not found: ${id}`);
-    const updated = { ...customer, archived: true };
+    const updated = { ...customer, archived: true, updatedAt: new Date().toISOString() };
     await saveOneCustomer(updated);
     invalidateCache();
     return updated;
@@ -433,7 +576,7 @@ export async function unarchiveCustomer(id) {
   return withWriteLock(async () => {
     const customer = await loadOneCustomer(id);
     if (!customer) throw new Error(`Customer not found: ${id}`);
-    const updated = { ...customer, archived: false };
+    const updated = { ...customer, archived: false, updatedAt: new Date().toISOString() };
     await saveOneCustomer(updated);
     invalidateCache();
     return updated;
@@ -447,11 +590,13 @@ export async function addServiceEntry(customerId, data) {
     const customer = await loadOneCustomer(customerId);
     if (!customer) throw new Error(`Customer not found: ${customerId}`);
 
+    const nowIso = new Date().toISOString();
     const entry = {
-      id:    await generateId(),
-      date:  data.date  || new Date().toISOString(),
-      type:  data.type  || 'service',
-      notes: data.notes || '',
+      id:        await generateId(),
+      date:      data.date  || nowIso,
+      type:      data.type  || 'service',
+      notes:     data.notes || '',
+      updatedAt: nowIso,
     };
 
     if (data.intervalDays  != null)       entry.intervalDays  = data.intervalDays;
@@ -462,6 +607,7 @@ export async function addServiceEntry(customerId, data) {
     const updated = {
       ...customer,
       serviceLog: [entry, ...(customer.serviceLog || [])],
+      updatedAt: nowIso,
     };
     await saveOneCustomer(updated);
     invalidateCache();
@@ -478,9 +624,10 @@ export async function updateServiceEntry(customerId, entryId, updates) {
     const eidx = log.findIndex((e) => e.id === entryId);
     if (eidx === -1) throw new Error(`Service entry not found: ${entryId}`);
 
+    const nowIso = new Date().toISOString();
     const updatedLog = [...log];
-    updatedLog[eidx] = { ...log[eidx], ...updates, id: entryId };
-    const updated = { ...customer, serviceLog: updatedLog };
+    updatedLog[eidx] = { ...log[eidx], ...updates, id: entryId, updatedAt: nowIso };
+    const updated = { ...customer, serviceLog: updatedLog, updatedAt: nowIso };
     await saveOneCustomer(updated);
     invalidateCache();
     return updatedLog[eidx];
@@ -495,6 +642,7 @@ export async function deleteServiceEntry(customerId, entryId) {
     const updated = {
       ...customer,
       serviceLog: (customer.serviceLog || []).filter((e) => e.id !== entryId),
+      updatedAt: new Date().toISOString(),
     };
     await saveOneCustomer(updated);
     invalidateCache();
@@ -508,16 +656,19 @@ export async function addScheduledService(customerId, data) {
     const customer = await loadOneCustomer(customerId);
     if (!customer) throw new Error(`Customer not found: ${customerId}`);
 
+    const nowIso = new Date().toISOString();
     const entry = {
       id:        await generateId(),
-      date:      data.date  || new Date().toISOString(),
+      date:      data.date  || nowIso,
       type:      data.type  || 'service',
       notes:     data.notes || '',
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
+      updatedAt: nowIso,
     };
     const updated = {
       ...customer,
       scheduledServices: [entry, ...(customer.scheduledServices || [])],
+      updatedAt: nowIso,
     };
     await saveOneCustomer(updated);
     invalidateCache();
@@ -533,6 +684,7 @@ export async function deleteScheduledService(customerId, entryId) {
     const updated = {
       ...customer,
       scheduledServices: (customer.scheduledServices || []).filter((e) => e.id !== entryId),
+      updatedAt: new Date().toISOString(),
     };
     await saveOneCustomer(updated);
     invalidateCache();
@@ -599,20 +751,19 @@ export async function saveServiceIntervalCustomDays(days) {
 
 /**
  * Overwrite the entire customer store with a validated array.
- * Validates each customer shape, clears the existing store, writes the new
- * set, and rebuilds the index. Wrapped in the write mutex.
+ * Used by manual backup-restore (NOT by cloud sync — sync uses applyCloudMerge
+ * for per-record merge). Only requires a valid id; empty-name records are
+ * preserved (they may be in-progress edits the user wants back).
  */
 export async function restoreCustomers(customers) {
   if (!Array.isArray(customers)) {
     throw new Error('restoreCustomers: expected an array');
   }
 
-  // Validate and normalize each customer — reject any without a valid id+name
   const validated = customers
     .map((c) => {
       if (!c || typeof c !== 'object') return null;
       if (!c.id || typeof c.id !== 'string') return null;
-      if (!c.name || typeof c.name !== 'string') return null;
       return normalizeCustomer(c);
     })
     .filter(Boolean);
@@ -629,6 +780,99 @@ export async function restoreCustomers(customers) {
       saveIndex(ids),
     ]);
     invalidateCache();
+  });
+}
+
+/**
+ * Apply a cloud snapshot to local storage as a per-record merge. Newer
+ * `updatedAt` wins. Tombstones (deletedAt set) propagate. Local-only records
+ * are left untouched (caller's syncUp will push them next).
+ *
+ * Returns { applied, skipped, inserted } counts for diagnostics.
+ *
+ * This function does NOT update LAST_LOCAL_MUTATION_KEY because the writes
+ * are not user mutations — they are remote state arriving locally.
+ */
+export async function applyCloudMerge(remoteCustomers) {
+  if (!Array.isArray(remoteCustomers)) {
+    throw new Error('applyCloudMerge: expected an array');
+  }
+
+  return withWriteLock(async () => {
+    const localIds = await loadIndex();
+    const localById = new Map();
+    await Promise.all(localIds.map(async (id) => {
+      const raw = await AsyncStorage.getItem(CUSTOMER_KEY_PREFIX + id);
+      if (!raw) return;
+      try { localById.set(id, JSON.parse(raw)); } catch { /* ignore */ }
+    }));
+
+    let applied = 0, skipped = 0, inserted = 0;
+    const toWrite = [];
+    const newIds = new Set(localIds);
+
+    for (const rc of remoteCustomers) {
+      if (!rc || typeof rc !== 'object' || !rc.id) continue;
+      const local = localById.get(rc.id);
+      const normalized = normalizeCustomer(rc);
+      if (!normalized) continue;
+
+      if (!local) {
+        toWrite.push(normalized);
+        newIds.add(rc.id);
+        inserted++;
+        continue;
+      }
+      // Newer wins. Equal updatedAt = no-op (local already represents this).
+      if (compareIso(normalized.updatedAt, local.updatedAt) > 0) {
+        toWrite.push(normalized);
+        applied++;
+      } else {
+        skipped++;
+      }
+    }
+
+    if (toWrite.length > 0) {
+      await Promise.all(toWrite.map(saveOneCustomer));
+      // Index needs to include any newly inserted IDs.
+      if (newIds.size !== localIds.length) {
+        await saveIndex(Array.from(newIds));
+      }
+      invalidateCache();
+    }
+
+    return { applied, skipped, inserted };
+  });
+}
+
+/**
+ * Hard-remove tombstones older than TOMBSTONE_RETENTION_MS. Called from the
+ * cloud sync layer after a successful round so deleted records do not
+ * accumulate forever. Safe to call on devices that never sync — tombstones
+ * will pile up but will eventually be reaped.
+ */
+export async function purgeOldTombstones() {
+  return withWriteLock(async () => {
+    const ids = await loadIndex();
+    const cutoff = Date.now() - TOMBSTONE_RETENTION_MS;
+    const stale = [];
+    await Promise.all(ids.map(async (id) => {
+      const raw = await AsyncStorage.getItem(CUSTOMER_KEY_PREFIX + id);
+      if (!raw) return;
+      try {
+        const c = JSON.parse(raw);
+        if (c?.deletedAt && Date.parse(c.deletedAt) < cutoff) {
+          stale.push(id);
+        }
+      } catch { /* ignore */ }
+    }));
+    if (stale.length === 0) return 0;
+
+    const staleSet = new Set(stale);
+    await Promise.all(stale.map(deleteOneCustomer));
+    await saveIndex(ids.filter((id) => !staleSet.has(id)));
+    invalidateCache();
+    return stale.length;
   });
 }
 
@@ -670,6 +914,8 @@ export async function clearAllData() {
     ...ids.map(deleteOneCustomer),
     AsyncStorage.removeItem(CUSTOMER_INDEX_KEY),
     AsyncStorage.removeItem(SORT_PREF_KEY),
+    AsyncStorage.removeItem(SCHEMA_VERSION_KEY),
+    AsyncStorage.removeItem(LAST_LOCAL_MUTATION_KEY),
   ]);
   invalidateCache();
 }

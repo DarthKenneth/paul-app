@@ -53,6 +53,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getAllCustomers,
+  getAllCustomersIncludingDeleted,
   getCustomerById,
   addCustomer,
   updateCustomer,
@@ -64,6 +65,9 @@ import {
   saveSortPreference,
   clearAllData,
   initStorage,
+  applyCloudMerge,
+  purgeOldTombstones,
+  getLastLocalMutation,
   CURRENT_SCHEMA_VERSION,
 } from '../data/storage';
 
@@ -483,13 +487,13 @@ describe('initStorage', () => {
     });
   });
 
-  test('removes orphaned legacy @callcard_schema_version key', async () => {
-    // The multiRemove that cleans up the schema_version key only runs during
-    // migration, so we need to also set the legacy customers key to trigger it.
-    store['@callcard_schema_version'] = '1';
+  test('writes schema version 3 after V2→V3 migration completes', async () => {
+    // V3 (project v2.0.0) repurposes @callcard_schema_version from "orphaned
+    // legacy key" to the actual on-disk schema version. After init runs, the
+    // store should record the current schema version.
     store['@callcard_customers'] = JSON.stringify([]);
     await initStorage();
-    expect(store['@callcard_schema_version']).toBeUndefined();
+    expect(store['@callcard_schema_version']).toBe('3');
   });
 });
 
@@ -588,5 +592,184 @@ describe('adversarial scenarios', () => {
       ids.add(entry.id);
     }
     expect(ids.size).toBe(100);
+  });
+});
+
+// ── V3 schema (project v2.0.0) ───────────────────────────────────────────────
+
+describe('V3 schema: updatedAt + deletedAt', () => {
+  test('addCustomer stamps updatedAt and null deletedAt', async () => {
+    const c = await addCustomer({ name: 'Alpha' });
+    expect(typeof c.updatedAt).toBe('string');
+    expect(c.deletedAt).toBeNull();
+  });
+
+  test('updateCustomer advances updatedAt', async () => {
+    const c = await addCustomer({ name: 'Alpha' });
+    const before = c.updatedAt;
+    // Sleep a tick so the new ISO timestamp differs from before
+    await new Promise((r) => setTimeout(r, 5));
+    const updated = await updateCustomer(c.id, { name: 'Bravo' });
+    expect(updated.updatedAt).not.toBe(before);
+    expect(Date.parse(updated.updatedAt)).toBeGreaterThanOrEqual(Date.parse(before));
+  });
+
+  test('deleteCustomer is a soft delete: tombstone visible only via *IncludingDeleted', async () => {
+    const c = await addCustomer({ name: 'Alpha' });
+    await deleteCustomer(c.id);
+    expect(await getCustomerById(c.id)).toBeNull();
+    const all = await getAllCustomers();
+    expect(all.find((x) => x.id === c.id)).toBeUndefined();
+    const allInc = await getAllCustomersIncludingDeleted();
+    const tomb = allInc.find((x) => x.id === c.id);
+    expect(tomb).toBeDefined();
+    expect(tomb.deletedAt).not.toBeNull();
+  });
+
+  test('LAST_LOCAL_MUTATION advances on every successful write', async () => {
+    const before = await getLastLocalMutation();
+    await addCustomer({ name: 'Alpha' });
+    const after = await getLastLocalMutation();
+    expect(after).not.toBe(before);
+    expect(Date.parse(after)).toBeGreaterThan(0);
+  });
+
+  test('addServiceEntry stamps updatedAt on the entry AND the parent customer', async () => {
+    const c = await addCustomer({ name: 'Alpha' });
+    const beforeCustomer = c.updatedAt;
+    await new Promise((r) => setTimeout(r, 5));
+    const entry = await addServiceEntry(c.id, { notes: 'first', date: new Date().toISOString() });
+    expect(entry.updatedAt).toBeDefined();
+    const reloaded = await getCustomerById(c.id);
+    expect(reloaded.updatedAt).not.toBe(beforeCustomer);
+    expect(Date.parse(reloaded.updatedAt)).toBeGreaterThanOrEqual(Date.parse(beforeCustomer));
+  });
+});
+
+describe('V2 → V3 migration', () => {
+  test('stamps updatedAt + deletedAt on existing V2 records, preserves data', async () => {
+    // Simulate a V2 install: index + per-customer keys, no schema_version.
+    Object.keys(store).forEach((k) => delete store[k]);
+    await clearAllData();
+    store['@callcard_customer_index'] = JSON.stringify(['cust-1']);
+    store['@callcard_customer_cust-1'] = JSON.stringify({
+      id: 'cust-1',
+      name: 'Legacy User',
+      serviceLog: [
+        { id: 'e1', date: '2025-01-01T12:00:00.000Z', notes: 'first' },
+      ],
+    });
+    // Note: no @callcard_schema_version key (V2 didn't have one)
+
+    await initStorage();
+
+    const c = await getCustomerById('cust-1');
+    expect(c).toBeTruthy();
+    expect(c.name).toBe('Legacy User');
+    expect(typeof c.updatedAt).toBe('string');
+    expect(c.deletedAt).toBeNull();
+    expect(c.serviceLog[0].updatedAt).toBeDefined();
+    expect(store['@callcard_schema_version']).toBe(String(CURRENT_SCHEMA_VERSION));
+  });
+
+  test('skips migration when schema_version already at current', async () => {
+    Object.keys(store).forEach((k) => delete store[k]);
+    await clearAllData();
+    store['@callcard_customer_index'] = JSON.stringify(['cust-1']);
+    store['@callcard_customer_cust-1'] = JSON.stringify({
+      id: 'cust-1',
+      name: 'Already V3',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      deletedAt: null,
+    });
+    store['@callcard_schema_version'] = String(CURRENT_SCHEMA_VERSION);
+
+    await initStorage();
+
+    const c = await getCustomerById('cust-1');
+    // updatedAt should be unchanged — migration didn't touch the record
+    expect(c.updatedAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+});
+
+describe('applyCloudMerge: per-record sync', () => {
+  test('inserts new remote records', async () => {
+    const result = await applyCloudMerge([
+      { id: 'remote-1', name: 'Remote', updatedAt: '2026-04-29T00:00:00.000Z', deletedAt: null },
+    ]);
+    expect(result.inserted).toBe(1);
+    expect(result.applied).toBe(0);
+    const all = await getAllCustomers();
+    expect(all.find((c) => c.id === 'remote-1')).toBeDefined();
+  });
+
+  test('newer remote updatedAt wins', async () => {
+    const c = await addCustomer({ name: 'Local' });
+    const newer = {
+      ...c,
+      name: 'Remote-Updated',
+      updatedAt: new Date(Date.parse(c.updatedAt) + 60000).toISOString(),
+    };
+    const result = await applyCloudMerge([newer]);
+    expect(result.applied).toBe(1);
+    const reloaded = await getCustomerById(c.id);
+    expect(reloaded.name).toBe('Remote-Updated');
+  });
+
+  test('older remote updatedAt is skipped', async () => {
+    const c = await addCustomer({ name: 'Local' });
+    const older = {
+      ...c,
+      name: 'Stale',
+      updatedAt: new Date(Date.parse(c.updatedAt) - 60000).toISOString(),
+    };
+    const result = await applyCloudMerge([older]);
+    expect(result.skipped).toBe(1);
+    const reloaded = await getCustomerById(c.id);
+    expect(reloaded.name).toBe('Local');
+  });
+
+  test('remote tombstone propagates a delete', async () => {
+    const c = await addCustomer({ name: 'Local' });
+    const tomb = {
+      ...c,
+      deletedAt: new Date(Date.parse(c.updatedAt) + 60000).toISOString(),
+      updatedAt: new Date(Date.parse(c.updatedAt) + 60000).toISOString(),
+    };
+    await applyCloudMerge([tomb]);
+    expect(await getCustomerById(c.id)).toBeNull();
+  });
+
+  test('local-only records are preserved (not in remote payload)', async () => {
+    const c = await addCustomer({ name: 'LocalOnly' });
+    await applyCloudMerge([]); // empty cloud
+    expect(await getCustomerById(c.id)).toBeTruthy();
+  });
+});
+
+describe('purgeOldTombstones', () => {
+  test('removes tombstones older than 30 days', async () => {
+    const c = await addCustomer({ name: 'Doomed' });
+    // Mark deleted ~31 days ago
+    const ancient = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+    store['@callcard_customer_' + c.id] = JSON.stringify({
+      ...JSON.parse(store['@callcard_customer_' + c.id]),
+      deletedAt: ancient,
+      updatedAt: ancient,
+    });
+
+    const removed = await purgeOldTombstones();
+    expect(removed).toBe(1);
+    const allInc = await getAllCustomersIncludingDeleted();
+    expect(allInc.find((x) => x.id === c.id)).toBeUndefined();
+  });
+
+  test('keeps recent tombstones', async () => {
+    const c = await addCustomer({ name: 'Recent' });
+    await deleteCustomer(c.id); // deletedAt = now
+    const removed = await purgeOldTombstones();
+    expect(removed).toBe(0);
+    const allInc = await getAllCustomersIncludingDeleted();
+    expect(allInc.find((x) => x.id === c.id)).toBeDefined();
   });
 });

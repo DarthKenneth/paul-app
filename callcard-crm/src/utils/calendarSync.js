@@ -1,6 +1,6 @@
 // =============================================================================
 // calendarSync.js - Pushes service due dates and scheduled services to device calendar
-// Version: 1.7.1
+// Version: 1.8
 // Last Updated: 2026-04-18
 //
 // PROJECT:      Rolodeck (project v0.24.2)
@@ -341,15 +341,23 @@ function buildEventNotes(customer) {
  * Upsert a single customer's due-date event in the Rolodeck calendar.
  * Silently no-ops if sync is disabled, permission is missing, or the
  * customer has no service history.
+ *
+ * @param {object}  customer
+ * @param {object}  [opts]
+ * @param {boolean} [opts.writeStatus=true]  Whether to write to the sync-status
+ *   record. Set to false when called inside a batch (syncAllCustomers) so the
+ *   batch can own one final status record instead of the per-customer noise
+ *   clobbering a real failure.
  */
-export async function syncCustomerDueDate(customer) {
+export async function syncCustomerDueDate(customer, opts = {}) {
+  const writeStatus = opts.writeStatus !== false;
   try {
     const enabled = await getCalendarSyncEnabled();
     if (!enabled) return;
 
     const granted = await requestCalendarPermission();
     if (!granted) {
-      await setSyncStatus('permission-denied', 'Calendar access was revoked.');
+      if (writeStatus) await setSyncStatus('permission-denied', 'Calendar access was revoked.');
       return;
     }
 
@@ -365,6 +373,11 @@ export async function syncCustomerDueDate(customer) {
     // addDaysLocal (not millisecond arithmetic) so DST transitions don't
     // shift the due date by an hour → potentially wrong day
     const dueDate = addDaysLocal(lastService, effectiveDays);
+    // expo-calendar all-day events expect endDate strictly after startDate.
+    // Some Android OEMs drop the event entirely if start === end, and on iOS
+    // EventKit can interpret it as the prior day in non-UTC zones. The
+    // canonical pattern: end = start + 1 day.
+    const endDate = addDaysLocal(dueDate, 1);
 
     const calendarId = await getRoledeckCalendar();
     const eventIds   = await getEventIds();
@@ -372,7 +385,7 @@ export async function syncCustomerDueDate(customer) {
     const eventDetails = {
       title:      `${customer.name || 'Customer'} — Service Due`,
       startDate:  dueDate,
-      endDate:    dueDate,
+      endDate,
       allDay:     true,
       calendarId,
       notes:      buildEventNotes(customer),
@@ -394,9 +407,10 @@ export async function syncCustomerDueDate(customer) {
       eventIds[customer.id] = eventId;
       await saveEventIds(eventIds);
     }
-    await setSyncStatus('ok');
+    if (writeStatus) await setSyncStatus('ok');
   } catch (err) {
-    await setSyncStatus('error', err?.message || 'Calendar sync failed.');
+    if (writeStatus) await setSyncStatus('error', err?.message || 'Calendar sync failed.');
+    else throw err; // surface to the batch caller
   }
 }
 
@@ -418,12 +432,21 @@ export async function syncAllCustomers() {
     const all = await getAllCustomers();
     const active = all.filter((c) => !c.archived);
 
+    let firstFailure = null;
     for (const customer of active) {
-      await syncCustomerDueDate(customer);
+      try {
+        // writeStatus:false so per-customer success/failure does not clobber
+        // a mid-loop failure with the next customer's "ok"
+        await syncCustomerDueDate(customer, { writeStatus: false });
+      } catch (err) {
+        if (!firstFailure) firstFailure = err;
+      }
     }
-    // syncCustomerDueDate already writes status per-customer, but if the
-    // loop ran without any per-customer errors, mark the whole batch ok
-    await setSyncStatus('ok');
+    if (firstFailure) {
+      await setSyncStatus('error', firstFailure?.message || 'Calendar sync failed for some customers.');
+    } else {
+      await setSyncStatus('ok');
+    }
   } catch (err) {
     await setSyncStatus('error', err?.message || 'Calendar sync failed.');
   }

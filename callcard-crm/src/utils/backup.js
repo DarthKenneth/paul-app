@@ -1,6 +1,6 @@
 // =============================================================================
 // backup.js - Cloud backup and restore for customer data
-// Version: 1.5
+// Version: 1.6
 // Last Updated: 2026-04-28
 //
 // PROJECT:      Rolodeck (project v1.5)
@@ -93,12 +93,16 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
-import { getAllCustomers, restoreCustomers, CURRENT_SCHEMA_VERSION } from '../data/storage';
+import { getAllCustomers, restoreCustomers, getLastLocalMutation, CURRENT_SCHEMA_VERSION } from '../data/storage';
 import { APP_VERSION } from '../appVersion';
 
 const BACKUP_VERSION          = '1';
 const LAST_BACKUP_KEY         = '@callcard_last_backup';
 const AUTO_BACKUP_KEY         = '@callcard_last_auto_backup';
+// Tracks the lastLocalMutation timestamp at the time of the last successful
+// auto-backup. If nothing has changed locally since then, autoBackup skips
+// the disk write — avoiding pointless iCloud Backup deltas every 24h.
+const AUTO_BACKUP_MUTATION_KEY = '@callcard_last_auto_backup_mutation';
 const AUTO_BACKUP_FILE        = 'callcard-auto-backup.json';
 const AUTO_BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 // 50 MB. A typical backup is ~1 KB per customer; even 10K customers fits in
@@ -311,8 +315,26 @@ export async function autoBackup() {
     }
   }
 
+  // Skip the actual file write when nothing has changed since the last
+  // successful backup. iOS iCloud Backup and Android Auto Backup ship
+  // deltas, but rewriting the same JSON every 24h still burns cycles and
+  // metering quota for users on capped plans.
+  const currentMutation = await getLastLocalMutation();
+  let lastBackupMutation = null;
+  try { lastBackupMutation = await AsyncStorage.getItem(AUTO_BACKUP_MUTATION_KEY); } catch { /* ignore */ }
+  const unchanged = currentMutation && lastBackupMutation === currentMutation;
+
   const customers = await getAllCustomers();
   if (!customers.length) return;
+
+  if (unchanged) {
+    // Bump the timestamp so the 24h gate above still rate-limits even though
+    // we skipped the disk write. Without this, every autoBackup call after
+    // the 24h boundary would re-enter this branch and re-set the timestamp
+    // anyway, just without writing — same end state, less code.
+    await AsyncStorage.setItem(AUTO_BACKUP_KEY, new Date().toISOString());
+    return;
+  }
 
   const payload = {
     backupVersion:        BACKUP_VERSION,
@@ -326,4 +348,7 @@ export async function autoBackup() {
   const fileUri = FileSystem.documentDirectory + AUTO_BACKUP_FILE;
   await FileSystem.writeAsStringAsync(fileUri, JSON.stringify(payload), { encoding: 'utf8' });
   await AsyncStorage.setItem(AUTO_BACKUP_KEY, new Date().toISOString());
+  if (currentMutation) {
+    await AsyncStorage.setItem(AUTO_BACKUP_MUTATION_KEY, currentMutation);
+  }
 }
