@@ -1,6 +1,6 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.3
+// Version: 2.3.1
 // Last Updated: 2026-04-28
 //
 // PROJECT:      Rolodeck (project v1.5)
@@ -111,6 +111,7 @@
 // v2.0.2 2026-04-17  Claude  handleCalSyncRetry: add catch block safety net + null-coalesce
 //                             on getCalendarSyncStatus result
 // v2.0.1 2026-04-17  Claude  Retry sync now calls syncAll (due dates + scheduled services)
+// v2.3.1 2026-04-28  Claude  __DEV__-only seed-data button in Developer section
 // v2.3  2026-04-28  Claude  Backup & Restore section — live (replacing coming-soon)
 //       - Added exportBackup, importBackup, getLastBackupDate imports from backup.js
 //       - Added lastBackupDate, backupBusy, restoreBusy state
@@ -243,6 +244,8 @@ import {
   getSquareSyncMetadata,
   getSquareAutoSync,
   saveSquareAutoSync,
+  addCustomer,
+  addServiceEntry,
 } from '../data/storage';
 import {
   isSquareConnected,
@@ -260,6 +263,7 @@ import {
 } from '../utils/calendarSync';
 import { APP_VERSION } from '../appVersion';
 import { useProfession } from '../contexts/ProfessionContext';
+import { SEED_CUSTOMERS } from '../../scripts/seed-data';
 
 const INTERVAL_MODE_LABELS = {
   '30':   '30 Days',
@@ -314,6 +318,7 @@ export default function SettingsScreen({ navigation }) {
   const [lastBackupDate, setLastBackupDate]     = useState(null);
   const [backupBusy, setBackupBusy]             = useState(false);
   const [restoreBusy, setRestoreBusy]           = useState(false);
+  const [seedBusy, setSeedBusy]                 = useState(false);
   const toggleAnim    = useRef(new Animated.Value(0)).current;
   const calSyncAnim   = useRef(new Animated.Value(0)).current;
   const autoSyncAnim  = useRef(new Animated.Value(0)).current;
@@ -454,6 +459,37 @@ export default function SettingsScreen({ navigation }) {
     setSquareAutoSync(next);
     Animated.spring(autoSyncAnim, { toValue: next ? 1 : 0, useNativeDriver: false, friction: 6, tension: 80 }).start();
     await saveSquareAutoSync(next);
+  };
+
+  const handleSeedData = () => {
+    Alert.alert(
+      'Seed Sample Data',
+      `Add ${SEED_CUSTOMERS.length} sample customers for testing? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Seed',
+          onPress: async () => {
+            setSeedBusy(true);
+            try {
+              for (const seed of SEED_CUSTOMERS) {
+                const { serviceDaysAgo, ...fields } = seed;
+                const customer = await addCustomer(fields);
+                if (serviceDaysAgo != null) {
+                  const date = new Date(Date.now() - serviceDaysAgo * 86400000).toISOString();
+                  await addServiceEntry(customer.id, { date, type: 'service', notes: '' });
+                }
+              }
+              Alert.alert('Done', `${SEED_CUSTOMERS.length} sample customers added.`);
+            } catch (err) {
+              Alert.alert('Seed Failed', err?.message || 'Something went wrong.');
+            } finally {
+              setSeedBusy(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleBackup = async () => {
@@ -869,6 +905,31 @@ export default function SettingsScreen({ navigation }) {
           </Pressable>
         </View>
 
+        {/* ── Developer (DEV builds only) ── */}
+        {__DEV__ && (
+          <View style={[styles.section, styles.devSection]}>
+            <Text style={styles.sectionTitle}>Developer</Text>
+            <Pressable
+              style={styles.appearanceRow}
+              onPress={handleSeedData}
+              disabled={seedBusy}
+              accessibilityRole="button"
+              accessibilityLabel="Seed sample customer data"
+            >
+              <View style={styles.rowLeft}>
+                <Ionicons name="flask-outline" size={20} color={theme.textSecondary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>Seed Sample Data</Text>
+                  <Text style={styles.rowDesc}>Add {SEED_CUSTOMERS.length} fake customers for testing</Text>
+                </View>
+              </View>
+              {seedBusy
+                ? <ActivityIndicator size="small" color={theme.primary} />
+                : <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />}
+            </Pressable>
+          </View>
+        )}
+
         {/* ── Copyright + version ── */}
         <Text style={styles.copyright}>
           v{APP_VERSION} · © 2026 ArdinGate Studios LLC. All rights reserved.
@@ -1080,6 +1141,10 @@ function makeStyles(theme) {
       textAlign:     'center',
       marginTop:     10,
       paddingBottom: 8,
+    },
+    devSection: {
+      borderWidth:  1,
+      borderColor:  theme.warning + '50',
     },
   });
 }

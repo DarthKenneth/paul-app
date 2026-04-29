@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Rolodeck are documented in this file.
+All notable changes to Callcard CRM are documented in this file.
 
 PROJECT TYPE: Mobile app (React Native / Expo managed workflow)
 REPO:         local
@@ -31,6 +31,7 @@ CREATED:      2026-04-03
 
 ### Infrastructure
 - `photoUtils.savePhotoLocally` caches its directory-creation roundtrip after the first save, so bulk photo adds skip `getInfoAsync` for every photo after the first.
+- Added `__DEV__`-only "Seed Sample Data" button in Settings for screenshot capture workflow (not visible in production builds).
 
 ---
 
@@ -57,25 +58,10 @@ CREATED:      2026-04-03
 
 ---
 
-## [1.5.0] - 2026-04-28
-
-### Changed
-- App renamed to **Callcard CRM** throughout — display name, permission dialogs, calendar, backup files, and all AsyncStorage keys updated.
-- App deep link scheme updated from `rolodeck://` to `callcard://`.
-
----
-
 ## [1.4.4] - 2026-04-27
 
 ### Fixed
 - Removed `READ_MEDIA_IMAGES` from Android permissions manifest. expo-image-picker uses the system photo picker on API 33+, which doesn't require this permission. Fixes Google Play policy violation blocking store listing updates.
-
----
-
-## [1.4.3] - 2026-04-27
-
-### Changed
-- App rebranded from "Rolodeck" to "Callout CRM" across all store listings (App Store, Google Play) and app display name.
 
 ---
 
