@@ -7,7 +7,10 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID": "1066309643957-vtduj443aicjapigfa8vnesrbrdadsmj.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID": "1066309643957-vtduj443aicjapigfa8vnesrbrdadsmj.apps.googleusercontent.com",
+        "EXPO_PUBLIC_SQUARE_CLIENT_ID":       "sq0idp-s6G7pw56_DY7OA943ik9hg",
+        "EXPO_PUBLIC_SQUARE_LOCATION_ID":     "L097PCBJCVMMT",
+        "EXPO_PUBLIC_SQUARE_ENVIRONMENT":     "production"
       },
       "ios": {
         "buildConfiguration": "Release",
@@ -21,7 +24,10 @@
     "preview": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID": "1066309643957-gikeic4tgjn0n3qbp21a4e0h8d791f98.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID": "1066309643957-gikeic4tgjn0n3qbp21a4e0h8d791f98.apps.googleusercontent.com",
+        "EXPO_PUBLIC_SQUARE_CLIENT_ID":       "sq0idp-s6G7pw56_DY7OA943ik9hg",
+        "EXPO_PUBLIC_SQUARE_LOCATION_ID":     "L097PCBJCVMMT",
+        "EXPO_PUBLIC_SQUARE_ENVIRONMENT":     "production"
       },
       "ios": {
         "distribution": "store",
