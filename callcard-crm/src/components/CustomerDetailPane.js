@@ -1,7 +1,7 @@
 // =============================================================================
 // CustomerDetailPane.js - Embeddable customer detail body (no nav header)
-// Version: 1.1
-// Last Updated: 2026-04-25
+// Version: 1.2
+// Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v1.1.0)
 // FILES:        CustomerDetailPane.js     (this file — embeddable pane body)
@@ -30,6 +30,7 @@
 //     refreshes when customerId changes (split view tap) without needing focus
 //
 // CHANGE LOG:
+// v1.2  2026-04-29  Claude  Fire syncUp() after all customer/service mutations for immediate sync
 // v1.0  2026-04-24  Claude  Extracted from CustomerDetailScreen for tablet split view
 // v1.1  2026-04-25  Claude  Tap-to-call and tap-to-email on phone/email info rows
 // =============================================================================
@@ -61,6 +62,7 @@ import {
   addScheduledService, deleteScheduledService,
 } from '../data/storage';
 import { syncScheduledService, removeScheduledServiceEvent, removeCustomerEvent } from '../utils/calendarSync';
+import { syncUp } from '../utils/cloudSync';
 import { deletePhotosFromDisk } from '../utils/photoUtils';
 import { GEOAPIFY_API_KEY } from '../config/placesConfig';
 import { useTheme } from '../styles/theme';
@@ -217,6 +219,7 @@ export default function CustomerDetailPane({
     setSaving(true);
     try {
       await updateCustomer(customerId, form);
+      syncUp().catch(() => {});
       setEditing(false);
       const c = await getCustomerById(customerId);
       if (c) {
@@ -245,9 +248,11 @@ export default function CustomerDetailPane({
         await unarchiveCustomer(customerId);
       } else {
         await archiveCustomer(customerId);
+        syncUp().catch(() => {});
         onBack?.();
         return;
       }
+      syncUp().catch(() => {});
       const c = await getCustomerById(customerId);
       if (c) setCustomer(c);
     } catch {
@@ -258,6 +263,7 @@ export default function CustomerDetailPane({
   const handleDeleteScheduled = async (entryId) => {
     try {
       await deleteScheduledService(customerId, entryId);
+      syncUp().catch(() => {});
       removeScheduledServiceEvent(entryId);
       const c = await getCustomerById(customerId);
       if (c) setCustomer(c);
@@ -278,6 +284,7 @@ export default function CustomerDetailPane({
   const handleScheduleSave = async (cId, data) => {
     try {
       const entry = await addScheduledService(cId, data);
+      syncUp().catch(() => {});
       const c = await getCustomerById(customerId);
       if (c) {
         setCustomer(c);
@@ -314,6 +321,7 @@ export default function CustomerDetailPane({
               const photoUris  = (customer.serviceLog || []).flatMap((e) => (Array.isArray(e.photos) ? e.photos : []));
               const scheduledIds = (customer.scheduledServices || []).map((s) => s.id);
               await deleteCustomer(customerId);
+              syncUp().catch(() => {});
               removeCustomerEvent(customerId);
               scheduledIds.forEach((sid) => removeScheduledServiceEvent(sid));
               deletePhotosFromDisk(photoUris);

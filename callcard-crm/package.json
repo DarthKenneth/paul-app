@@ -1,6 +1,6 @@
 {
   "name": "callcard",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
@@ -46,7 +46,9 @@
     "@sentry/react-native": "~7.11.0",
     "expo": "~55.0.15",
     "expo-calendar": "~55.0.14",
+    "expo-auth-session": "~6.1.5",
     "expo-crypto": "~55.0.14",
+    "icloud-container": "file:./modules/icloud-container",
     "expo-document-picker": "~55.0.13",
     "expo-file-system": "~55.0.16",
     "expo-font": "~55.0.6",

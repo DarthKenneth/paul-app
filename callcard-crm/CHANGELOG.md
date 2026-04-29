@@ -8,6 +8,16 @@ CREATED:      2026-04-03
 
 ---
 
+## [1.5.4] - 2026-04-29
+
+### Fixed
+- **Cross-device sync fires immediately after every mutation** — adding a customer, logging a service, editing/deleting an entry, archiving, and scheduling all now trigger a background `syncUp()` on the spot. Previously sync only ran when the app went to the background, meaning force-killing the app right after a change on Android could lose the sync for that session.
+
+### Infrastructure
+- **Google OAuth client configured** — Web application client created in Google Cloud Console with Expo auth proxy redirect URI (`https://auth.expo.io/@ardingate-studios-llc/rolodeck`). Client ID wired into `.env` and `eas.json`. Google Drive sync is now fully ready for the next Android build.
+
+---
+
 ## [1.5.3] - 2026-04-28
 
 ### Fixed

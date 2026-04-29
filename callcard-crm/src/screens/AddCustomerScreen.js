@@ -1,7 +1,7 @@
 // =============================================================================
 // AddCustomerScreen.js - Form to add a new customer
-// Version: 1.8
-// Last Updated: 2026-04-19
+// Version: 1.9
+// Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v0.25.0)
 // FILES:        AddCustomerScreen.js  (this file)
@@ -31,6 +31,8 @@
 //   - Storage errors caught and surfaced via Alert
 //
 // CHANGE LOG:
+// v1.9    2026-04-29  Claude  Fire syncUp() after addCustomer() so data syncs immediately
+//                             regardless of when the user closes the app
 // v1.8    2026-04-19  Claude  Tablet width cap on form scroll container so the
 //                              customer-create form doesn't stretch across iPad
 // v1.0    2026-04-03  Claude  Initial scaffold
@@ -91,6 +93,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { addCustomer } from '../data/storage';
+import { syncUp } from '../utils/cloudSync';
 import { GEOAPIFY_API_KEY } from '../config/placesConfig';
 import { useTheme } from '../styles/theme';
 import { useContentContainerStyle } from '../utils/responsive';
@@ -234,6 +237,7 @@ export default function AddCustomerScreen({ navigation }) {
         trimmed[key] = (form[key] || '').trim();
       }
       await addCustomer(trimmed);
+      syncUp().catch(() => {});
       if (navigation.canGoBack()) {
         navigation.goBack();
       } else {

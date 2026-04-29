@@ -1,7 +1,7 @@
 // =============================================================================
 // AddServiceModal.js - Centered modal for logging a completed service entry
-// Version: 1.8
-// Last Updated: 2026-04-24
+// Version: 1.9
+// Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v0.28)
 // FILES:        AddServiceModal.js       (this file)
@@ -36,6 +36,7 @@
 //   - State resets to 'form' on each open via useEffect on visible prop
 //
 // CHANGE LOG:
+// v1.9  2026-04-29  Claude  Fire syncUp() after addServiceEntry() for immediate cross-device sync
 // v1.0  2026-04-10  Claude  Initial implementation (extracted from AddServiceScreen)
 // v1.1  2026-04-12  Claude  Post-save invoice prompt (Option F)
 //         - Added phase state ('form' | 'success' | 'invoice') to drive 3-phase flow
@@ -120,6 +121,7 @@ import {
   getServiceIntervalCustomDays,
 } from '../data/storage';
 import { syncCustomerDueDate } from '../utils/calendarSync';
+import { syncUp } from '../utils/cloudSync';
 import { sendSquareInvoice } from '../utils/squarePlaceholder';
 import { reportAndShow, reportError } from '../utils/errorReporting';
 import { useTheme } from '../styles/theme';
@@ -331,6 +333,7 @@ export default function AddServiceModal({ visible, customer, onSave, onClose }) 
       }
 
       await addServiceEntry(customer.id, entryData);
+      syncUp().catch(() => {});
 
       getCustomerById(customer.id)
         .then((c) => syncCustomerDueDate(c))

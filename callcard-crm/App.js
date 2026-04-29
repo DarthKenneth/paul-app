@@ -1,7 +1,7 @@
 // =============================================================================
 // App.js - Root application entry point
-// Version: 2.2
-// Last Updated: 2026-04-28
+// Version: 2.2.1
+// Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v1.5)
 // FILES:        App.js                  (this file — root entry)
@@ -39,6 +39,9 @@
 //       - Added showOnboarding state, checked via getOnboardingComplete on mount
 //       - Imported OnboardingModal and rendered it above NavigationContainer
 //       - handleOnboardingComplete writes flag then hides modal
+// v2.2.1  2026-04-29  Claude  Remove redundant borderRightWidth from tablet sidebar —
+//                            content pane already draws borderLeftColor: theme.border;
+//                            double border produced a 2px artifact with no color set
 // v2.2  2026-04-28  Claude  Sentry capture on silent fire-and-forget failures
 //       - Imported reportError from src/utils/errorReporting
 //       - initStorage / runSync auto-sync / autoBackup / getOnboardingComplete:
@@ -138,6 +141,7 @@ import { isSquareConnected } from './src/utils/squarePlaceholder';
 import { autoBackup } from './src/utils/backup';
 import { reportError } from './src/utils/errorReporting';
 import { runSync } from './src/utils/squareSync';
+import { syncFull, syncUp } from './src/utils/cloudSync';
 import { getAlertBadgeCount } from './src/utils/serviceAlerts';
 
 // ── Sentry init ────────────────────────────────────────────────────────────────
@@ -222,7 +226,6 @@ const sidebarStyles = StyleSheet.create({
   sidebar: {
     width:           SIDEBAR_WIDTH,
     backgroundColor: 'transparent',
-    borderRightWidth: 1,
     paddingTop:       56,
     paddingHorizontal: 12,
   },
@@ -313,6 +316,8 @@ function AppInner() {
           reportError(err, { feature: 'square-sync', action: 'auto-sync-precheck' });
         }
         autoBackup().catch((err) => reportError(err, { feature: 'backup', action: 'auto' }));
+        // Cloud sync: pull on launch (push happens after data mutations via syncUp)
+        syncFull().catch((err) => reportError(err, { feature: 'cloud-sync', action: 'launch' }));
       });
     getOnboardingComplete()
       .then((done) => { if (!done) setShowOnboarding(true); })
@@ -321,6 +326,12 @@ function AppInner() {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (appState.current.match(/inactive|background/) && nextState === 'active') {
         refreshAlerts();
+        // Re-sync whenever the app comes back to foreground
+        syncFull().catch((err) => reportError(err, { feature: 'cloud-sync', action: 'foreground' }));
+      }
+      if (nextState === 'background') {
+        // Push latest data before the app is suspended
+        syncUp().catch((err) => reportError(err, { feature: 'cloud-sync', action: 'background' }));
       }
       appState.current = nextState;
     });

@@ -1,9 +1,9 @@
 // =============================================================================
 // SettingsScreen.js - App preferences: sort, appearance, integrations, version
-// Version: 2.3.1
-// Last Updated: 2026-04-28
+// Version: 2.5.1
+// Last Updated: 2026-04-29
 //
-// PROJECT:      Rolodeck (project v1.5)
+// PROJECT:      Rolodeck (project v1.5.3)
 // FILES:        SettingsScreen.js         (this file)
 //               ThemeScreen.js            (color scheme + font pickers; navigated
 //                                          to from the Appearance card's Theme row)
@@ -111,6 +111,18 @@
 // v2.0.2 2026-04-17  Claude  handleCalSyncRetry: add catch block safety net + null-coalesce
 //                             on getCalendarSyncStatus result
 // v2.0.1 2026-04-17  Claude  Retry sync now calls syncAll (due dates + scheduled services)
+// v2.5.1  2026-04-29  Claude  Switch SEED_CUSTOMERS to conditional require so it's dead code in
+//                            production builds (was a top-level import always bundled by Metro)
+// v2.5  2026-04-29  Claude  Removed manual Backup & Restore section
+//       - Dropped Backup & Restore JSX section, handleBackup, handleRestore handlers
+//       - Removed lastBackupDate, backupBusy, restoreBusy state
+//       - Removed backup.js import (auto-backup still runs silently in App.js)
+//       - Cloud Sync section is now the only user-facing data-safety control
+// v2.4  2026-04-29  Claude  Cloud Sync section (iCloud on iOS, Google Drive on Android)
+//       - Added handleGoogleSignIn, handleSignOutGoogle, handleSyncNow handlers
+//       - Added Cloud Sync JSX section between Backup & Restore and Developer
+//       - iOS shows iCloud status + manual sync button; Android shows connect/disconnect flow
+//       - Fixed duplicate Platform import (was imported twice)
 // v2.3.1 2026-04-28  Claude  __DEV__-only seed-data button in Developer section
 // v2.3  2026-04-28  Claude  Backup & Restore section — live (replacing coming-soon)
 //       - Added exportBackup, importBackup, getLastBackupDate imports from backup.js
@@ -252,8 +264,14 @@ import {
   connectSquare,
   disconnectSquare,
 } from '../utils/squarePlaceholder';
-import { cloudProviderLabel, exportBackup, importBackup, getLastBackupDate } from '../utils/backup';
 import { reportAndShow } from '../utils/errorReporting';
+import {
+  isCloudSyncAvailable,
+  syncUp,
+  signInWithGoogle,
+  signOutGoogleDrive,
+} from '../utils/cloudSync';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   getCalendarSyncEnabled,
   enableCalendarSync,
@@ -263,7 +281,12 @@ import {
 } from '../utils/calendarSync';
 import { APP_VERSION } from '../appVersion';
 import { useProfession } from '../contexts/ProfessionContext';
-import { SEED_CUSTOMERS } from '../../scripts/seed-data';
+
+// Loaded lazily so Metro strips it from production bundles (__DEV__ is a
+// compile-time constant; the require() branch is dead code in release builds).
+const SEED_CUSTOMERS = __DEV__
+  ? require('../../scripts/seed-data').SEED_CUSTOMERS
+  : [];
 
 const INTERVAL_MODE_LABELS = {
   '30':   '30 Days',
@@ -315,10 +338,10 @@ export default function SettingsScreen({ navigation }) {
   const [squareConnecting, setSquareConnecting] = useState(false);
   const [squareAutoSync, setSquareAutoSync]     = useState(false);
   const [squareSyncMeta, setSquareSyncMeta]     = useState(null);
-  const [lastBackupDate, setLastBackupDate]     = useState(null);
-  const [backupBusy, setBackupBusy]             = useState(false);
-  const [restoreBusy, setRestoreBusy]           = useState(false);
   const [seedBusy, setSeedBusy]                 = useState(false);
+  const [cloudAvailable, setCloudAvailable]     = useState(false);
+  const [cloudSyncing, setCloudSyncing]         = useState(false);
+  const [cloudLastSync, setCloudLastSync]       = useState(null);
   const toggleAnim    = useRef(new Animated.Value(0)).current;
   const calSyncAnim   = useRef(new Animated.Value(0)).current;
   const autoSyncAnim  = useRef(new Animated.Value(0)).current;
@@ -340,7 +363,10 @@ export default function SettingsScreen({ navigation }) {
       if (active) { setSquareAutoSync(v); autoSyncAnim.setValue(v ? 1 : 0); }
     });
     getSquareSyncMetadata().then((m) => { if (active) setSquareSyncMeta(m); });
-    getLastBackupDate().then((d) => { if (active) setLastBackupDate(d); });
+    isCloudSyncAvailable().then((ok) => { if (active) setCloudAvailable(ok); });
+    AsyncStorage.getItem('@callcard_cloud_synced_at').then((ts) => {
+      if (active && ts) setCloudLastSync(ts);
+    });
     return () => { active = false; };
   }, []);
 
@@ -492,56 +518,50 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
-  const handleBackup = async () => {
-    if (backupBusy || restoreBusy) return;
-    setBackupBusy(true);
+  const handleGoogleSignIn = async () => {
+    setCloudSyncing(true);
     try {
-      await exportBackup();
-      const d = await getLastBackupDate();
-      setLastBackupDate(d);
+      const ok = await signInWithGoogle();
+      if (ok) {
+        setCloudAvailable(true);
+        await syncUp();
+        const ts = new Date().toISOString();
+        setCloudLastSync(ts);
+      }
     } catch (err) {
       reportAndShow(err, {
-        title:    'Backup Failed',
-        fallback: 'Could not create the backup file. Please try again.',
-        feature:  'backup',
-        action:   'export',
+        title:    'Google Drive',
+        fallback: 'Could not connect to Google Drive. Try again.',
+        feature:  'cloud-sync',
+        action:   'sign-in',
       });
     } finally {
-      setBackupBusy(false);
+      setCloudSyncing(false);
     }
   };
 
-  const handleRestore = () => {
-    if (backupBusy || restoreBusy) return;
-    Alert.alert(
-      'Restore Backup',
-      'This will replace all your current customer data with the selected backup file. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Restore',
-          style: 'destructive',
-          onPress: async () => {
-            setRestoreBusy(true);
-            try {
-              const result = await importBackup();
-              if (result) {
-                Alert.alert('Restored', `${result.customerCount} customer${result.customerCount === 1 ? '' : 's'} restored successfully.`);
-              }
-            } catch (err) {
-              reportAndShow(err, {
-                title:    'Restore Failed',
-                fallback: 'Could not read the selected backup file. It may be corrupt or from a newer version of the app.',
-                feature:  'backup',
-                action:   'import',
-              });
-            } finally {
-              setRestoreBusy(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleSignOutGoogle = async () => {
+    await signOutGoogleDrive();
+    setCloudAvailable(false);
+    setCloudLastSync(null);
+  };
+
+  const handleSyncNow = async () => {
+    setCloudSyncing(true);
+    try {
+      await syncUp();
+      const ts = new Date().toISOString();
+      setCloudLastSync(ts);
+    } catch (err) {
+      reportAndShow(err, {
+        title:    'Sync Failed',
+        fallback: 'Could not sync. Try again.',
+        feature:  'cloud-sync',
+        action:   'sync-now',
+      });
+    } finally {
+      setCloudSyncing(false);
+    }
   };
 
   const toggleBg = toggleAnim.interpolate({
@@ -850,59 +870,97 @@ export default function SettingsScreen({ navigation }) {
           )}
         </View>
 
-        {/* ── Backup & Restore ── */}
+        {/* ── Cloud Sync ── */}
         <View style={styles.section}>
-          <View style={styles.comingSoonHeader}>
-            <Ionicons name="cloud-upload-outline" size={22} color={theme.textSecondary} />
-            <Text style={styles.sectionTitle}>Backup &amp; Restore</Text>
-          </View>
-          <Text style={styles.sectionDesc}>
-            Save your customer data to {cloudProviderLabel()} and restore it anytime.
-          </Text>
+          <Text style={styles.sectionTitle}>Cloud Sync</Text>
 
-          <Pressable
-            style={styles.appearanceRow}
-            onPress={handleBackup}
-            disabled={backupBusy || restoreBusy}
-            accessibilityRole="button"
-            accessibilityLabel="Back up customer data"
-          >
-            <View style={styles.rowLeft}>
-              <Ionicons name="cloud-upload-outline" size={20} color={theme.textSecondary} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>Back Up Now</Text>
-                <Text style={styles.rowDesc}>
-                  {lastBackupDate
-                    ? `Last backed up ${formatSyncTime(lastBackupDate.toISOString())}`
-                    : 'Never backed up'}
-                </Text>
+          {Platform.OS === 'ios' ? (
+            /* iOS: iCloud is automatic — just show status */
+            <View style={styles.appearanceRow}>
+              <View style={styles.rowLeft}>
+                <Ionicons
+                  name={cloudAvailable ? 'cloud-done-outline' : 'cloud-offline-outline'}
+                  size={20}
+                  color={theme.textSecondary}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>iCloud Sync</Text>
+                  <Text style={styles.rowDesc}>
+                    {cloudAvailable
+                      ? cloudLastSync
+                        ? `Synced ${formatSyncTime(cloudLastSync)}`
+                        : 'Connected — syncing automatically'
+                      : 'Sign in to iCloud in Settings to enable sync'}
+                  </Text>
+                </View>
               </View>
+              {cloudAvailable && (
+                cloudSyncing
+                  ? <ActivityIndicator size="small" color={theme.primary} />
+                  : (
+                    <Pressable onPress={handleSyncNow} hitSlop={12}>
+                      <Ionicons name="sync-outline" size={20} color={theme.primary} />
+                    </Pressable>
+                  )
+              )}
             </View>
-            {backupBusy
-              ? <ActivityIndicator size="small" color={theme.primary} />
-              : <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />}
-          </Pressable>
+          ) : (
+            /* Android: user must connect Google Drive */
+            cloudAvailable ? (
+              <>
+                <View style={styles.appearanceRow}>
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="cloud-done-outline" size={20} color={theme.textSecondary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle}>Google Drive</Text>
+                      <Text style={styles.rowDesc}>
+                        {cloudLastSync
+                          ? `Synced ${formatSyncTime(cloudLastSync)}`
+                          : 'Connected — syncing automatically'}
+                      </Text>
+                    </View>
+                  </View>
+                  {cloudSyncing
+                    ? <ActivityIndicator size="small" color={theme.primary} />
+                    : (
+                      <Pressable onPress={handleSyncNow} hitSlop={12}>
+                        <Ionicons name="sync-outline" size={20} color={theme.primary} />
+                      </Pressable>
+                    )}
+                </View>
 
-          <View style={styles.rowDivider} />
+                <View style={styles.rowDivider} />
 
-          <Pressable
-            style={styles.appearanceRow}
-            onPress={handleRestore}
-            disabled={backupBusy || restoreBusy}
-            accessibilityRole="button"
-            accessibilityLabel="Restore customer data from backup"
-          >
-            <View style={styles.rowLeft}>
-              <Ionicons name="cloud-download-outline" size={20} color={theme.textSecondary} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>Restore</Text>
-                <Text style={styles.rowDesc}>Replace all data with a backup file</Text>
-              </View>
-            </View>
-            {restoreBusy
-              ? <ActivityIndicator size="small" color={theme.primary} />
-              : <Ionicons name="chevron-forward" size={16} color={theme.textMuted} />}
-          </Pressable>
+                <Pressable
+                  style={styles.appearanceRow}
+                  onPress={handleSignOutGoogle}
+                  accessibilityRole="button"
+                  accessibilityLabel="Disconnect Google Drive"
+                >
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="log-out-outline" size={20} color={theme.textSecondary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.rowTitle, { color: theme.danger ?? '#C0392B' }]}>
+                        Disconnect Google Drive
+                      </Text>
+                    </View>
+                  </View>
+                </Pressable>
+              </>
+            ) : (
+              <Pressable
+                style={[styles.connectButton, cloudSyncing && styles.connectButtonBusy]}
+                onPress={handleGoogleSignIn}
+                disabled={cloudSyncing}
+                accessibilityRole="button"
+                accessibilityLabel="Connect Google Drive for automatic sync"
+              >
+                {cloudSyncing
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={styles.connectButtonText}>Connect Google Drive</Text>}
+              </Pressable>
+            )
+          )}
         </View>
 
         {/* ── Developer (DEV builds only) ── */}

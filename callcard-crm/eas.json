@@ -6,6 +6,9 @@
   "build": {
     "production": {
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID": "1066309643957-p9d33aa88okbks4dj8ab5dqpsmrc3e4g.apps.googleusercontent.com"
+      },
       "ios": {
         "buildConfiguration": "Release",
         "credentialsSource": "remote"
@@ -17,6 +20,9 @@
     },
     "preview": {
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID": "1066309643957-p9d33aa88okbks4dj8ab5dqpsmrc3e4g.apps.googleusercontent.com"
+      },
       "ios": {
         "distribution": "store",
         "credentialsSource": "remote"

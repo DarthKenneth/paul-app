@@ -5,9 +5,10 @@ dist/
 web-build/
 .expo-shared/
 
-# Build outputs
-android/
-ios/
+# Build outputs (Expo prebuild scratch dirs at repo root only — keep local
+# module sources under modules/*/ios)
+/android/
+/ios/
 
 # Secrets & signing
 *.jks

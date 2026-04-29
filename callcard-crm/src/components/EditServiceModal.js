@@ -1,7 +1,7 @@
 // =============================================================================
 // EditServiceModal.js - View or edit notes + photos on a service log entry
-// Version: 1.2.2
-// Last Updated: 2026-04-24
+// Version: 1.2.3
+// Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v0.28.4)
 // FILES:        EditServiceModal.js      (this file)
@@ -36,6 +36,7 @@
 //   - typeLabel resolved from allServiceTypes so custom types display correctly
 //
 // CHANGE LOG:
+// v1.2.3  2026-04-29  Claude  Fire syncUp() after updateServiceEntry/deleteServiceEntry
 // v1.2.2  2026-04-24  Claude  Detail row label no longer squeezed — label sizes to content,
 //                             value takes remaining space and wraps to multiple lines instead
 // v1.2.1  2026-04-24  Claude  Photo file cleanup on entry delete + on photo removal during edit
@@ -77,6 +78,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { savePhotoLocally, deletePhotosFromDisk } from '../utils/photoUtils';
 import { updateServiceEntry, deleteServiceEntry } from '../data/storage';
+import { syncUp } from '../utils/cloudSync';
 import { useTheme } from '../styles/theme';
 import { useProfession } from '../contexts/ProfessionContext';
 import { FontSize } from '../styles/typography';
@@ -220,6 +222,7 @@ export default function EditServiceModal({
       const originalPhotos = Array.isArray(entry.photos) ? entry.photos : [];
       const removed = originalPhotos.filter((uri) => !photos.includes(uri));
       await updateServiceEntry(customerId, entry.id, updates);
+      syncUp().catch(() => {});
       if (removed.length > 0) deletePhotosFromDisk(removed); // fire-and-forget
       onSave?.();
     } catch {
@@ -242,6 +245,7 @@ export default function EditServiceModal({
             try {
               const entryPhotos = Array.isArray(entry.photos) ? entry.photos : [];
               await deleteServiceEntry(customerId, entry.id);
+              syncUp().catch(() => {});
               if (entryPhotos.length > 0) deletePhotosFromDisk(entryPhotos); // fire-and-forget
               onDelete?.();
             } catch {

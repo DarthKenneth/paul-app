@@ -1,7 +1,7 @@
 // =============================================================================
 // AddServiceScreen.js - Add a service entry: date stamp + notes
-// Version: 2.2
-// Last Updated: 2026-04-24
+// Version: 2.4
+// Last Updated: 2026-04-29
 //
 // PROJECT:      Rolodeck (project v0.28)
 // FILES:        AddServiceScreen.js  (this file)
@@ -37,6 +37,7 @@
 //   - Storage errors caught and surfaced via Alert
 //
 // CHANGE LOG:
+// v2.4  2026-04-29  Claude  Fire syncUp() after addServiceEntry() for immediate cross-device sync
 // v2.3  2026-04-24  Claude  Equipment multi-select picker, dynamic label, deduplicated
 //       - Same changes as AddServiceModal v1.9: label is "Equipment Installed" or
 //         "Equipment Serviced" based on activeType; equipmentServiced entryField
@@ -122,6 +123,7 @@ import {
   getServiceIntervalCustomDays,
 } from '../data/storage';
 import { syncCustomerDueDate } from '../utils/calendarSync';
+import { syncUp } from '../utils/cloudSync';
 import { reportError } from '../utils/errorReporting';
 import { useTheme } from '../styles/theme';
 import { useProfession } from '../contexts/ProfessionContext';
@@ -370,6 +372,7 @@ export default function AddServiceScreen({ route, navigation }) {
       }
 
       await addServiceEntry(customerId, entryData);
+      syncUp().catch(() => {});
 
       getCustomerById(customerId)
         .then((customer) => syncCustomerDueDate(customer))

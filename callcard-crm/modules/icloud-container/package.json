@@ -1,0 +1,7 @@
+{
+  "name": "icloud-container",
+  "version": "1.0.0",
+  "description": "Expo native module — exposes the iCloud ubiquity container path on iOS",
+  "main": "index.js",
+  "license": "MIT"
+}

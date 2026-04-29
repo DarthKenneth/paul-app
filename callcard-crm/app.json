@@ -3,7 +3,7 @@
     "name": "Callcard CRM",
     "slug": "rolodeck",
     "scheme": "callcard",
-    "version": "1.5.3",
+    "version": "1.5.4",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -40,7 +40,8 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-secure-store",
-      "expo-updates"
+      "expo-updates",
+      "./plugins/withICloud"
     ],
     "ios": {
       "supportsTablet": true,
