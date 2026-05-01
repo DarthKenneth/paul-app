@@ -8,6 +8,17 @@ CREATED:      2026-04-03
 
 ---
 
+## [2.0.1] - 2026-05-01
+
+### Fixed
+- **Play Store launcher icon now matches the hi-res store icon.** The v2.0.0 build was rejected under Google Play's Misleading Claims policy: "When it's installed, your app's icon … is different to the one shown in its store listing." Root cause — `adaptive-icon-fg.png` was rasterized from the full `icon.svg`, which bakes in a `<rect width="120" height="120" fill="#FDF0E0"/>` background. Android adaptive icons composite a foreground over a separate background layer, so the cream rect was inset into the 66.7% safe zone and then placed on top of the cream `adaptiveIcon.backgroundColor`. The launcher rendered a small, low-prominence clipboard floating in a sea of cream — visually disconnected from the bold brown-on-cream Play Store hi-res icon (`icon-512.png`). New `store-assets/adaptive-icon-fg.svg` contains the clipboard graphic only with the viewBox cropped tight, so when rasterized into the safe zone the clipboard fills it; the cream comes from the bg layer. Launcher composite now matches the store hi-res icon in color, composition, and proportion. (`store-assets/adaptive-icon-fg.svg`, `scripts/generate-icons.js`)
+- **Material You themed icon (Android 13+) is now the clipboard silhouette, not a solid white square.** `generateMonochrome` rendered the full `icon.svg` and turned every opaque pixel white — but the cream background rect is fully opaque, so the entire safe zone became one big white tile. The themed-icon pass now sources from `adaptive-icon-fg.svg` (transparent background, clipboard only), so the Material You silhouette correctly shows the clipboard shape. (`scripts/generate-icons.js`)
+
+### Action items for the user
+- **Re-upload the build to Play Console.** The hi-res Play Store icon (`store-assets/icons/icon-512.png`) is unchanged — it was already correct. Only the launcher icon shipped inside the APK/AAB needed fixing. Run the release pipeline again so the next bundle Google reviews has the fixed `adaptive-icon-fg.png`.
+
+---
+
 ## [2.0.0] - 2026-04-29
 
 ### Added

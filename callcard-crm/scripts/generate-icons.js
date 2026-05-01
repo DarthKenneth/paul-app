@@ -1,14 +1,15 @@
 // =============================================================================
 // generate-icons.js - Generates all required app icon PNGs from icon.svg
-// Version: 1.4
-// Last Updated: 2026-04-26
+// Version: 1.5
+// Last Updated: 2026-05-01
 //
-// PROJECT:      Rolodeck (project v1.4)
-// FILES:        scripts/generate-icons.js       (this file — icon pipeline)
-//               store-assets/icon.svg            (light icon master source)
-//               store-assets/icon-dark.svg       (dark icon master source)
-//               store-assets/splash.png          (splash screen — dedicated path)
-//               store-assets/icons/              (output directory)
+// PROJECT:      Rolodeck (project v2.0.1)
+// FILES:        scripts/generate-icons.js          (this file — icon pipeline)
+//               store-assets/icon.svg               (light icon master source)
+//               store-assets/icon-dark.svg          (dark icon master source)
+//               store-assets/adaptive-icon-fg.svg   (Android fg — no bg rect)
+//               store-assets/splash.png             (splash screen — dedicated path)
+//               store-assets/icons/                 (output directory)
 //
 // Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
 //
@@ -29,11 +30,15 @@
 //   - splash.png (1024) is output to store-assets/ (NOT icons/) so app.json
 //     can reference a path distinct from icon.png — iOS caches launch screens
 //     by asset name; a separate path guarantees the new image is loaded
-//   - adaptive-icon-fg.png: icon centered with padding to respect the Android
-//     adaptive icon 72dp safe zone (icon occupies center 72/108 = 66.7%)
+//   - adaptive-icon-fg.png: rendered from store-assets/adaptive-icon-fg.svg
+//     (clipboard only, NO baked-in cream bg — the cream comes from
+//     adaptive-icon-bg.png so the launcher composite matches the Play Store
+//     hi-res icon visually). Sized into the 72dp safe zone (center 66.7%).
 //   - adaptive-icon-bg.png: solid #FDF0E0 fill, same dimensions
 //   - adaptive-icon-monochrome.png: white silhouette on transparent bg —
-//     used as Android 13+ Material You themed icon (monochromeImage)
+//     used as Android 13+ Material You themed icon (monochromeImage).
+//     Generated from adaptive-icon-fg.svg too, so the silhouette is the
+//     clipboard graphic only (NOT a solid white square from the cream bg).
 //   - Outputs file list summary to stdout on completion
 //
 // CHANGE LOG:
@@ -55,6 +60,20 @@
 //         - app.json splash.image now points to ./store-assets/splash.png so
 //           iOS sees a fresh asset path and cannot serve the cached old launch
 //           screen [updated ARCHITECTURE, FILES]
+// v1.5  2026-05-01  Claude  Fix Play Store launcher / hi-res icon mismatch
+//         - Added SVG_ADAPTIVE_FG_SRC pointing at new
+//           store-assets/adaptive-icon-fg.svg (clipboard only, no bg rect)
+//         - Adaptive foreground now renders that SVG into the safe zone, so
+//           the launcher composite shows clipboard at the same visual
+//           prominence as icon-512.png (Play Store hi-res). Previously the
+//           full icon.svg (cream bg + clipboard) was inset into the safe
+//           zone, producing a small clipboard floating on a cream square on
+//           top of a cream bg — visually different from the store listing
+//           and a Misleading-Claims policy violation
+//         - Monochrome icon also switched to the new SVG; previously the
+//           cream bg rect (fully opaque) became a solid white square in
+//           the silhouette pass, defeating Material You themed icons
+//           [updated ARCHITECTURE, FILES]
 // =============================================================================
 
 'use strict';
@@ -63,10 +82,11 @@ const sharp  = require('sharp');
 const fs     = require('fs');
 const path   = require('path');
 
-const ROOT         = path.join(__dirname, '..');
-const SVG_SRC      = path.join(ROOT, 'store-assets', 'icon.svg');
-const SVG_DARK_SRC = path.join(ROOT, 'store-assets', 'icon-dark.svg');
-const OUT_DIR      = path.join(ROOT, 'store-assets', 'icons');
+const ROOT             = path.join(__dirname, '..');
+const SVG_SRC          = path.join(ROOT, 'store-assets', 'icon.svg');
+const SVG_DARK_SRC     = path.join(ROOT, 'store-assets', 'icon-dark.svg');
+const SVG_ADAPTIVE_FG  = path.join(ROOT, 'store-assets', 'adaptive-icon-fg.svg');
+const OUT_DIR          = path.join(ROOT, 'store-assets', 'icons');
 
 // Adaptive icon dimensions: 648px = 108dp @ xxxhdpi (6x baseline)
 // Safe zone = inner 432px (72dp) = center 66.7%
@@ -173,8 +193,13 @@ async function main() {
   }
 
   // ── Adaptive icon foreground ──────────────────────────────────────────────
+  // Source is adaptive-icon-fg.svg — clipboard-only, no cream bg rect.
+  // Cream comes from adaptive-icon-bg.png so the launcher composite matches
+  // the Play Store hi-res icon at the same visual scale.
 
-  const fgBuffer = await sharp(svgBuffer, { density: 300 })
+  const adaptiveFgSvg = fs.readFileSync(SVG_ADAPTIVE_FG);
+
+  const fgBuffer = await sharp(adaptiveFgSvg, { density: 300 })
     .resize(ADAPTIVE_ICON_SZ, ADAPTIVE_ICON_SZ, { fit: 'cover' })
     .toBuffer();
 
@@ -207,8 +232,25 @@ async function main() {
   console.log(`  ✓  ${'adaptive-icon-bg.png'.padEnd(28)} ${ADAPTIVE_TOTAL}×${ADAPTIVE_TOTAL}   Android adaptive background (#FDF0E0 solid)`);
 
   // ── Android monochrome (Material You themed icon) ─────────────────────────
+  // Use the clipboard-only SVG too — otherwise the cream bg rect (fully
+  // opaque) becomes a solid white square in the silhouette pass.
+  // Render into the safe zone so the silhouette has the same scale as the
+  // foreground composite.
 
-  const monoPipeline = await generateMonochrome(svgBuffer, ADAPTIVE_TOTAL);
+  const monoFgBuffer = await sharp(adaptiveFgSvg, { density: 300 })
+    .resize(ADAPTIVE_ICON_SZ, ADAPTIVE_ICON_SZ, { fit: 'cover' })
+    .toBuffer();
+  const monoPaddedBuffer = await sharp(monoFgBuffer)
+    .extend({
+      top:        ADAPTIVE_PAD,
+      bottom:     ADAPTIVE_PAD,
+      left:       ADAPTIVE_PAD,
+      right:      ADAPTIVE_PAD,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer();
+  const monoPipeline = await generateMonochrome(monoPaddedBuffer, ADAPTIVE_TOTAL);
   await monoPipeline.toFile(path.join(OUT_DIR, 'adaptive-icon-monochrome.png'));
 
   console.log(`  ✓  ${'adaptive-icon-monochrome.png'.padEnd(28)} ${ADAPTIVE_TOTAL}×${ADAPTIVE_TOTAL}   Android Material You themed icon (white silhouette, transparent bg)`);

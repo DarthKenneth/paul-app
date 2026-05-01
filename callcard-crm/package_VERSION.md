@@ -26,3 +26,4 @@
 | v1.8.4 | 2026-04-14 | Claude | Added `patch-package` dev-dep + `postinstall` script; bumped version to 0.22.4 |
 | v1.8.5 | 2026-04-14 | Claude | Bumped version to 0.22.5 — Services tab badge fix |
 | v1.8.6 | 2026-04-14 | Claude | Bumped version to 0.22.6 — removed Sentry test button |
+| v1.8.7 | 2026-05-01 | Claude | Bumped version to 2.0.1 — Play Store launcher / hi-res icon mismatch fix |

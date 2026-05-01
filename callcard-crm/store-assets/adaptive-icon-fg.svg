@@ -1,0 +1,56 @@
+<!--
+  =============================================================================
+  adaptive-icon-fg.svg - Android adaptive-icon foreground (clipboard only)
+  Version: 1.0
+  Last Updated: 2026-05-01
+
+  PROJECT:      Rolodeck (project v2.0.1)
+  FILES:        adaptive-icon-fg.svg            (this file — Android fg source)
+                icon.svg                        (full iOS / Play hi-res source)
+                scripts/generate-icons.js       (rasterizer)
+
+  Copyright © 2026 ArdinGate Studios LLC. All rights reserved.
+
+  ARCHITECTURE:
+    - Android adaptive icons composite a foreground over a background. The
+      background color comes from app.json (`adaptiveIcon.backgroundColor`
+      = #FDF0E0). The foreground must NOT bake in that bg color, otherwise
+      the launcher renders a small foreground-square inset on a larger
+      background-square — visually different from the Play hi-res icon
+      and a Misleading-Claims policy violation.
+    - viewBox is cropped tight to the clipboard graphic so the clipboard
+      fills the adaptive-icon safe zone (inner 66.7%) when rasterized.
+    - Path coords match icon.svg exactly so the two icons are identical
+      shapes; only the bg differs (here: none; icon.svg: cream rect).
+
+  CHANGE LOG:
+  v1.0  2026-05-01  Claude  Initial — split foreground from icon.svg to fix
+                            Play Store launcher/hi-res icon mismatch
+                            (Misleading Claims policy rejection 2026-05-01)
+  =============================================================================
+-->
+<svg width="1024" height="1024" viewBox="12 16 96 96"
+     fill="none" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Clipboard body -->
+  <rect x="17" y="30" width="86" height="82" rx="10" fill="#8B4513"/>
+
+  <!-- Clipboard body highlight (top edge shimmer) -->
+  <rect x="17" y="30" width="86" height="14" rx="10" fill="white" opacity="0.12"/>
+
+  <!-- Clip assembly -->
+  <rect x="38" y="18" width="44" height="25" rx="13" fill="#5C3317"/>
+  <!-- Clip hole -->
+  <rect x="46" y="22" width="28" height="16" rx="8" fill="#FDF0E0"/>
+
+  <!-- Ruled lines on clipboard -->
+  <rect x="26" y="52" width="68" height="6"  rx="3" fill="white" opacity="0.58"/>
+  <rect x="26" y="64" width="50" height="6"  rx="3" fill="white" opacity="0.40"/>
+  <rect x="26" y="76" width="62" height="6"  rx="3" fill="white" opacity="0.58"/>
+  <rect x="26" y="88" width="36" height="6"  rx="3" fill="white" opacity="0.40"/>
+
+  <!-- Amber accent dot (contact / phone indicator) -->
+  <circle cx="89" cy="94" r="13" fill="#D4A853"/>
+  <!-- Dot highlight -->
+  <circle cx="85" cy="90" r="4"  fill="white" opacity="0.35"/>
+</svg>
